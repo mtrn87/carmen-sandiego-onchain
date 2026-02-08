@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/carmen-sandiego-logo.png" alt="Where in the Web3 World is Carmen Sandiego?" width="500"/>
+  <img src="./.github/assets/logo.png" alt="Where in the Web3 World is Carmen Sandiego?" width="500"/>
 </p>
 
 <h3 align="center">A Decentralized Mystery Across the Blockchain</h3>
@@ -59,29 +59,29 @@ Every mission is **unique**. Every clue is **generated in real-time by AI**. Eve
 
 Smart contracts alone **cannot** call AI APIs, generate audio, or orchestrate complex workflows. **Chainlink Runtime Environment (CRE)** makes all of this possible:
 
-| Capability | Without CRE | With CRE |
-|-----------|-------------|----------|
-| Call OpenAI for dynamic clues | Impossible | Native HTTP Fetch |
-| Generate witness audio (TTS) | Impossible | ElevenLabs integration |
-| Orchestrate multi-step AI workflows | Complex oracle setup | Single workflow |
-| Read/write across multiple chains | Requires bridges | Native EVM Read/Write |
-| Gas cost for game logic | Prohibitive | Off-chain = $0 |
+| Capability                          | Without CRE          | With CRE               |
+| ----------------------------------- | -------------------- | ---------------------- |
+| Call OpenAI for dynamic clues       | Impossible           | Native HTTP Fetch      |
+| Generate witness audio (TTS)        | Impossible           | ElevenLabs integration |
+| Orchestrate multi-step AI workflows | Complex oracle setup | Single workflow        |
+| Read/write across multiple chains   | Requires bridges     | Native EVM Read/Write  |
+| Gas cost for game logic             | Prohibitive          | Off-chain = $0         |
 
 ### CRE Workflows
 
-| Workflow | Trigger | What it does |
-|----------|---------|-------------|
-| `generateBriefing` | MissionStarted event | Creates unique mission narrative + audio via AI |
-| `generateClue` | InvestigationSubmitted event | Generates text/audio clues based on player progress |
-| `carmenMoves` | Cron / conditions | Carmen flees to a different chain |
-| `generateFinale` | CarmenCaptured event | Personalized ending based on gameplay |
+| Workflow           | Trigger                      | What it does                                        |
+| ------------------ | ---------------------------- | --------------------------------------------------- |
+| `generateBriefing` | MissionStarted event         | Creates unique mission narrative + audio via AI     |
+| `generateClue`     | InvestigationSubmitted event | Generates text/audio clues based on player progress |
+| `carmenMoves`      | Cron / conditions            | Carmen flees to a different chain                   |
+| `generateFinale`   | CarmenCaptured event         | Personalized ending based on gameplay               |
 
 ## Chainlink Stack
 
-| Service | Role | How it's used |
-|---------|------|--------------|
-| **CRE** | Game Master Brain | Orchestrates all AI services, generates dynamic content, manages cross-chain state |
-| **VRF v2.5** | Randomness | Carmen's location, clue type (text/audio), clue veracity (true 70% / false 30%) |
+| Service      | Role              | How it's used                                                                      |
+| ------------ | ----------------- | ---------------------------------------------------------------------------------- |
+| **CRE**      | Game Master Brain | Orchestrates all AI services, generates dynamic content, manages cross-chain state |
+| **VRF v2.5** | Randomness        | Carmen's location, clue type (text/audio), clue veracity (true 70% / false 30%)    |
 
 ## Architecture
 
@@ -105,13 +105,13 @@ Each blockchain = A city where Carmen might be hiding
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Smart Contracts | Solidity 0.8.24, Hardhat, OpenZeppelin |
-| Chainlink | CRE SDK, VRF v2.5 |
-| AI Services | OpenAI GPT-4o-mini (text), ElevenLabs (audio) |
-| Storage | IPFS via Pinata |
-| Frontend | React, wagmi, viem, RainbowKit |
+| Layer           | Technology                                    |
+| --------------- | --------------------------------------------- |
+| Smart Contracts | Solidity 0.8.24, Hardhat, OpenZeppelin        |
+| Chainlink       | CRE SDK, VRF v2.5                             |
+| AI Services     | OpenAI GPT-4o-mini (text), ElevenLabs (audio) |
+| Storage         | IPFS via Pinata                               |
+| Frontend        | React, wagmi, viem, RainbowKit                |
 
 ## Project Structure
 
@@ -162,12 +162,12 @@ npx hardhat run scripts/deploy-citynode.ts --network baseSepolia
 
 Performance is measured by blocks elapsed since mission start:
 
-| Blocks Used | Rating | Reward |
-|------------|--------|--------|
-| 0-20 | Gold | 100 points |
-| 21-35 | Silver | 75 points |
-| 36-50 | Bronze | 50 points |
-| 51+ | Failed | 0 |
+| Blocks Used | Rating | Reward     |
+| ----------- | ------ | ---------- |
+| 0-20        | Gold   | 100 points |
+| 21-35       | Silver | 75 points  |
+| 36-50       | Bronze | 50 points  |
+| 51+         | Failed | 0          |
 
 ## Documentation
 
