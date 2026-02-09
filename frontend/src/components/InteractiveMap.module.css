@@ -1,0 +1,749 @@
+/* ── map container ── */
+.mapContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(0, 240, 255, 0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 70%, rgba(255, 0, 255, 0.02) 0%, transparent 50%),
+    rgba(6, 6, 14, 1);
+}
+
+.worldmapBg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── blockchain entity on map ── */
+.entityMarker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.entityMarker:hover {
+  transform: translate(-50%, -50%) scale(1.15);
+  z-index: 15;
+}
+
+.entityIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(10, 10, 20, 0.85);
+  border: 2px solid color-mix(in srgb, var(--chain-color, #F0B90B) 60%, transparent);
+  padding: 6px;
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--chain-color, #F0B90B) 30%, transparent),
+    0 0 20px color-mix(in srgb, var(--chain-color, #F0B90B) 10%, transparent);
+  transition: all 0.2s ease;
+}
+
+.entityIcon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--chain-color, #F0B90B) 50%, transparent));
+}
+
+.entityMarker:hover .entityIcon {
+  border-color: color-mix(in srgb, var(--chain-color, #F0B90B) 90%, transparent);
+  box-shadow:
+    0 0 16px color-mix(in srgb, var(--chain-color, #F0B90B) 50%, transparent),
+    0 0 30px color-mix(in srgb, var(--chain-color, #F0B90B) 20%, transparent);
+}
+
+.entityPulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--chain-color, #F0B90B) 50%, transparent);
+  opacity: 0;
+  animation: entityPulse 2.5s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes entityPulse {
+  0% { opacity: 0.6; transform: translate(-50%, -50%) scale(0.8); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(2); }
+}
+
+.entityLabel {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  color: var(--chain-color, #F0B90B);
+  letter-spacing: 1px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+
+.entityMarkerActive .entityIcon {
+  border-color: var(--chain-color, #F0B90B);
+  box-shadow:
+    0 0 16px color-mix(in srgb, var(--chain-color, #F0B90B) 60%, transparent),
+    0 0 30px color-mix(in srgb, var(--chain-color, #F0B90B) 30%, transparent);
+}
+
+.entityMarkerLocked .entityIcon {
+  opacity: 0.5;
+  filter: grayscale(0.4);
+}
+
+.entityMarkerLocked .entityIcon img {
+  filter: grayscale(0.3) drop-shadow(0 0 4px color-mix(in srgb, var(--chain-color, #F0B90B) 30%, transparent));
+}
+
+.entityMarkerLocked .entityLabel {
+  opacity: 0.5;
+}
+
+/* ── location panel ── */
+.locationPanel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 40;
+  width: 380px;
+  max-width: 90%;
+  background: rgba(10, 10, 20, 0.97);
+  border: 1px solid rgba(240, 185, 11, 0.2);
+  box-shadow:
+    0 0 40px rgba(0, 0, 0, 0.6),
+    0 0 20px rgba(240, 185, 11, 0.05);
+  animation: panelIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@keyframes panelIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.locationPanelImage {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  overflow: hidden;
+}
+
+.locationPanelImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.locationPanelImageOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 40%,
+    rgba(10, 10, 20, 0.95) 100%
+  );
+  pointer-events: none;
+}
+
+.locationPanelBadge {
+  position: absolute;
+  bottom: 10px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--text-primary);
+  letter-spacing: 1px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+}
+
+.locationPanelChain {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 2px;
+  opacity: 0.9;
+}
+
+/* ── scan section (unscanned network) ── */
+.scanSection {
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.scanInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.scanIcon {
+  font-size: 1.6rem;
+  opacity: 0.7;
+}
+
+.scanTitle {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  color: var(--text-primary);
+  letter-spacing: 3px;
+}
+
+.scanDesc {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 260px;
+}
+
+.scanBtn {
+  width: 100%;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 1.5px;
+  color: var(--chain-color, var(--cyan));
+  background: color-mix(in srgb, var(--chain-color, var(--cyan)) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--chain-color, var(--cyan)) 30%, transparent);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.scanBtn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--chain-color, var(--cyan)) 15%, transparent);
+  border-color: color-mix(in srgb, var(--chain-color, var(--cyan)) 60%, transparent);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--chain-color, var(--cyan)) 40%, transparent);
+}
+
+.scanBtnDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.scanBtnSpinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid color-mix(in srgb, var(--chain-color, var(--cyan)) 30%, transparent);
+  border-top-color: var(--chain-color, var(--cyan));
+  border-radius: 50%;
+  animation: spinScan 0.8s linear infinite;
+}
+
+@keyframes spinScan {
+  to { transform: rotate(360deg); }
+}
+
+.scanNoGas {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  color: var(--red);
+  letter-spacing: 2px;
+  animation: blinkGas 1s ease-in-out infinite;
+}
+
+@keyframes blinkGas {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.locationPanelContent {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.locationPanelTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  letter-spacing: 3px;
+}
+
+.locationPanelCount {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  padding: 1px 6px;
+  background: rgba(240, 185, 11, 0.12);
+  color: #F0B90B;
+  border-radius: 2px;
+}
+
+.locationPanelCases {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.caseCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.caseCard:hover {
+  background: rgba(240, 185, 11, 0.06);
+  border-color: rgba(240, 185, 11, 0.2);
+}
+
+.caseImageWrap {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.caseImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.caseInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.caseType {
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  color: var(--red);
+  letter-spacing: 2px;
+}
+
+.caseName {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-primary);
+}
+
+.caseDesc {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.caseArrow {
+  font-size: 1rem;
+  color: rgba(240, 185, 11, 0.4);
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+
+.caseCard:hover .caseArrow {
+  color: #F0B90B;
+}
+
+.locationPanelClose {
+  padding: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.02);
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.locationPanelClose:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* CRT overlay on map */
+.crtOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(0, 0, 0, 0.08) 1px,
+    rgba(0, 0, 0, 0.08) 3px
+  );
+}
+
+/* ── location nodes ── */
+.node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: transform 0.2s ease;
+}
+
+.node:hover {
+  transform: translate(-50%, -50%) scale(1.1);
+  z-index: 15;
+}
+
+.nodeSelected {
+  z-index: 20;
+}
+
+.nodeSelected .nodeIcon {
+  border-color: var(--node-color);
+  box-shadow:
+    0 0 12px var(--node-color),
+    0 0 30px color-mix(in srgb, var(--node-color) 30%, transparent);
+}
+
+.nodeInvestigated .nodeIcon {
+  opacity: 0.6;
+}
+
+.pulseRing {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -60%);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid var(--node-color);
+  opacity: 0;
+  animation: pulse 2.5s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.5; transform: translate(-50%, -60%) scale(0.8); }
+  100% { opacity: 0; transform: translate(-50%, -60%) scale(1.8); }
+}
+
+.nodeIcon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  background: rgba(10, 10, 20, 0.9);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.nodeLabel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  pointer-events: none;
+}
+
+.nodeName {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+.nodeChain {
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  letter-spacing: 1px;
+  opacity: 0.7;
+}
+
+.checkmark {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  background: var(--green);
+  color: var(--dark-bg);
+  border-radius: 50%;
+  font-weight: bold;
+}
+
+/* ── tooltip ── */
+.tooltip {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  padding: 10px;
+  background: rgba(10, 10, 20, 0.95);
+  border: 1px solid rgba(0, 240, 255, 0.15);
+  font-family: var(--font-mono);
+  z-index: 30;
+  pointer-events: none;
+  animation: tooltipIn 0.15s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes tooltipIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.tooltipHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 0.6rem;
+  letter-spacing: 1px;
+}
+
+.tooltipType {
+  color: var(--text-muted);
+  font-size: 0.5rem;
+}
+
+.tooltipDesc {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.tooltipStatus {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.5rem;
+  color: var(--green);
+  letter-spacing: 2px;
+}
+
+/* ── investigating overlay ── */
+.investigatingOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.3s ease;
+}
+
+.investigatingContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.scanLine {
+  width: 200px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  animation: scanMove 1.5s ease-in-out infinite;
+}
+
+@keyframes scanMove {
+  0%, 100% { transform: translateX(-60px); opacity: 0.5; }
+  50% { transform: translateX(60px); opacity: 1; }
+}
+
+.investigatingText {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--cyan);
+  letter-spacing: 4px;
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+}
+
+.investigatingSub {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+/* ── clue modal ── */
+.clueOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.clueModal {
+  width: 420px;
+  max-width: 90%;
+  background: rgba(10, 10, 20, 0.95);
+  border: 1px solid rgba(255, 230, 0, 0.2);
+  box-shadow: 0 0 40px rgba(255, 230, 0, 0.05);
+  animation: modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.clueHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 230, 0, 0.1);
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  color: var(--yellow);
+  letter-spacing: 2px;
+}
+
+.clueIcon {
+  font-size: 1rem;
+}
+
+.clueBody {
+  padding: 16px;
+}
+
+/* waveform visualization */
+.waveform {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 50px;
+  margin-bottom: 14px;
+  padding: 8px 0;
+  border: 1px solid rgba(0, 240, 255, 0.06);
+  background: rgba(0, 240, 255, 0.02);
+}
+
+.waveBar {
+  width: 3px;
+  background: var(--cyan);
+  opacity: 0.6;
+  border-radius: 1px;
+  animation: waveAnimate 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes waveAnimate {
+  0% { transform: scaleY(0.4); }
+  100% { transform: scaleY(1); }
+}
+
+.clueText {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-primary);
+  line-height: 1.7;
+}
+
+.clueClose {
+  width: 100%;
+  padding: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--yellow);
+  background: rgba(255, 230, 0, 0.05);
+  border: none;
+  border-top: 1px solid rgba(255, 230, 0, 0.1);
+  cursor: pointer;
+  letter-spacing: 2px;
+  transition: all 0.2s ease;
+}
+
+.clueClose:hover {
+  background: rgba(255, 230, 0, 0.1);
+  text-shadow: 0 0 8px rgba(255, 230, 0, 0.4);
+}
+
+/* ── map label ── */
+.mapLabel {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  color: rgba(0, 240, 255, 0.25);
+  letter-spacing: 3px;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.mapLabelSub {
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  letter-spacing: 2px;
+  opacity: 0.6;
+}

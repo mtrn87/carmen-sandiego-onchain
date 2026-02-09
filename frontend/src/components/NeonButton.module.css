@@ -1,0 +1,85 @@
+.btn {
+  position: relative;
+  padding: 14px 40px;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  background: transparent;
+  border: none;
+  color: var(--cyan);
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.border {
+  position: absolute;
+  inset: 0;
+  border: 2px solid currentColor;
+  clip-path: polygon(
+    0 10px, 10px 0, calc(100% - 10px) 0, 100% 10px,
+    100% calc(100% - 10px), calc(100% - 10px) 100%,
+    10px 100%, 0 calc(100% - 10px)
+  );
+  transition: all 0.3s ease;
+}
+
+.glow {
+  position: absolute;
+  inset: -2px;
+  opacity: 0;
+  filter: blur(12px);
+  border: 2px solid currentColor;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.btn:hover:not(:disabled) .glow {
+  opacity: 0.6;
+}
+
+.btn:hover:not(:disabled) {
+  text-shadow: 0 0 8px currentColor, 0 0 20px currentColor;
+  transform: translateY(-2px);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* variants */
+.cyan { color: var(--cyan); }
+.magenta { color: var(--magenta); }
+.green { color: var(--green); }
+.red { color: var(--red); }
+
+/* loading dots */
+.loader {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  background: currentColor;
+  border-radius: 50%;
+  animation: dotPulse 1s ease-in-out infinite;
+}
+
+.dot:nth-child(2) { animation-delay: 0.15s; }
+.dot:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes dotPulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.2); }
+}
