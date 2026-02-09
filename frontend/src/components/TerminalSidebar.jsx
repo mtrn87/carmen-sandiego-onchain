@@ -1,0 +1,254 @@
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { useGameStore } from '../store/gameStore'
+import styles from './TerminalSidebar.module.css'
+
+const COLOR_MAP = {
+  cyan: 'var(--cyan)',
+  green: 'var(--green)',
+  red: 'var(--red)',
+  yellow: 'var(--yellow)',
+  muted: 'var(--text-muted)',
+}
+
+const RARITY_COLORS = {
+  common: 'var(--text-muted)',
+  rare: 'var(--cyan)',
+  epic: 'var(--magenta)',
+  legendary: 'var(--yellow)',
+}
+
+const ICON_MAP = {
+  receipt: '\u{1F4C4}',
+  audio: '\u{1F50A}',
+  hot: '\u{1F525}',
+  cold: '\u{2744}\uFE0F',
+  key: '\u{1F511}',
+}
+
+export default function TerminalSidebar() {
+  const scrollRef = useRef(null)
+  const inputRef = useRef(null)
+  const audioRef = useRef(null)
+  const [activeTab, setActiveTab] = useState('terminal')
+  const [chatInput, setChatInput] = useState('')
+  const [playingAudio, setPlayingAudio] = useState(null)
+
+  const {
+    terminalLines,
+    walletAddress,
+    rankTitle,
+    currentMission,
+    evidence,
+    clues,
+    addTerminalLine,
+    tourActive,
+    tourStep,
+    advanceTour,
+  } = useGameStore()
+
+  // auto scroll terminal to bottom
+  useEffect(() => {
+    if (scrollRef.current && activeTab === 'terminal') {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [terminalLines, activeTab])
+
+  const handlePlayAudio = useCallback((evidenceId, audioSrc) => {
+    if (playingAudio === evidenceId) {
+      audioRef.current?.pause()
+      setPlayingAudio(null)
+      return
+    }
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.src = audioSrc
+      audioRef.current.play()
+      setPlayingAudio(evidenceId)
+    }
+  }, [playingAudio])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    const onEnded = () => setPlayingAudio(null)
+    audio.addEventListener('ended', onEnded)
+    return () => audio.removeEventListener('ended', onEnded)
+  }, [])
+
+  const handleSendMessage = () => {
+    const msg = chatInput.trim()
+    if (!msg) return
+    addTerminalLine(`> ${msg}`, 'cyan', 'user')
+    setChatInput('')
+    // simulate AI response
+    setTimeout(() => {
+      addTerminalLine('> ACME AI: Processing your request...', 'muted', 'system')
+      setTimeout(() => {
+        addTerminalLine('> ACME AI: Keep investigating the contracts and follow the blockchain trail. Check transaction logs for suspicious activity.', 'green', 'system')
+      }, 1200)
+    }, 600)
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSendMessage()
+    }
+  }
+
+  return (
+    <div className={styles.sidebar}>
+      {/* header */}
+      <div className={styles.header}>
+        <div className={styles.headerDots}>
+          <span className={styles.dot} data-color="red" />
+          <span className={styles.dot} data-color="yellow" />
+          <span className={styles.dot} data-color="green" />
+        </div>
+        <span className={styles.headerTitle}>acme_terminal.exe</span>
+      </div>
+
+      {/* agent info */}
+      <div className={styles.agentBar}>
+        <div className={styles.agentRow}>
+          <span className={styles.agentLabel}>AGENT</span>
+          <span className={styles.agentValue}>{walletAddress || '—'}</span>
+        </div>
+        <div className={styles.agentRow}>
+          <span className={styles.agentLabel}>RANK</span>
+          <span className={styles.rankBadge}>{rankTitle}</span>
+        </div>
+        <div className={styles.agentRow}>
+          <span className={styles.agentLabel}>MISSION</span>
+          <span className={styles.missionValue}>{currentMission?.title || '—'}</span>
+        </div>
+      </div>
+
+      {/* tabs */}
+      <div className={styles.tabs}>
+        <button
+          className={`${styles.tab} ${activeTab === 'terminal' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('terminal')}
+        >
+          TERMINAL
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'evidence' ? styles.tabActive : ''} ${tourActive && tourStep === 3 ? styles.tourHighlight : ''}`}
+          data-tour="evidence-tab"
+          onClick={() => {
+            setActiveTab('evidence')
+            if (tourActive && tourStep === 3) advanceTour()
+          }}
+        >
+          EVIDENCE
+          {evidence.length > 0 && (
+            <span className={styles.tabBadge}>{evidence.length}</span>
+          )}
+        </button>
+      </div>
+
+      {/* tab content */}
+      {activeTab === 'terminal' ? (
+        <>
+          {/* terminal output */}
+          <div className={styles.terminalOutput} ref={scrollRef}>
+            {terminalLines.map((line, i) => (
+              <div
+                key={i}
+                className={styles.line}
+                style={{ color: COLOR_MAP[line.color] || COLOR_MAP.cyan }}
+              >
+                {line.text}
+              </div>
+            ))}
+            <span className={styles.cursor}>_</span>
+          </div>
+
+          {/* chat input */}
+          <div className={styles.chatInput}>
+            <span className={styles.chatPrefix}>&gt;</span>
+            <input
+              ref={inputRef}
+              className={styles.chatField}
+              type="text"
+              placeholder="Ask ACME AI for help..."
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+            />
+            <button
+              className={styles.chatSend}
+              onClick={handleSendMessage}
+              disabled={!chatInput.trim()}
+            >
+              SEND
+            </button>
+          </div>
+        </>
+      ) : (
+        /* evidence tab */
+        <div className={styles.evidenceList}>
+          <div className={styles.evidenceStats}>
+            <span className={styles.evidenceStat}>
+              <span className={styles.evidenceStatNum}>{evidence.length}</span> ITEMS
+            </span>
+            <span className={styles.evidenceStatDivider}>|</span>
+            <span className={styles.evidenceStat}>
+              <span className={styles.evidenceStatNum}>{clues.length}</span> CLUES
+            </span>
+          </div>
+
+          <div className={styles.evidenceItems}>
+            {evidence.length === 0 ? (
+              <div className={styles.evidenceEmpty}>
+                <span className={styles.evidenceEmptyIcon}>&#128269;</span>
+                <span>No evidence collected yet. Investigate locations to gather intel.</span>
+              </div>
+            ) : (
+              evidence.map((item) => (
+                <div
+                  key={item.id}
+                  className={`${styles.evidenceCard} ${item.audioSrc ? styles.evidenceCardAudio : ''}`}
+                  style={{ '--rarity': RARITY_COLORS[item.rarity] || RARITY_COLORS.common }}
+                  onClick={() => item.audioSrc && handlePlayAudio(item.id, item.audioSrc)}
+                >
+                  <div className={styles.evidenceIcon}>
+                    {ICON_MAP[item.icon] || '\u{1F4CE}'}
+                  </div>
+                  <div className={styles.evidenceContent}>
+                    <div className={styles.evidenceTop}>
+                      <span className={styles.evidenceName}>{item.name}</span>
+                      <span
+                        className={styles.evidenceRarity}
+                        style={{ color: RARITY_COLORS[item.rarity] }}
+                      >
+                        {item.rarity.toUpperCase()}
+                      </span>
+                    </div>
+                    <span className={styles.evidenceDesc}>{item.description}</span>
+                    {item.audioSrc && (
+                      <button
+                        className={`${styles.audioPlayBtn} ${playingAudio === item.id ? styles.audioPlaying : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handlePlayAudio(item.id, item.audioSrc)
+                        }}
+                      >
+                        {playingAudio === item.id ? (
+                          <><span className={styles.audioWaveAnim} /> PLAYING... CLICK TO STOP</>
+                        ) : (
+                          <><span className={styles.audioPlayIcon}>&#9654;</span> PLAY INTERCEPTED AUDIO</>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+      <audio ref={audioRef} preload="none" />
+    </div>
+  )
+}

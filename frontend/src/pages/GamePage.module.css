@@ -1,0 +1,134 @@
+/* ── full layout ── */
+.layout {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+  background: var(--dark-bg);
+}
+
+/* ── CRT scanlines (full screen) ── */
+.crtScanlines {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(0, 0, 0, 0.12) 1px,
+    rgba(0, 0, 0, 0.12) 3px
+  );
+  animation: scanlineScroll 0.1s steps(3) infinite;
+}
+
+@keyframes scanlineScroll {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 3px; }
+}
+
+/* ── CRT rolling bar (full screen) ── */
+.crtRollingBar {
+  position: fixed;
+  inset: 0;
+  z-index: 101;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 240, 255, 0.015) 42%,
+    rgba(255, 255, 255, 0.03) 50%,
+    rgba(0, 240, 255, 0.015) 58%,
+    transparent 100%
+  );
+  background-size: 100% 200%;
+  animation: rollingBar 6s linear infinite;
+}
+
+@keyframes rollingBar {
+  0% { background-position: 0 -100%; }
+  100% { background-position: 0 100%; }
+}
+
+/* ── vignette ── */
+.vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 102;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+/* ── sidebar ── */
+.sidebar {
+  width: 320px;
+  min-width: 280px;
+  max-width: 360px;
+  height: 100vh;
+  flex-shrink: 0;
+  z-index: 10;
+  position: relative;
+}
+
+/* ── main area (map + evidence) ── */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  z-index: 5;
+  position: relative;
+}
+
+.mapArea {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+
+/* ── back to explorer button (over map) ── */
+.backToExplorer {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(0, 240, 255, 0.15);
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(6px);
+}
+
+.backToExplorer:hover {
+  background: rgba(0, 240, 255, 0.08);
+  border-color: rgba(0, 240, 255, 0.3);
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+}
+
+/* ── responsive ── */
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-width: unset;
+    max-width: unset;
+    height: 200px;
+    border-right: none;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+  }
+
+}
