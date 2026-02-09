@@ -9,10 +9,11 @@ async function main() {
   const VRF_SUBSCRIPTION_ID = process.env.VRF_SUBSCRIPTION_ID || "0";
   const VRF_KEY_HASH = process.env.VRF_KEY_HASH_SEPOLIA || "0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c";
 
-  // City chain IDs (Arbitrum Sepolia = Tokyo, Base Sepolia = Paris)
+  // City chain IDs
   const validChainIds = [
     421614,  // Arbitrum Sepolia - Tokyo
     84532,   // Base Sepolia - Paris
+    51,      // XDC Apothem - London
   ];
 
   // CRE oracle address (will be updated after CRE workflow deployment)
@@ -37,7 +38,7 @@ async function main() {
   console.log("\n--- Next Steps ---");
   console.log("1. Add GameMaster address as VRF consumer in subscription");
   console.log("2. Update CRE oracle address after workflow deployment");
-  console.log("3. Deploy CityNode contracts on Arbitrum Sepolia and Base Sepolia");
+  console.log("3. Deploy CityNode contracts on Arbitrum Sepolia, Base Sepolia, and XDC Apothem");
 }
 
 main().catch((error) => {

@@ -4,6 +4,7 @@ import { ethers, network } from "hardhat";
 const CITY_CONFIG: Record<string, { name: string; chainId: number }> = {
   arbitrumSepolia: { name: "Tokyo", chainId: 421614 },
   baseSepolia: { name: "Paris", chainId: 84532 },
+  xdcApothem: { name: "London", chainId: 51 },
 };
 
 async function main() {

@@ -15,8 +15,8 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
     "@nomicfoundation/hardhat-verify": "^2.0.0",
-    "hardhat": "^2.19.0",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "hardhat": "^2.19.0"
   },
   "dependencies": {
     "@chainlink/contracts": "^1.1.0",

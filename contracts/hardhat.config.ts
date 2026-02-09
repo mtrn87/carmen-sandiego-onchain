@@ -34,6 +34,11 @@ const config: HardhatUserConfig = {
       accounts: [PRIVATE_KEY],
       chainId: 84532,
     },
+    xdcApothem: {
+      url: process.env.XDC_APOTHEM_RPC_URL || "https://erpc.apothem.network",
+      accounts: [PRIVATE_KEY],
+      chainId: 51,
+    },
   },
   etherscan: {
     apiKey: {
