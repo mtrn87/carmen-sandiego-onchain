@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePrivy } from '@privy-io/react-auth'
 import CyberGrid from '../components/CyberGrid'
 import GlitchText from '../components/GlitchText'
 import TypeWriter from '../components/TypeWriter'
 import NeonButton from '../components/NeonButton'
+import NicknameModal from '../components/NicknameModal'
 import { useGameStore } from '../store/gameStore'
+import { getEthereumAddressFromPrivy, generateMultiChainAddressesFromPrivy, getUserInfoFromPrivy, getProviderFromPrivy } from '../utils/privyProvider'
+import { saveAuthSession, clearAuthSession } from '../utils/authPersistence'
 import styles from './LoginPage.module.css'
-
-const MOCK_ADDRESS = '0x7a3B...F42d'
 
 const BOOT_LINES = [
   '> ACME DETECTIVE AGENCY :: MAINFRAME v3.1.4',
@@ -26,7 +28,8 @@ export default function LoginPage() {
   const [showButtons, setShowButtons] = useState(false)
   const [connecting, setConnecting] = useState(false)
   const [flickerClass, setFlickerClass] = useState('')
-  const { connectWallet, isConnected, walletAddress } = useGameStore()
+  const [showNicknameModal, setShowNicknameModal] = useState(false)
+  const { connectWallet, isConnected, walletAddress, playerNickname, setWeb3AuthProvider, setUserInfo, setMultiChainAddresses, initializeWeb3AuthSession, disconnectWallet } = useGameStore()
 
   // boot sequence
   useEffect(() => {
@@ -58,14 +61,82 @@ export default function LoginPage() {
     return () => clearInterval(interval)
   }, [])
 
-  const handleConnect = useCallback(() => {
+  const { user, login, logout } = usePrivy()
+
+  const handleConnect = useCallback(async () => {
     setConnecting(true)
-    // mock wallet connection
-    setTimeout(() => {
-      connectWallet(MOCK_ADDRESS)
+    try {
+      console.log('Connecting with Privy...')
+      
+      // Privy login dispara modal de autenticação social
+      await login()
+      
       setConnecting(false)
-    }, 2000)
-  }, [connectWallet])
+    } catch (error) {
+      console.error('Connection failed:', error)
+      setConnecting(false)
+    }
+  }, [login])
+
+  const handleDisconnect = useCallback(async () => {
+    try {
+      await logout()
+      disconnectWallet()
+      clearAuthSession()
+    } catch (error) {
+      console.error('Logout failed:', error)
+    }
+  }, [logout, disconnectWallet])
+
+  // Sincroniza com Privy quando usuário faz login
+  useEffect(() => {
+    if (user && !isConnected) {
+      (async () => {
+        try {
+          console.log('Syncing Privy user...', user)
+          
+          // Se tem wallet (MetaMask), extrai endereço
+          let address = null
+          let ethProvider = null
+          let addresses = null
+          
+          if (user.wallet) {
+            try {
+              address = await getEthereumAddressFromPrivy(user)
+              ethProvider = await getProviderFromPrivy(user)
+              addresses = await generateMultiChainAddressesFromPrivy(user)
+            } catch (walletError) {
+              console.warn('Wallet error:', walletError)
+              address = user.wallet.address
+            }
+          } else if (user.email || user.google) {
+            // Se fez login com Google, usa o ID do Privy como endereço
+            address = user.id || 'guest'
+            ethProvider = null
+            addresses = null
+          }
+          
+          const userInfo = getUserInfoFromPrivy(user)
+
+          if (ethProvider) setWeb3AuthProvider(ethProvider)
+          setUserInfo(userInfo)
+          if (addresses) setMultiChainAddresses(addresses)
+          if (address) connectWallet(address)
+
+          saveAuthSession(address, userInfo, addresses, null)
+          setShowNicknameModal(true)
+        } catch (error) {
+          console.error('Error syncing Privy user:', error)
+        }
+      })()
+    }
+  }, [user, isConnected, connectWallet, setWeb3AuthProvider, setUserInfo, setMultiChainAddresses])
+
+  const handleNicknameConfirm = useCallback((nickname) => {
+    localStorage.setItem('player_nickname', nickname)
+    setShowNicknameModal(false)
+    navigate('/game')
+  }, [navigate])
 
   return (
     <div className={`${styles.container} ${styles.crtScreen} ${flickerClass}`}>
@@ -73,6 +144,9 @@ export default function LoginPage() {
 
       {/* vignette overlay */}
       <div className={styles.vignette} />
+
+      {/* nickname modal */}
+      {showNicknameModal && <NicknameModal onConfirm={handleNicknameConfirm} />}
 
       {/* boot sequence terminal */}
       {phase === 'boot' && (
@@ -132,7 +206,7 @@ export default function LoginPage() {
                       loading={connecting}
                       variant="cyan"
                     >
-                      Connect Wallet
+                      Connect
                     </NeonButton>
                   </div>
 
@@ -150,12 +224,23 @@ export default function LoginPage() {
                     <span className={styles.connectedLabel}>CONNECTED</span>
                   </div>
 
+                  {playerNickname && (
+                    <div className={styles.nicknameDisplay}>
+                      <span className={styles.nicknameLabel}>AGENT:</span>
+                      <span className={styles.nicknameBadge}>{playerNickname}</span>
+                    </div>
+                  )}
+
                   <NeonButton variant="green" onClick={() => navigate('/game')}>
                     Start Investigation
                   </NeonButton>
 
                   <NeonButton variant="magenta" onClick={() => {}}>
                     Leaderboard
+                  </NeonButton>
+
+                  <NeonButton variant="red" onClick={handleDisconnect}>
+                    Logout
                   </NeonButton>
                 </div>
               )}

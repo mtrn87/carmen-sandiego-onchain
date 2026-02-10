@@ -76,6 +76,11 @@ export const useGameStore = create((set, get) => ({
   player: null,
   walletAddress: null,
   isConnected: false,
+  playerNickname: null,
+  isFirstLogin: false,
+  web3authProvider: null,
+  multiChainAddresses: {},
+  userInfo: null,
 
   // gas
   gas: 100,
@@ -111,12 +116,37 @@ export const useGameStore = create((set, get) => ({
     set({ walletAddress: address, isConnected: true }),
 
   disconnectWallet: () =>
-    set({ walletAddress: null, isConnected: false, player: null }),
+    set({ walletAddress: null, isConnected: false, player: null, playerNickname: null, web3authProvider: null, multiChainAddresses: {} }),
 
   registerPlayer: (name) =>
     set((state) => ({
       player: { name, address: state.walletAddress, rank: 0, rankTitle: 'Detective Rookie' },
     })),
+
+  setWeb3AuthProvider: (provider) =>
+    set({ web3authProvider: provider }),
+
+  setUserInfo: (userInfo) =>
+    set({ userInfo }),
+
+  setPlayerNickname: (nickname) =>
+    set({ playerNickname: nickname }),
+
+  setIsFirstLogin: (isFirst) =>
+    set({ isFirstLogin: isFirst }),
+
+  setMultiChainAddresses: (addresses) =>
+    set({ multiChainAddresses: addresses }),
+
+  initializeWeb3AuthSession: (address, userInfo, addresses, nickname) =>
+    set({
+      walletAddress: address,
+      isConnected: true,
+      userInfo,
+      multiChainAddresses: addresses,
+      playerNickname: nickname,
+      isFirstLogin: false,
+    }),
 
   // game actions
   selectLocation: (locationId) => set({ selectedLocation: locationId }),

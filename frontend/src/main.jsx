@@ -1,13 +1,25 @@
+import './polyfills'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { PrivyProvider } from '@privy-io/react-auth'
 import App from './App'
 import './styles/global.css'
 
+const privyConfig = {
+  loginMethods: ['google', 'wallet'],
+  appearance: {
+    theme: 'dark',
+    accentColor: '#00ffff',
+  },
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <PrivyProvider appId="cmlh3u02l00fnl50cr0btgldc" config={privyConfig}>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </PrivyProvider>
   </React.StrictMode>
 )
