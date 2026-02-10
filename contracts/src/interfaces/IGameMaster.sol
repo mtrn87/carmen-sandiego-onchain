@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 interface IGameMaster {
     // --- Enums ---
     enum MissionStatus { None, Active, Completed, Failed }
-    enum ClueType { Text, Audio }
+    enum ClueType { Text, Audio, Image }
 
     // --- Structs ---
     struct Mission {

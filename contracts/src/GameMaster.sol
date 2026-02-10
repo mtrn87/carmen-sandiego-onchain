@@ -128,20 +128,23 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
         uint256 missionId = activePlayerMission[msg.sender];
         Mission storage mission = missions[missionId];
 
-        require(mission.investigationsCount < MAX_INVESTIGATIONS, "Max investigations reached");
-        require(block.number - mission.startBlock <= MAX_BLOCKS, "Mission timed out");
         require(_isValidChainId(chainId), "Invalid city/chain");
 
         mission.investigationsCount++;
 
-        // If player guessed the correct chain, they can capture Carmen
-        if (chainId == mission.targetChainId) {
+        // If player guessed the correct chain and have at least one clue, they can capture Carmen
+        if (chainId == mission.targetChainId && missionClues[missionId].length > 2) {
             _captureCarmen(missionId);
             return;
         }
 
         // Check if mission reached max attempts
         if (mission.investigationsCount >= MAX_INVESTIGATIONS) {
+            _failMission(missionId);
+            return;
+        }
+
+        if (block.number - mission.startBlock >= MAX_BLOCKS) {
             _failMission(missionId);
             return;
         }
