@@ -17,7 +17,7 @@
 # ==========================================================================
 staging-settings:
   user-workflow:
-    workflow-name: "mission-start-staging"
+    workflow-name: "carmen-game-staging"
   workflow-artifacts:
     workflow-path: "./main.ts"
     config-path: "./config.staging.json"
@@ -27,7 +27,7 @@ staging-settings:
 # ==========================================================================
 production-settings:
   user-workflow:
-    workflow-name: "mission-start-production"
+    workflow-name: "carmen-game-production"
   workflow-artifacts:
     workflow-path: "./main.ts"
     config-path: "./config.production.json"

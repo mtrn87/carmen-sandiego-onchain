@@ -19,16 +19,13 @@ describe("GameMaster", function () {
   const VRF_SUB_ID = 1;
   const VRF_KEY_HASH = "0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c";
 
+  // Mock ECIES public key (65 bytes uncompressed secp256k1)
+  const MOCK_PUBLIC_KEY = "0x04" + "ab".repeat(64);
+
   beforeEach(async function () {
     [owner, player, creOracle, otherUser] = await ethers.getSigners();
 
-    // For local testing, we use the VRFCoordinatorV2_5Mock
-    // In a real test, you'd deploy the mock first
-    // For now, we test the non-VRF parts by using owner as VRF coordinator
     const GameMasterFactory = await ethers.getContractFactory("GameMaster");
-
-    // Note: For full VRF testing, deploy VRFCoordinatorV2_5Mock first
-    // This basic test focuses on game logic
     gameMaster = await GameMasterFactory.deploy(
       owner.address, // Mock VRF coordinator (owner for testing)
       VRF_SUB_ID,
@@ -55,6 +52,40 @@ describe("GameMaster", function () {
     });
   });
 
+  describe("Player Registration", function () {
+    it("should register player with public key", async function () {
+      await gameMaster.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      const key = await gameMaster.getPlayerPublicKey(player.address);
+      expect(key).to.equal(MOCK_PUBLIC_KEY.toLowerCase());
+    });
+
+    it("should emit PlayerRegistered event", async function () {
+      await expect(gameMaster.connect(player).registerPlayer(MOCK_PUBLIC_KEY))
+        .to.emit(gameMaster, "PlayerRegistered")
+        .withArgs(player.address, MOCK_PUBLIC_KEY.toLowerCase());
+    });
+
+    it("should reject empty public key", async function () {
+      await expect(
+        gameMaster.connect(player).registerPlayer("0x")
+      ).to.be.revertedWith("Invalid key");
+    });
+
+    it("should allow updating public key", async function () {
+      await gameMaster.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      const newKey = "0x04" + "cd".repeat(64);
+      await gameMaster.connect(player).registerPlayer(newKey);
+      const key = await gameMaster.getPlayerPublicKey(player.address);
+      expect(key).to.equal(newKey.toLowerCase());
+    });
+
+    it("should reject startMission without registration", async function () {
+      await expect(
+        gameMaster.connect(player).startMission()
+      ).to.be.revertedWith("Register first");
+    });
+  });
+
   describe("CRE Oracle", function () {
     it("should allow owner to update CRE oracle", async function () {
       await gameMaster.connect(owner).setCREOracle(otherUser.address);
@@ -68,21 +99,57 @@ describe("GameMaster", function () {
     });
   });
 
-  describe("Receive Clue (CRE callback)", function () {
-    // We need a mission to exist first, so we simulate one
-    // In production, startMission() creates it via VRF
+  describe("Commit-Reveal Privacy", function () {
+    it("should store targetHash not targetChainId", async function () {
+      // Mission struct now has targetHash (bytes32), not targetChainId (uint256)
+      // After VRF, the value should be a hash, not a readable chainId
+      const mission = await gameMaster.getMission(1);
+      // Mission 1 doesn't exist yet, so targetHash should be bytes32(0)
+      expect(mission.targetHash).to.equal(ethers.ZeroHash);
+    });
+  });
 
+  describe("Receive Clue (CRE callback)", function () {
     it("should reject clue from non-CRE address", async function () {
       await expect(
         gameMaster.connect(player).receiveClue(
-          1, // missionId
-          0, // ClueType.Text
+          1, 0,
           ethers.keccak256(ethers.toUtf8Bytes("test clue")),
-          "",
-          "A witness saw Carmen near the airport",
-          true
+          ""
         )
       ).to.be.revertedWith("Not CRE oracle");
+    });
+  });
+
+  describe("Resolve Capture (Reveal)", function () {
+    it("should reject resolveCapture from non-CRE address", async function () {
+      const salt = ethers.keccak256(ethers.toUtf8Bytes("salt"));
+      await expect(
+        gameMaster.connect(player).resolveCapture(1, ARBITRUM_SEPOLIA, salt)
+      ).to.be.revertedWith("Not CRE oracle");
+    });
+
+    it("should reject resolveCapture for non-active mission", async function () {
+      const salt = ethers.keccak256(ethers.toUtf8Bytes("salt"));
+      await expect(
+        gameMaster.connect(creOracle).resolveCapture(1, ARBITRUM_SEPOLIA, salt)
+      ).to.be.revertedWith("Mission not active");
+    });
+  });
+
+  describe("Update Target (Carmen Moves)", function () {
+    it("should reject updateTarget from non-CRE address", async function () {
+      const newHash = ethers.keccak256(ethers.toUtf8Bytes("new target"));
+      await expect(
+        gameMaster.connect(player).updateTarget(1, newHash)
+      ).to.be.revertedWith("Not CRE oracle");
+    });
+
+    it("should reject updateTarget for non-active mission", async function () {
+      const newHash = ethers.keccak256(ethers.toUtf8Bytes("new target"));
+      await expect(
+        gameMaster.connect(creOracle).updateTarget(1, newHash)
+      ).to.be.revertedWith("Mission not active");
     });
   });
 

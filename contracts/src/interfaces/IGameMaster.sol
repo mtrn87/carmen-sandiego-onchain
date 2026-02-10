@@ -10,7 +10,7 @@ interface IGameMaster {
     struct Mission {
         address player;
         uint256 startBlock;
-        uint256 targetChainId;     // Chain where Carmen is hiding
+        bytes32 targetHash;            // Commit-reveal: hash of (chainId, salt)
         uint8 cluesReceived;
         uint8 investigationsCount;
         MissionStatus status;
@@ -18,18 +18,23 @@ interface IGameMaster {
 
     struct Clue {
         ClueType clueType;
-        bytes32 contentHash;       // Hash of the clue content (for verification)
-        string ipfsPointer;        // IPFS CID for audio clues
-        string textContent;        // Text content for text clues
-        bool isTrue;               // Whether the clue points to the real location
+        bytes32 contentHash;           // Hash of the clue content (for verification)
+        string ipfsPointer;            // IPFS CID for encrypted content
         uint256 timestamp;
     }
 
+    // --- External Functions (called by GameMasterProxy) ---
+    function receiveClue(uint256 missionId, ClueType clueType, bytes32 contentHash, string calldata ipfsPointer) external;
+    function resolveCapture(uint256 missionId, uint256 revealedChainId, bytes32 salt) external;
+    function updateTarget(uint256 missionId, bytes32 newTargetHash) external;
+
     // --- Events ---
+    event PlayerRegistered(address indexed player, bytes publicKey);
     event MissionStarted(uint256 indexed missionId, address indexed player, uint256 startBlock);
-    event CarmenLocationSet(uint256 indexed missionId, uint256 targetChainId);
+    event CarmenLocationCommitted(uint256 indexed missionId, bytes32 targetHash);
     event InvestigationSubmitted(uint256 indexed missionId, address indexed player, uint256 chainId);
     event ClueReceived(uint256 indexed missionId, ClueType clueType, bytes32 contentHash, string ipfsPointer);
     event CarmenCaptured(uint256 indexed missionId, address indexed player, uint256 blocksUsed, uint256 reward);
+    event CarmenMoved(uint256 indexed missionId, bytes32 newTargetHash);
     event MissionFailed(uint256 indexed missionId, address indexed player);
 }

@@ -1,0 +1,74 @@
+{
+  "scenarios": [
+    {
+      "id": "heist-of-cryptopunk",
+      "title": "The Heist of the Lost CryptoPunk",
+      "briefing": "Carmen Sandiego's gang has struck again! In China, the gang stole the legendary CryptoPunk #7804 — valued at 4,200 ETH — from the digital vault of the collector known as 'The Vault' on the Ethereum network. The heist was executed through a coordinated flash loan. Our last lead indicates she passed through the Ethereum network heading toward Polygon. The NFT has already left Ethereum. Carmen is on the move. Good luck, detective.",
+      "cities": {
+        "421614": {
+          "name": "Tokyo",
+          "emoji": "🗾",
+          "chain": "Arbitrum Sepolia"
+        },
+        "84532": {
+          "name": "Paris",
+          "emoji": "🗼",
+          "chain": "Base Sepolia"
+        },
+        "51": {
+          "name": "London",
+          "emoji": "🎡",
+          "chain": "XDC Apothem"
+        }
+      },
+      "clues": {
+        "true": [
+          {
+            "type": 0,
+            "text": "A witness at the digital art market saw a woman in red swapping tokens. She asked about 'hanami season' and said she needed 'ramen before the next flight.' A taxi driver confirmed she carried a suitcase with cherry blossom stickers."
+          },
+          {
+            "type": 0,
+            "text": "Security camera footage shows a red-clad figure near a terminal displaying 'NRT' — Narita Airport. She was seen holding a plane ticket and looking at a map with Japanese ideograms."
+          },
+          {
+            "type": 0,
+            "text": "The NFT kiosk vendor said she bought a token with a green crown image. She laughed and said 'give me your tired, your poor, your huddled masses.' Then she asked the price of a transpacific flight west."
+          },
+          {
+            "type": 0,
+            "text": "A Western woman in a long red coat was at the cafe looking at photos of skyscrapers. She mentioned 'the statue that faces west' and 'Central Park.' Then she took a taxi to Narita."
+          },
+          {
+            "type": 0,
+            "text": "NFT metadata contains encoded coordinates: 40.6892, -74.0445 — the Statue of Liberty. Carmen is heading to New York on the Base network."
+          }
+        ],
+        "false": [
+          {
+            "type": 0,
+            "text": "A vendor reported seeing her heading south on the Eurostar. Transfer detected to a lending protocol. Suspect seen near a large observation wheel."
+          },
+          {
+            "type": 0,
+            "text": "Transfer detected to a staking protocol. Suspect mentioned 'afternoon tea' and 'fog.' Possible destination: city with a famous river and historic clock. Big Ben is lovely this time of year."
+          },
+          {
+            "type": 0,
+            "text": "Flash loan executed with surgical precision. Attacker signature contains non-Latin characters. Too fast, detective. She's not where you think she is."
+          },
+          {
+            "type": 0,
+            "text": "Second deposit detected in the same pool. Suspect appears to still be operating locally. Have you checked Cafe des Deux Moulins? You're chasing a ghost, detective."
+          },
+          {
+            "type": 0,
+            "text": "Return transfer detected. Suspect may be doubling back to cover tracks. Intercepted fragment: 'retour a la maison... finish what I started...' Deja vu, detective? Carmen never goes back."
+          }
+        ]
+      },
+      "captureMessage": "MISSION COMPLETE! Carmen Sandiego has been captured while attempting to stake the stolen CryptoPunk in a yield-farming protocol. CryptoPunk #7804 was recovered and returned to its original Ethereum vault via CCIP. 'Not bad for a rookie,' Carmen said. 'See you on the next chain, detective.'",
+      "failureMessage": "CARMEN ESCAPED! You attempted the arrest in the wrong location. While you were investigating, Carmen completed the staking and escaped with the yields. The CryptoPunk was moved to a new, unknown chain. 'Maybe next time, detective,' a laugh echoed in the next block."
+    }
+  ]
+}

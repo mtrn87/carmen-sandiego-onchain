@@ -8,8 +8,8 @@ import {IGameMaster} from "./interfaces/IGameMaster.sol";
 /**
  * @title GameMaster
  * @notice Main contract for Carmen Sandiego On-Chain game.
- *         Deployed on Ethereum Sepolia as the HQ.
- *         CRE workflows listen to events emitted here and write results back.
+ *         Uses commit-reveal pattern: Carmen's location is stored as a hash,
+ *         never in plaintext. CRE validates off-chain and reveals on capture.
  *         VRF v2.5 provides verifiable randomness for Carmen's location.
  */
 contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
@@ -35,6 +35,10 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
     mapping(uint256 => Clue[]) public missionClues;                     // missionId => Clue[]
     mapping(address => uint256) public activePlayerMission;             // player => active missionId
     mapping(uint256 => uint256) private vrfRequestToMission;            // VRF requestId => missionId
+    mapping(uint256 => bytes32) public missionSalts;                    // missionId => salt (for CRE to read)
+
+    // --- Player Registry ---
+    mapping(address => bytes) public playerPublicKeys;                  // player => ECIES public key
 
     // --- Access Control ---
     address public creOracle;    // CRE workflow address allowed to write results
@@ -80,11 +84,22 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
     // ============================================================
 
     /**
+     * @notice Register player with ECIES public key for encrypted clues.
+     * @param publicKey The player's ECIES public key (secp256k1).
+     */
+    function registerPlayer(bytes calldata publicKey) external {
+        require(publicKey.length > 0, "Invalid key");
+        playerPublicKeys[msg.sender] = publicKey;
+        emit PlayerRegistered(msg.sender, publicKey);
+    }
+
+    /**
      * @notice Start a new investigation mission.
      *         Triggers VRF to select Carmen's hiding location.
-     *         Emits MissionStarted for CRE to generate the AI briefing.
+     *         Location is stored as hash (commit-reveal pattern).
      */
     function startMission() external {
+        require(playerPublicKeys[msg.sender].length > 0, "Register first");
         require(activePlayerMission[msg.sender] == 0, "Already on a mission");
 
         uint256 missionId = nextMissionId++;
@@ -92,7 +107,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
         missions[missionId] = Mission({
             player: msg.sender,
             startBlock: block.number,
-            targetChainId: 0, // Set by VRF callback
+            targetHash: bytes32(0), // Set by VRF callback
             cluesReceived: 0,
             investigationsCount: 0,
             status: MissionStatus.Active
@@ -122,6 +137,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
     /**
      * @notice Submit an investigation guess for a specific chain/city.
      *         CRE workflow listens to this event and generates a clue.
+     *         The contract does NOT check if the guess is correct — CRE does that off-chain.
      * @param chainId The chain ID the player is investigating.
      */
     function submitInvestigation(uint256 chainId) external hasActiveMission(msg.sender) {
@@ -132,13 +148,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
 
         mission.investigationsCount++;
 
-        // If player guessed the correct chain and have at least one clue, they can capture Carmen
-        if (chainId == mission.targetChainId && missionClues[missionId].length > 2) {
-            _captureCarmen(missionId);
-            return;
-        }
-
-        // Check if mission reached max attempts
+        // Check fail conditions
         if (mission.investigationsCount >= MAX_INVESTIGATIONS) {
             _failMission(missionId);
             return;
@@ -149,6 +159,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
             return;
         }
 
+        // Emit event — CRE decides everything off-chain
         emit InvestigationSubmitted(missionId, msg.sender, chainId);
     }
 
@@ -158,20 +169,17 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
 
     /**
      * @notice Called by CRE workflow to deliver a generated clue.
+     *         The contract does NOT know if the clue is true or false.
      * @param missionId The mission this clue belongs to.
-     * @param clueType Type of clue (Text or Audio).
+     * @param clueType Type of clue (Text, Audio, or Image).
      * @param contentHash Hash of the clue content for verification.
-     * @param ipfsPointer IPFS CID (for audio clues).
-     * @param textContent Text content (for text clues).
-     * @param isTrue Whether this clue points to the real location.
+     * @param ipfsPointer IPFS CID for the encrypted content.
      */
     function receiveClue(
         uint256 missionId,
         ClueType clueType,
         bytes32 contentHash,
-        string calldata ipfsPointer,
-        string calldata textContent,
-        bool isTrue
+        string calldata ipfsPointer
     ) external onlyCRE {
         require(missions[missionId].status == MissionStatus.Active, "Mission not active");
 
@@ -179,8 +187,6 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
             clueType: clueType,
             contentHash: contentHash,
             ipfsPointer: ipfsPointer,
-            textContent: textContent,
-            isTrue: isTrue,
             timestamp: block.timestamp
         });
 
@@ -190,12 +196,48 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
         emit ClueReceived(missionId, clueType, contentHash, ipfsPointer);
     }
 
+    /**
+     * @notice Called by CRE to resolve a capture attempt (REVEAL phase).
+     *         CRE reveals the actual chainId and salt, contract verifies the hash.
+     * @param missionId The mission to resolve.
+     * @param revealedChainId The actual chain where Carmen was hiding.
+     * @param salt The salt used in the commit hash.
+     */
+    function resolveCapture(
+        uint256 missionId,
+        uint256 revealedChainId,
+        bytes32 salt
+    ) external onlyCRE {
+        Mission storage mission = missions[missionId];
+        require(mission.status == MissionStatus.Active, "Mission not active");
+        require(missionClues[missionId].length >= 3, "Need 3+ clues");
+
+        // REVEAL: verify the CRE is not lying about the location
+        bytes32 expectedHash = keccak256(abi.encodePacked(revealedChainId, salt));
+        require(expectedHash == mission.targetHash, "Invalid reveal");
+
+        _captureCarmen(missionId);
+    }
+
+    /**
+     * @notice Called by CRE to move Carmen to a new chain mid-mission.
+     *         Uses commit pattern — only hash is stored, not the actual chainId.
+     * @param missionId The mission to update.
+     * @param newTargetHash Hash of (newChainId, newSalt).
+     */
+    function updateTarget(uint256 missionId, bytes32 newTargetHash) external onlyCRE {
+        require(missions[missionId].status == MissionStatus.Active, "Mission not active");
+        missions[missionId].targetHash = newTargetHash;
+        emit CarmenMoved(missionId, newTargetHash);
+    }
+
     // ============================================================
     //                   VRF CALLBACK
     // ============================================================
 
     /**
-     * @notice VRF callback - sets Carmen's hiding location.
+     * @notice VRF callback — commits Carmen's hiding location as a hash.
+     *         The actual chainId is never stored in plaintext.
      */
     function fulfillRandomWords(
         uint256 requestId,
@@ -206,9 +248,18 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
 
         // Select a random city from valid chains
         uint256 cityIndex = randomWords[0] % validChainIds.length;
-        missions[missionId].targetChainId = validChainIds[cityIndex];
+        uint256 targetChainId = validChainIds[cityIndex];
 
-        emit CarmenLocationSet(missionId, validChainIds[cityIndex]);
+        // Generate salt from VRF randomness
+        bytes32 salt = keccak256(abi.encodePacked(randomWords[0], missionId));
+
+        // Store salt so CRE can read it and brute-force the 3 cities
+        missionSalts[missionId] = salt;
+
+        // COMMIT: store hash, not the value
+        missions[missionId].targetHash = keccak256(abi.encodePacked(targetChainId, salt));
+
+        emit CarmenLocationCommitted(missionId, missions[missionId].targetHash);
     }
 
     // ============================================================
@@ -235,6 +286,14 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
 
     function getValidCities() external view returns (uint256[] memory) {
         return validChainIds;
+    }
+
+    function getPlayerPublicKey(address player) external view returns (bytes memory) {
+        return playerPublicKeys[player];
+    }
+
+    function getMissionSalt(uint256 missionId) external view returns (bytes32) {
+        return missionSalts[missionId];
     }
 
     // ============================================================
