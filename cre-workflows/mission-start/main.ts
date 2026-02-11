@@ -44,23 +44,21 @@ const GameMasterABI = parseAbi([
 ])
 
 // ============================================================
-//  Scenarios (pre-written clues)
+//  Scenarios (loaded from scenarios.json)
 // ============================================================
-const TRUE_CLUES = [
-  "A witness at the digital art market saw a woman in red swapping tokens. She asked about 'hanami season' and said she needed 'ramen before the next flight.' A taxi driver confirmed she carried a suitcase with cherry blossom stickers.",
-  "Security camera footage shows a red-clad figure near a terminal displaying 'NRT' — Narita Airport. She was seen holding a plane ticket and looking at a map with Japanese ideograms.",
-  "The NFT kiosk vendor said she bought a token with a green crown image. She laughed and said 'give me your tired, your poor, your huddled masses.' Then she asked the price of a transpacific flight west.",
-  "A Western woman in a long red coat was at the cafe looking at photos of skyscrapers. She mentioned 'the statue that faces west' and 'Central Park.' Then she took a taxi to Narita.",
-  "NFT metadata contains encoded coordinates: 40.6892, -74.0445 — the Statue of Liberty. Carmen is heading to New York on the Base network.",
-]
+import scenariosData from "../data/scenarios.json"
 
-const FALSE_CLUES = [
-  "A vendor reported seeing her heading south on the Eurostar. Transfer detected to a lending protocol. Suspect seen near a large observation wheel.",
-  "Transfer detected to a staking protocol. Suspect mentioned 'afternoon tea' and 'fog.' Possible destination: city with a famous river and historic clock. Big Ben is lovely this time of year.",
-  "Flash loan executed with surgical precision. Attacker signature contains non-Latin characters. Too fast, detective. She's not where you think she is.",
-  "Second deposit detected in the same pool. Suspect appears to still be operating locally. Have you checked Cafe des Deux Moulins? You're chasing a ghost, detective.",
-  "Return transfer detected. Suspect may be doubling back to cover tracks. Intercepted fragment: 'retour a la maison... finish what I started...' Deja vu, detective? Carmen never goes back.",
-]
+type ScenarioClue = { type: number; text: string }
+type Scenario = {
+  id: string
+  clues: { true: ScenarioClue[]; false: ScenarioClue[] }
+}
+
+function getScenario(missionId: bigint): Scenario {
+  const scenarios = scenariosData.scenarios
+  const index = Number(missionId - BigInt(1)) % scenarios.length
+  return scenarios[index] as Scenario
+}
 
 // Action codes matching GameMasterProxy.sol
 const ACTION_RECEIVE_CLUE = 1
@@ -190,11 +188,13 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
   const isCorrectCity = investigatedChainId === carmenCity
   runtime.log(`Player investigated ${investigatedChainId}, correct=${isCorrectCity}`)
 
-  // Select clue deterministically based on missionId + cluesReceived
-  const cluePool = isCorrectCity ? TRUE_CLUES : FALSE_CLUES
+  // Select clue from scenario data
+  const scenario = getScenario(missionId)
+  const cluePool = isCorrectCity ? scenario.clues.true : scenario.clues.false
   const clueIndex = Number(cluesReceived) % cluePool.length
-  const clueText = cluePool[clueIndex]
-  const clueType = 0 // Text
+  const selectedClue = cluePool[clueIndex]
+  const clueText = selectedClue.text
+  const clueType = selectedClue.type
 
   // --- 7. Compute contentHash ---
   const contentHash = keccak256(toBytes(clueText))

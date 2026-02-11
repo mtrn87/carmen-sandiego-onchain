@@ -138,12 +138,12 @@ async function main() {
   console.log(`${C.cyan}${C.bold}  ┌──────────────────────────────────────────────────┐${C.reset}`);
   console.log(`${C.cyan}${C.bold}  │  ACME DETECTIVE AGENCY - MISSION BRIEFING       │${C.reset}`);
   console.log(`${C.cyan}${C.bold}  ├──────────────────────────────────────────────────┤${C.reset}`);
-  console.log(`${C.cyan}  │${C.reset} Carmen's gang stole CryptoPunk #7804 (4,200 ETH) ${C.cyan}│${C.reset}`);
-  console.log(`${C.cyan}  │${C.reset} from "The Vault" via a coordinated flash loan.   ${C.cyan}│${C.reset}`);
-  console.log(`${C.cyan}  │${C.reset} She fled across chains. Could be in Tokyo, Paris  ${C.cyan}│${C.reset}`);
-  console.log(`${C.cyan}  │${C.reset} or London.                                        ${C.cyan}│${C.reset}`);
+  console.log(`${C.cyan}  │${C.reset} Scenario: "The Heist of the Lost CryptoPunk"     ${C.cyan}│${C.reset}`);
+  console.log(`${C.cyan}  │${C.reset} CryptoPunk #7804 (4,200 ETH) stolen via flash    ${C.cyan}│${C.reset}`);
+  console.log(`${C.cyan}  │${C.reset} loan. Carmen is hopping across chains.            ${C.cyan}│${C.reset}`);
+  console.log(`${C.cyan}  │${C.reset} Possible locations: Tokyo, Paris, London          ${C.cyan}│${C.reset}`);
   console.log(`${C.cyan}  │${C.reset}                                                   ${C.cyan}│${C.reset}`);
-  console.log(`${C.cyan}  │${C.reset} ${C.bold}Collect clues and let CRE validate your arrest.${C.reset} ${C.cyan}│${C.reset}`);
+  console.log(`${C.cyan}  │${C.reset} ${C.bold}Clues loaded from scenarios.json (3 scenarios)${C.reset}  ${C.cyan}│${C.reset}`);
   console.log(`${C.cyan}  │${C.reset} ${C.dim}Contract only stores hashes — total privacy!${C.reset}    ${C.cyan}│${C.reset}`);
   console.log(`${C.cyan}${C.bold}  └──────────────────────────────────────────────────┘${C.reset}`);
   console.log("");

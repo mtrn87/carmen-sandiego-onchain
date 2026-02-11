@@ -3,7 +3,7 @@
     {
       "id": "heist-of-cryptopunk",
       "title": "The Heist of the Lost CryptoPunk",
-      "briefing": "Carmen Sandiego's gang has struck again! In China, the gang stole the legendary CryptoPunk #7804 — valued at 4,200 ETH — from the digital vault of the collector known as 'The Vault' on the Ethereum network. The heist was executed through a coordinated flash loan. Our last lead indicates she passed through the Ethereum network heading toward Polygon. The NFT has already left Ethereum. Carmen is on the move. Good luck, detective.",
+      "briefing": "Carmen Sandiego's gang has struck again! The legendary CryptoPunk #7804 — valued at 4,200 ETH — was stolen from the digital vault of the collector known as 'The Vault' on the Ethereum network. The heist was executed through a coordinated flash loan attack. Our intel indicates Carmen passed through the Ethereum network and is now hopping across chains. The NFT has already left Ethereum. Carmen is on the move. Good luck, detective.",
       "cities": {
         "421614": {
           "name": "Tokyo",
@@ -21,6 +21,11 @@
           "chain": "XDC Apothem"
         }
       },
+      "cityClues": {
+        "421614": { "landmark": "Shibuya Crossing", "culture": "cherry blossoms, ramen, bullet train" },
+        "84532": { "landmark": "Eiffel Tower", "culture": "croissants, Eurostar, Louvre" },
+        "51": { "landmark": "Big Ben", "culture": "afternoon tea, fog, Thames" }
+      },
       "clues": {
         "true": [
           {
@@ -33,21 +38,21 @@
           },
           {
             "type": 0,
-            "text": "The NFT kiosk vendor said she bought a token with a green crown image. She laughed and said 'give me your tired, your poor, your huddled masses.' Then she asked the price of a transpacific flight west."
+            "text": "On-chain analysis reveals the CryptoPunk was bridged to a marketplace known for anime-inspired PFPs. The destination wallet has prior transactions with a Shibuya-based NFT gallery."
           },
           {
             "type": 0,
-            "text": "A Western woman in a long red coat was at the cafe looking at photos of skyscrapers. She mentioned 'the statue that faces west' and 'Central Park.' Then she took a taxi to Narita."
+            "text": "A Western woman in a long red coat was spotted at a cafe near Akihabara. She was overheard saying 'the punk needs a new home in the land of the rising sun.' She paid with a freshly minted token."
           },
           {
             "type": 0,
-            "text": "NFT metadata contains encoded coordinates: 40.6892, -74.0445 — the Statue of Liberty. Carmen is heading to New York on the Base network."
+            "text": "NFT provenance trail shows a transfer to a cold wallet labeled 'sakura-vault.' Metadata contains encoded coordinates: 35.6762, 139.6503 — Shibuya, Tokyo."
           }
         ],
         "false": [
           {
             "type": 0,
-            "text": "A vendor reported seeing her heading south on the Eurostar. Transfer detected to a lending protocol. Suspect seen near a large observation wheel."
+            "text": "A vendor reported seeing her heading south on the Eurostar. Transfer detected to a lending protocol. Suspect seen near a large observation wheel. You're chasing shadows, detective."
           },
           {
             "type": 0,
@@ -55,20 +60,170 @@
           },
           {
             "type": 0,
-            "text": "Flash loan executed with surgical precision. Attacker signature contains non-Latin characters. Too fast, detective. She's not where you think she is."
+            "text": "Flash loan executed with surgical precision. Attacker used a DEX on a chain famous for its baguettes. Too fast, detective. She's not where you think she is."
           },
           {
             "type": 0,
-            "text": "Second deposit detected in the same pool. Suspect appears to still be operating locally. Have you checked Cafe des Deux Moulins? You're chasing a ghost, detective."
+            "text": "Second deposit detected in the same pool. Suspect appears to still be operating near the Seine. Have you checked Cafe des Deux Moulins? You're chasing a ghost, detective."
           },
           {
             "type": 0,
-            "text": "Return transfer detected. Suspect may be doubling back to cover tracks. Intercepted fragment: 'retour a la maison... finish what I started...' Deja vu, detective? Carmen never goes back."
+            "text": "Intercepted comms fragment: 'retour a la maison... finish what I started...' The trail is cold. Carmen never goes back — why would she stay in one place?"
           }
         ]
       },
-      "captureMessage": "MISSION COMPLETE! Carmen Sandiego has been captured while attempting to stake the stolen CryptoPunk in a yield-farming protocol. CryptoPunk #7804 was recovered and returned to its original Ethereum vault via CCIP. 'Not bad for a rookie,' Carmen said. 'See you on the next chain, detective.'",
-      "failureMessage": "CARMEN ESCAPED! You attempted the arrest in the wrong location. While you were investigating, Carmen completed the staking and escaped with the yields. The CryptoPunk was moved to a new, unknown chain. 'Maybe next time, detective,' a laugh echoed in the next block."
+      "captureMessage": "MISSION COMPLETE! Carmen Sandiego has been captured while attempting to list the stolen CryptoPunk on an underground NFT marketplace. CryptoPunk #7804 was recovered and returned to its original Ethereum vault via CCIP. 'Not bad for a rookie,' Carmen smirked. 'See you on the next chain, detective.'",
+      "failureMessage": "CARMEN ESCAPED! While you investigated the wrong city, Carmen completed the sale and vanished with the proceeds. The CryptoPunk was moved to a new, unknown chain. 'Maybe next time, detective,' a laugh echoed in the next block."
+    },
+    {
+      "id": "stolen-bored-ape",
+      "title": "The Stolen Bored Ape",
+      "briefing": "URGENT — Carmen's crew has pulled off a daring heist at the prestigious 'Apes & Art' virtual gallery in the Metaverse. Bored Ape #8888 — one of the rarest golden-fur apes with laser eyes, valued at 850 ETH — was extracted through a sophisticated phishing attack on the gallery curator. The ape's metadata has been tampered with and the NFT is being laundered through cross-chain mixers. Track Carmen before she sells it on a dark marketplace. Time is running out, detective.",
+      "cities": {
+        "421614": {
+          "name": "Tokyo",
+          "emoji": "🗾",
+          "chain": "Arbitrum Sepolia"
+        },
+        "84532": {
+          "name": "Paris",
+          "emoji": "🗼",
+          "chain": "Base Sepolia"
+        },
+        "51": {
+          "name": "London",
+          "emoji": "🎡",
+          "chain": "XDC Apothem"
+        }
+      },
+      "cityClues": {
+        "421614": { "landmark": "Akihabara Electric Town", "culture": "manga, pixel art, arcade tokens" },
+        "84532": { "landmark": "Centre Pompidou", "culture": "avant-garde art, wine, digital galleries" },
+        "51": { "landmark": "Tate Modern", "culture": "contemporary art, auction houses, Thames" }
+      },
+      "clues": {
+        "true": [
+          {
+            "type": 0,
+            "text": "The stolen Ape's metadata was modified to include a hidden field: 'origin: centre-pompidou-digital.' A Parisian gallery owner confirmed a woman in red reserved a private viewing room for 'a very special primate.'"
+          },
+          {
+            "type": 0,
+            "text": "Blockchain forensics traced a mixer output to a wallet that previously interacted with a Base-chain NFT marketplace registered in the 8th arrondissement. The trail leads to the City of Light."
+          },
+          {
+            "type": 0,
+            "text": "A suspicious listing appeared on a Parisian darknet marketplace: 'Golden Ape, one of a kind. Bidding starts at 500 ETH. Seller accepts payment in croissants.' The listing was signed with a known Carmen alias."
+          },
+          {
+            "type": 0,
+            "text": "Security footage from a blockchain cafe near the Champs-Elysees shows a woman examining an NFT on a hardware wallet. She whispered to the barista: 'The ape will feel at home near the Louvre.'"
+          },
+          {
+            "type": 0,
+            "text": "On-chain analysis of the mixer reveals the final destination wallet was funded from a faucet registered to an IP address near Gare du Nord. Carmen is in Paris, detective."
+          }
+        ],
+        "false": [
+          {
+            "type": 0,
+            "text": "An informant claims Carmen was spotted at a karaoke bar in Shinjuku, singing about 'monkey business.' But our data shows the wallet activity doesn't match the Tokyo timezone. Red herring, detective."
+          },
+          {
+            "type": 0,
+            "text": "A transfer to an Arbitrum DeFi pool was flagged. The transaction memo reads: 'sayonara, detective.' Classic misdirection — Carmen loves to leave false trails on fast L2s."
+          },
+          {
+            "type": 0,
+            "text": "Christie's London office reported an anonymous inquiry about 'authenticating a primate NFT.' But the inquiry came from a burner wallet with no on-chain history. Dead end."
+          },
+          {
+            "type": 0,
+            "text": "A Thames-side security camera captured someone in a red coat boarding a riverboat. But facial recognition returned no match. Carmen wouldn't be that careless, detective."
+          },
+          {
+            "type": 0,
+            "text": "Intercepted message: 'Meet me at the Tower Bridge, bring the ape.' Analysis shows this message was planted — the sender's wallet was created 2 minutes before sending. It's a decoy."
+          }
+        ]
+      },
+      "captureMessage": "MISSION COMPLETE! Carmen was apprehended at a secret NFT auction in a basement gallery near Le Marais. Bored Ape #8888 was recovered, its metadata restored, and returned to the 'Apes & Art' gallery via CCIP bridge. 'You have good taste, detective,' Carmen said, adjusting her beret. 'But Paris was always my favorite hideout.'",
+      "failureMessage": "CARMEN ESCAPED! The Bored Ape was sold to an anonymous collector through a Tornado Cash-style mixer. By the time you arrived, Carmen had already boarded the Eurostar with the ETH proceeds. 'Au revoir, detective. The ape sends its regards.'"
+    },
+    {
+      "id": "art-blocks-vanishing",
+      "title": "The Art Blocks Vanishing",
+      "briefing": "CODE RED — Carmen has executed her most ambitious heist yet. She exploited a reentrancy vulnerability in the 'Chromatic Dreams' generative art collection — a prestigious Art Blocks series by the legendary artist known as 'Pixel Prophet.' 42 unique pieces worth a combined 2,100 ETH were drained from the collection contract in a single transaction. The art is being scattered across chains to make recovery impossible. Each piece generates unique visuals from on-chain data — if Carmen burns the originals, they're gone forever. Move fast, detective.",
+      "cities": {
+        "421614": {
+          "name": "Tokyo",
+          "emoji": "🗾",
+          "chain": "Arbitrum Sepolia"
+        },
+        "84532": {
+          "name": "Paris",
+          "emoji": "🗼",
+          "chain": "Base Sepolia"
+        },
+        "51": {
+          "name": "London",
+          "emoji": "🎡",
+          "chain": "XDC Apothem"
+        }
+      },
+      "cityClues": {
+        "421614": { "landmark": "teamLab Borderless", "culture": "digital art installations, generative art scene" },
+        "84532": { "landmark": "Palais de Tokyo", "culture": "contemporary art, NFT exhibitions" },
+        "51": { "landmark": "Serpentine Gallery", "culture": "digital art pavilion, crypto-art community" }
+      },
+      "clues": {
+        "true": [
+          {
+            "type": 0,
+            "text": "The exploit transaction's calldata contains a hidden message in hex: '4C4F4E444F4E' which decodes to 'LONDON.' Carmen is taunting us. A wallet linked to the attack has been interacting with XDC contracts near the Greenwich meridian."
+          },
+          {
+            "type": 0,
+            "text": "An underground art dealer on the XDC network received 12 of the stolen Chromatic Dreams pieces. His wallet ENS resolves to 'serpentine-collector.xdc' — a reference to the Serpentine Gallery in Hyde Park."
+          },
+          {
+            "type": 0,
+            "text": "The generative art's seed values were modified to produce images of Tower Bridge and red telephone boxes. Carmen is customizing the stolen art with London landmarks before reselling them."
+          },
+          {
+            "type": 0,
+            "text": "A crypto-art exhibition in Shoreditch just listed 'exclusive generative pieces from an anonymous collector in red.' The gallery accepts XDC tokens only. Carmen is hiding in plain sight across the Thames."
+          },
+          {
+            "type": 0,
+            "text": "On-chain provenance analysis shows all 42 pieces converging to a single vault contract deployed on XDC Apothem. The deployer address matches a known Carmen wallet. She's in London, detective — move now."
+          }
+        ],
+        "false": [
+          {
+            "type": 0,
+            "text": "A generative art exhibition in Roppongi Hills announced a 'mystery collection drop.' But the curator confirmed all pieces are original commissions — no stolen art. Tokyo is a dead end."
+          },
+          {
+            "type": 0,
+            "text": "Wallet analysis shows a small transfer to an Arbitrum bridge contract with memo: 'art belongs in Tokyo.' Classic Carmen bait — the amount is too small to be the real haul."
+          },
+          {
+            "type": 0,
+            "text": "The Palais de Tokyo tweeted about 'a revolutionary on-chain art exhibition.' Investigation reveals it's a legitimate Art Blocks partnership, not connected to the theft. Paris is clear."
+          },
+          {
+            "type": 0,
+            "text": "A Parisian gallery owner claims she was offered 'generative masterpieces at a discount.' But the wallet she provided leads to a known scam operation unrelated to Carmen. Another false trail."
+          },
+          {
+            "type": 0,
+            "text": "Intercepted encrypted message mentions 'the art will bloom where cherry blossoms fall.' Decryption analysis suggests this is a planted message designed to send us east. Don't take the bait, detective."
+          }
+        ]
+      },
+      "captureMessage": "MISSION COMPLETE! Carmen was caught red-handed at a secret auction in a Mayfair basement, attempting to sell the entire Chromatic Dreams collection to a syndicate of anonymous collectors. All 42 generative art pieces were recovered and the original contract's ownership was restored via CCIP. 'Generative art is wasted on those who can't appreciate the code,' Carmen sighed as she was escorted away. 'The algorithm was beautiful, detective. You have to admit that.'",
+      "failureMessage": "CARMEN ESCAPED! While you searched the wrong city, Carmen completed the auction and burned the original token IDs. The Chromatic Dreams collection is gone forever — 42 unique generative masterpieces, reduced to ashes on the blockchain. 'Art is ephemeral, detective. Even on-chain,' Carmen's message read. The Pixel Prophet weeps."
     }
   ]
 }
