@@ -31,7 +31,7 @@ async function main() {
   // ============================================================
   //  SETUP
   // ============================================================
-  await banner("CARMEN SANDIEGO ON-CHAIN - Live Simulation v3 (Commit-Reveal)");
+  await banner("CARMEN SANDIEGO ON-CHAIN - Live Simulation v4 (Proxy + CRE)");
 
   await log(`${C.cyan}[SETUP]${C.reset} Deploying contracts on local Hardhat network...`);
 
@@ -59,6 +59,12 @@ async function main() {
   await vrfCoordinator.addConsumer(subId, await gameMaster.getAddress());
   await log(`${C.green}  ✓${C.reset} GameMaster deployed`);
 
+  // Deploy GameMasterProxy (simulates KeystoneForwarder → Proxy → GameMaster)
+  const ProxyFactory = await ethers.getContractFactory("GameMasterProxy");
+  const proxy = await ProxyFactory.deploy(creOracle.address, await gameMaster.getAddress());
+  await proxy.waitForDeployment();
+  await log(`${C.green}  ✓${C.reset} GameMasterProxy deployed (CRE → Proxy → GameMaster)`);
+
   const MissionNFTFactory = await ethers.getContractFactory("MissionNFT");
   const missionNFT = await MissionNFTFactory.deploy(await gameMaster.getAddress());
   await missionNFT.waitForDeployment();
@@ -67,6 +73,10 @@ async function main() {
   const CityNodeFactory = await ethers.getContractFactory("CityNode");
   await CityNodeFactory.deploy("Tokyo", 421614, creOracle.address);
   await log(`${C.green}  ✓${C.reset} CityNodes: Tokyo | Paris | London`);
+
+  // Set proxy as CRE oracle (production: KeystoneForwarder → Proxy → GameMaster)
+  await gameMaster.setCREOracle(await proxy.getAddress());
+  await log(`${C.green}  ✓${C.reset} GameMaster.setCREOracle → Proxy address`);
 
   await sep();
   await log(`${C.cyan}[INFO]${C.reset} Player:     ${C.bold}${player.address.slice(0, 14)}...${C.reset}`);
@@ -152,7 +162,15 @@ async function main() {
   await sleep(500);
 
   const clue1Hash = ethers.keccak256(ethers.toUtf8Bytes("false-clue-paris"));
-  await gameMaster.connect(creOracle).receiveClue(missionId, 0, clue1Hash, "");
+  // CRE → writeReport → KeystoneForwarder → Proxy.onReport → GameMaster.receiveClue
+  const clue1Data = ethers.AbiCoder.defaultAbiCoder().encode(
+    ["uint256", "uint8", "bytes32", "string"], [missionId, 0, clue1Hash, ""]
+  );
+  const clue1Report = ethers.AbiCoder.defaultAbiCoder().encode(["uint8", "bytes"], [1, clue1Data]);
+  const clue1Metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+    ["bytes32", "bytes10", "address"], [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+  );
+  await proxy.connect(creOracle).onReport(clue1Metadata, clue1Report);
 
   console.log(`${C.yellow}  ┌─────────────────────────────────────────────────┐${C.reset}`);
   console.log(`${C.yellow}  │  CLUE #1 (Text) ${C.dim}[CRE knows: MISLEADING]${C.reset}${C.yellow}        │${C.reset}`);
@@ -169,7 +187,14 @@ async function main() {
 
   await log(`${C.magenta}[CRE]${C.reset} 🎤 ElevenLabs TTS → 🔐 ECIES encrypt → 📤 IPFS upload`);
   const clue2Hash = ethers.keccak256(ethers.toUtf8Bytes("true-clue-audio-tokyo"));
-  await gameMaster.connect(creOracle).receiveClue(missionId, 1, clue2Hash, "QmEncryptedAudioClue");
+  const clue2Data = ethers.AbiCoder.defaultAbiCoder().encode(
+    ["uint256", "uint8", "bytes32", "string"], [missionId, 1, clue2Hash, "QmEncryptedAudioClue"]
+  );
+  const clue2Report = ethers.AbiCoder.defaultAbiCoder().encode(["uint8", "bytes"], [1, clue2Data]);
+  const clue2Metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+    ["bytes32", "bytes10", "address"], [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+  );
+  await proxy.connect(creOracle).onReport(clue2Metadata, clue2Report);
 
   console.log(`${C.green}  ┌─────────────────────────────────────────────────┐${C.reset}`);
   console.log(`${C.green}  │  CLUE #2 (Audio) ${C.bold}[CRE knows: TRUE]${C.reset}${C.green}              │${C.reset}`);
@@ -191,7 +216,14 @@ async function main() {
   await log(`\n${C.magenta}[CRE]${C.reset} 🤖 Generating TRUE image clue...`);
   await log(`${C.magenta}[CRE]${C.reset} 🖼️ DALL-E → 🔐 ECIES encrypt → 📤 IPFS upload`);
   const clue3Hash = ethers.keccak256(ethers.toUtf8Bytes("true-clue-image-tokyo"));
-  await gameMaster.connect(creOracle).receiveClue(missionId, 2, clue3Hash, "QmEncryptedImageClue");
+  const clue3Data = ethers.AbiCoder.defaultAbiCoder().encode(
+    ["uint256", "uint8", "bytes32", "string"], [missionId, 2, clue3Hash, "QmEncryptedImageClue"]
+  );
+  const clue3Report = ethers.AbiCoder.defaultAbiCoder().encode(["uint8", "bytes"], [1, clue3Data]);
+  const clue3Metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+    ["bytes32", "bytes10", "address"], [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+  );
+  await proxy.connect(creOracle).onReport(clue3Metadata, clue3Report);
 
   console.log(`${C.green}  ┌─────────────────────────────────────────────────┐${C.reset}`);
   console.log(`${C.green}  │  CLUE #3 (Image) ${C.bold}[CRE knows: TRUE]${C.reset}${C.green}              │${C.reset}`);
@@ -219,7 +251,15 @@ async function main() {
   await log(`\n${C.magenta}[CRE]${C.reset} 🔓 ${C.bold}REVEAL${C.reset}: chainId=${C.bold}421614${C.reset} (Tokyo), salt=${salt.slice(0, 18)}...`);
   await log(`${C.dim}  → Contract verifies: keccak256(421614, salt) == targetHash?${C.reset}`);
 
-  const captureTx = await gameMaster.connect(creOracle).resolveCapture(missionId, 421614, salt);
+  // CRE → writeReport → KeystoneForwarder → Proxy.onReport → GameMaster.resolveCapture
+  const captureData = ethers.AbiCoder.defaultAbiCoder().encode(
+    ["uint256", "uint256", "bytes32"], [missionId, 421614, salt]
+  );
+  const captureReport = ethers.AbiCoder.defaultAbiCoder().encode(["uint8", "bytes"], [2, captureData]);
+  const captureMetadata = ethers.AbiCoder.defaultAbiCoder().encode(
+    ["bytes32", "bytes10", "address"], [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+  );
+  const captureTx = await proxy.connect(creOracle).onReport(captureMetadata, captureReport);
   const captureReceipt = await captureTx.wait();
 
   const capturedEvent = captureReceipt?.logs.find((l: any) => {
@@ -262,18 +302,18 @@ async function main() {
 
   await banner("SIMULATION COMPLETE");
 
-  console.log(`${C.dim}  Commit-Reveal game flow:`);
+  console.log(`${C.dim}  Commit-Reveal game flow (with Proxy):`);
   console.log(`  1. Player registers ECIES public key on-chain`);
   console.log(`  2. Starts mission → VRF picks Carmen's city`);
   console.log(`  3. VRF COMMITS: targetHash = keccak256(chainId, salt)`);
   console.log(`  4. Contract stores HASH → nobody knows where Carmen is!`);
-  console.log(`  5. Player investigates → CRE generates encrypted clues`);
-  console.log(`  6. Clues delivered WITHOUT isTrue → contract is blind`);
-  console.log(`  7. CRE REVEALS: resolveCapture(chainId, salt)`);
-  console.log(`  8. Contract verifies hash → capture confirmed!`);
-  console.log(`  9. NFT trophy minted for the player`);
+  console.log(`  5. Player investigates → CRE reads salt, brute-forces 3 cities`);
+  console.log(`  6. CRE → writeReport → Forwarder → Proxy → GameMaster.receiveClue()`);
+  console.log(`  7. Clues delivered WITHOUT isTrue → contract is blind`);
+  console.log(`  8. CRE → writeReport → Forwarder → Proxy → GameMaster.resolveCapture()`);
+  console.log(`  9. Contract verifies hash → capture confirmed! NFT minted`);
   console.log(`${C.reset}`);
-  console.log(`${C.bold}  CRE = Trusted Arbiter | VRF = Commit | ECIES = Privacy${C.reset}`);
+  console.log(`${C.bold}  CRE = Trusted Arbiter | VRF = Commit | Proxy = ReceiverTemplate${C.reset}`);
   console.log(`${C.bold}  Contract knows NOTHING about Carmen's location until REVEAL${C.reset}`);
   console.log("");
 }

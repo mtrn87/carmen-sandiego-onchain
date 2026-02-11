@@ -6,7 +6,7 @@ import {
   hexToBase64,
   bytesToHex,
   encodeCallMsg,
-  LAST_FINALIZED_BLOCK_NUMBER,
+  LATEST_BLOCK_NUMBER,
   type Runtime,
   type EVMLog,
 } from "@chainlink/cre-sdk"
@@ -110,7 +110,7 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
         to: config.gameMasterAddress as `0x${string}`,
         data: saltCallData,
       }),
-      blockNumber: LAST_FINALIZED_BLOCK_NUMBER,
+      blockNumber: LATEST_BLOCK_NUMBER,
     })
     .result()
 
@@ -133,7 +133,7 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
         to: config.gameMasterAddress as `0x${string}`,
         data: citiesCallData,
       }),
-      blockNumber: LAST_FINALIZED_BLOCK_NUMBER,
+      blockNumber: LATEST_BLOCK_NUMBER,
     })
     .result()
 
@@ -157,7 +157,7 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
         to: config.gameMasterAddress as `0x${string}`,
         data: missionCallData,
       }),
-      blockNumber: LAST_FINALIZED_BLOCK_NUMBER,
+      blockNumber: LATEST_BLOCK_NUMBER,
     })
     .result()
 

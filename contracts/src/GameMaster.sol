@@ -124,7 +124,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
                 callbackGasLimit: VRF_CALLBACK_GAS,
                 numWords: VRF_NUM_WORDS,
                 extraArgs: VRFV2PlusClient._argsToBytes(
-                    VRFV2PlusClient.ExtraArgsV1({nativePayment: false})
+                    VRFV2PlusClient.ExtraArgsV1({nativePayment: true})
                 )
             })
         );
