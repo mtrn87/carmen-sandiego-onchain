@@ -51,6 +51,19 @@ export default function MissionBriefing() {
   const [typedLines, setTypedLines] = useState([])
   const [allDone, setAllDone] = useState(false)
   const [skipped, setSkipped] = useState(false)
+  const [isStarting, setIsStarting] = useState(false)
+
+  const handleStartMission = useCallback(async () => {
+    if (isStarting) return
+    setIsStarting(true)
+    audioRef.current?.pause()
+    try {
+      await completeBriefing()
+    } catch (err) {
+      console.error('Failed to start mission:', err)
+      setIsStarting(false)
+    }
+  }, [completeBriefing, isStarting])
 
   // start audio on mount
   useEffect(() => {
@@ -118,9 +131,7 @@ export default function MissionBriefing() {
       if (e.key !== 'Enter') return
 
       if (allDone) {
-        // 2nd enter — close briefing, stop audio
-        audioRef.current?.pause()
-        completeBriefing()
+        handleStartMission()
       } else {
         // 1st enter — skip to end + stop audio
         setTypedLines(TYPED_LINES.map((l) => ({ text: l.text, color: l.color })))
@@ -129,7 +140,7 @@ export default function MissionBriefing() {
         audioRef.current?.pause()
       }
     },
-    [allDone, completeBriefing]
+    [allDone, handleStartMission]
   )
 
   useEffect(() => {
@@ -204,13 +215,13 @@ export default function MissionBriefing() {
           {allDone && (
             <button
               className={styles.continueBtn}
-              onClick={() => {
-                audioRef.current?.pause()
-                completeBriefing()
-              }}
+              disabled={isStarting}
+              onClick={handleStartMission}
             >
               <span className={styles.continueFlicker}>
-                {'>'} PRESS ENTER OR CLICK TO CONTINUE
+                {isStarting
+                  ? '> STARTING MISSION ON-CHAIN...'
+                  : '> PRESS ENTER OR CLICK TO CONTINUE'}
               </span>
             </button>
           )}

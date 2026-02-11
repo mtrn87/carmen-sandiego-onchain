@@ -9,7 +9,7 @@ import styles from './GamePage.module.css'
 
 export default function GamePage() {
   const navigate = useNavigate()
-  const { isConnected, briefingDone, setCurrentCase } = useGameStore()
+  const { isConnected, briefingDone, setCurrentCase, initGame } = useGameStore()
   const [showMap, setShowMap] = useState(false)
 
   // redirect to login if not connected
@@ -18,6 +18,13 @@ export default function GamePage() {
       navigate('/')
     }
   }, [isConnected, navigate])
+
+  // load on-chain state on mount (handles page refresh)
+  useEffect(() => {
+    if (isConnected) {
+      initGame()
+    }
+  }, [isConnected, initGame])
 
   if (!isConnected) return null
 

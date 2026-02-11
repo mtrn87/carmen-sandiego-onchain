@@ -100,7 +100,12 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
      */
     function startMission() external {
         require(playerPublicKeys[msg.sender].length > 0, "Register first");
-        require(activePlayerMission[msg.sender] == 0, "Already on a mission");
+
+        // Auto-close any existing active mission so player can start fresh
+        uint256 existingMission = activePlayerMission[msg.sender];
+        if (existingMission != 0 && missions[existingMission].status == MissionStatus.Active) {
+            _failMission(existingMission);
+        }
 
         uint256 missionId = nextMissionId++;
 

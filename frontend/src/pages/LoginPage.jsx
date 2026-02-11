@@ -9,6 +9,8 @@ import NicknameModal from '../components/NicknameModal'
 import { useGameStore } from '../store/gameStore'
 import { getEthereumAddressFromPrivy, generateMultiChainAddressesFromPrivy, getUserInfoFromPrivy, getProviderFromPrivy } from '../utils/privyProvider'
 import { saveAuthSession, clearAuthSession } from '../utils/authPersistence'
+import { getOrCreateKeyPair } from '../utils/ecies'
+import { isPlayerRegistered, registerPlayer as registerPlayerOnChain, ensureSepoliaNetwork, getSigner } from '../services/contractService'
 import styles from './LoginPage.module.css'
 
 const BOOT_LINES = [
@@ -16,7 +18,7 @@ const BOOT_LINES = [
   '> CONNECTING TO DECENTRALIZED NETWORK...',
   '> CHAINLINK CRE RUNTIME DETECTED',
   '> MULTI-CHAIN BRIDGE: ONLINE',
-  '> ENCRYPTION PROTOCOL: ECDSA-256',
+  '> ENCRYPTION PROTOCOL: ECIES-secp256k1',
   '> STATUS: AWAITING AGENT CREDENTIALS',
 ]
 
@@ -29,7 +31,7 @@ export default function LoginPage() {
   const [connecting, setConnecting] = useState(false)
   const [flickerClass, setFlickerClass] = useState('')
   const [showNicknameModal, setShowNicknameModal] = useState(false)
-  const { connectWallet, isConnected, walletAddress, playerNickname, setWeb3AuthProvider, setUserInfo, setMultiChainAddresses, initializeWeb3AuthSession, disconnectWallet } = useGameStore()
+  const { connectWallet, isConnected, walletAddress, playerNickname, setWeb3AuthProvider, setUserInfo, setMultiChainAddresses, initializeWeb3AuthSession, disconnectWallet, initGame } = useGameStore()
 
   // boot sequence
   useEffect(() => {
@@ -110,8 +112,8 @@ export default function LoginPage() {
               address = user.wallet.address
             }
           } else if (user.email || user.google) {
-            // Se fez login com Google, usa o ID do Privy como endereço
-            address = user.id || 'guest'
+            // Login with Google/email — no embedded wallet, no valid ETH address
+            address = null
             ethProvider = null
             addresses = null
           }
@@ -124,6 +126,34 @@ export default function LoginPage() {
           if (address) connectWallet(address)
 
           saveAuthSession(address, userInfo, addresses, null)
+
+          // Generate ECIES keys and check on-chain registration
+          if (user.wallet && address) {
+            try {
+              await ensureSepoliaNetwork()
+              // Use actual signer address (MetaMask active account)
+              const signer = await getSigner()
+              const signerAddr = await signer.getAddress()
+              console.log('[LoginPage] Privy address:', address, 'Signer address:', signerAddr)
+              if (signerAddr.toLowerCase() !== address.toLowerCase()) {
+                console.warn('[LoginPage] ADDRESS MISMATCH — using signer address instead')
+                connectWallet(signerAddr) // update store with correct address
+              }
+              const checkAddr = signerAddr
+              const { publicKeyHex } = await getOrCreateKeyPair()
+              const registered = await isPlayerRegistered(checkAddr)
+              if (!registered) {
+                console.log('Registering player on-chain with ECIES public key...')
+                await registerPlayerOnChain(publicKeyHex)
+                console.log('Player registered on-chain.')
+              }
+              // Load on-chain state (active mission, clues, etc.)
+              await initGame()
+            } catch (regErr) {
+              console.warn('On-chain registration skipped:', regErr.message)
+            }
+          }
+
           setShowNicknameModal(true)
         } catch (error) {
           console.error('Error syncing Privy user:', error)
@@ -212,8 +242,8 @@ export default function LoginPage() {
 
                   <div className={styles.networkBadges}>
                     <span className={styles.badge}>SEPOLIA</span>
-                    <span className={styles.badge}>POLYGON AMOY</span>
                     <span className={styles.badge}>ARBITRUM SEPOLIA</span>
+                    <span className={styles.badge}>BASE SEPOLIA</span>
                   </div>
                 </>
               ) : (
@@ -262,7 +292,7 @@ export default function LoginPage() {
               <div className={styles.infoDivider} />
               <div className={styles.infoItem}>
                 <span className={styles.infoLabel}>ENCRYPTION</span>
-                <span className={styles.infoValue}>ECDSA-256</span>
+                <span className={styles.infoValue}>ECIES-secp256k1</span>
               </div>
               <div className={styles.infoDivider} />
               <div className={styles.infoItem}>

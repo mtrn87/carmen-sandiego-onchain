@@ -1,75 +1,65 @@
 import { create } from 'zustand'
+import {
+  registerPlayer as registerPlayerOnChain,
+  isPlayerRegistered,
+  getPlayerActiveMission,
+  startMission as startMissionOnChain,
+  submitInvestigation as submitInvestigationOnChain,
+  getMission,
+  getMissionClues,
+  getBlocksUsed,
+  onClueReceived,
+  onCarmenCaptured,
+  onMissionFailed,
+  ensureSepoliaNetwork,
+  getSigner,
+  CITY_MAP,
+} from '../services/contractService'
+import { getPublicKeyHex, decryptClue } from '../utils/ecies'
 
-const LOCATIONS = [
+// ============================================================
+//  City locations derived from real chain IDs
+// ============================================================
+
+const CITY_LOCATIONS = [
   {
-    id: 'defi-bnb',
-    name: 'DeFi Lending Protocol',
-    chain: 'BNB Chain',
-    chainColor: '#F0B90B',
-    type: 'defi',
-    description: 'A decentralized lending protocol with billions in TVL. Suspicious flash loan activity detected.',
-    coords: { x: 25, y: 30 },
-    investigated: false,
-    connections: ['nft-polygon'],
-  },
-  {
-    id: 'nft-polygon',
-    name: 'NFT Marketplace',
-    chain: 'Polygon Amoy',
-    chainColor: '#8247e5',
-    type: 'nft',
-    description: 'A bustling digital art marketplace. Rare collections with anomalous pricing patterns.',
-    coords: { x: 60, y: 25 },
-    investigated: false,
-    connections: ['staking-arbitrum', 'dao-base'],
-  },
-  {
-    id: 'staking-arbitrum',
-    name: 'Staking Contract',
+    id: 421614,
+    name: 'Tokyo',
     chain: 'Arbitrum Sepolia',
     chainColor: '#28a0f0',
     type: 'staking',
-    description: 'A yield staking vault. An unusual amount of tokens was locked recently from an unknown address.',
+    description: 'A yield staking vault on Arbitrum. An unusual amount of tokens was locked recently from an unknown address.',
     coords: { x: 78, y: 55 },
     investigated: false,
-    connections: ['bridge-cross'],
+    connections: [84532],
   },
   {
-    id: 'dao-base',
-    name: 'DAO Governance',
-    chain: 'Base Testnet',
+    id: 84532,
+    name: 'Paris',
+    chain: 'Base Sepolia',
     chainColor: '#0052ff',
     type: 'dao',
-    description: 'A governance forum for a major DAO. A proposal was submitted by a suspicious new member.',
-    coords: { x: 40, y: 60 },
+    description: 'A governance forum on Base. A proposal was submitted by a suspicious new member.',
+    coords: { x: 40, y: 30 },
     investigated: false,
-    connections: ['staking-arbitrum'],
+    connections: [51],
   },
   {
-    id: 'bridge-cross',
-    name: 'Cross-Chain Bridge',
-    chain: 'Multi-Chain',
+    id: 51,
+    name: 'London',
+    chain: 'XDC Apothem',
     chainColor: '#ff6b00',
     type: 'bridge',
-    description: 'A cross-chain bridge with recent high-value transfers. One transaction stands out.',
-    coords: { x: 55, y: 80 },
+    description: 'A cross-chain bridge on XDC. One high-value transfer stands out among recent activity.',
+    coords: { x: 55, y: 35 },
     investigated: false,
-    connections: ['defi-bnb'],
+    connections: [421614],
   },
 ]
 
-const MOCK_CLUES = [
-  {
-    id: 'clue-1',
-    locationId: 'defi-bnb',
-    text: 'Carmen left a subtle trace in the digital vault. She manipulated a flash loan of negligible value — 0.0001 USDC in an obscure liquidity pool.',
-    type: 'audio',
-    timestamp: Date.now() - 300000,
-    decrypted: true,
-  },
-]
-
-const MOCK_EVIDENCE = []
+// ============================================================
+//  Store
+// ============================================================
 
 export const useGameStore = create((set, get) => ({
   // auth
@@ -82,41 +72,60 @@ export const useGameStore = create((set, get) => ({
   multiChainAddresses: {},
   userInfo: null,
 
-  // gas
+  // gas (UI-only element)
   gas: 100,
   gasFlash: false,
+
+  // on-chain state
+  missionId: null,
+  missionData: null,
+  isRegistered: false,
 
   // game state
   rank: 0,
   rankTitle: 'Detective Rookie',
-  currentMission: {
-    id: 'mission-1',
-    title: 'The Phantom Flash Loan',
-    description: 'Carmen Sandiego has been spotted near a DeFi lending protocol on BNB Chain. Track her across the blockchain.',
-    status: 'active',
-  },
-  carmenLocation: 'staking-arbitrum', // hidden from player
-  locations: LOCATIONS,
+  currentMission: null,
+  locations: CITY_LOCATIONS,
   selectedLocation: null,
   clues: [],
   evidence: [],
-  scannedLocations: ['shanghai'],
+  scannedLocations: [],
   isScanning: false,
   briefingDone: false,
   tourActive: false,
   tourStep: 0,
-  currentCase: 'cryptopunk-7804',
+  currentCase: null,
   terminalLines: [],
   isInvestigating: false,
   showClueModal: false,
   activeClue: null,
 
-  // auth actions
+  // event unsubscribers
+  _unsubscribers: [],
+
+  // ============================================================
+  //  Auth actions
+  // ============================================================
+
   connectWallet: (address) =>
     set({ walletAddress: address, isConnected: true }),
 
-  disconnectWallet: () =>
-    set({ walletAddress: null, isConnected: false, player: null, playerNickname: null, web3authProvider: null, multiChainAddresses: {} }),
+  disconnectWallet: () => {
+    const { _unsubscribers } = get()
+    _unsubscribers.forEach((unsub) => unsub())
+    set({
+      walletAddress: null,
+      isConnected: false,
+      player: null,
+      playerNickname: null,
+      web3authProvider: null,
+      multiChainAddresses: {},
+      missionId: null,
+      missionData: null,
+      isRegistered: false,
+      _unsubscribers: [],
+    })
+  },
 
   registerPlayer: (name) =>
     set((state) => ({
@@ -148,7 +157,213 @@ export const useGameStore = create((set, get) => ({
       isFirstLogin: false,
     }),
 
-  // game actions
+  // ============================================================
+  //  Game initialization (on-chain)
+  // ============================================================
+
+  /**
+   * Initialize game state from on-chain data.
+   * Call after wallet is connected.
+   */
+  initGame: async () => {
+    const { walletAddress } = get()
+    if (!walletAddress || !/^0x[0-9a-fA-F]{40}$/.test(walletAddress)) return
+
+    try {
+      await ensureSepoliaNetwork()
+
+      // Use actual signer address (may differ from Privy walletAddress)
+      const signer = await getSigner()
+      const signerAddr = await signer.getAddress()
+      console.log('[initGame] walletAddress (store):', walletAddress)
+      console.log('[initGame] signerAddress (actual):', signerAddr)
+      if (signerAddr.toLowerCase() !== walletAddress.toLowerCase()) {
+        console.warn('[initGame] ADDRESS MISMATCH — updating store to signer address')
+        set({ walletAddress: signerAddr })
+      }
+      const queryAddr = signerAddr
+
+      // Check registration
+      const registered = await isPlayerRegistered(queryAddr)
+      set({ isRegistered: registered })
+
+      // Check active mission
+      const activeMissionId = await getPlayerActiveMission(queryAddr)
+      if (activeMissionId > 0n) {
+        const state = get()
+        await state.loadMissionState(Number(activeMissionId))
+      }
+    } catch (error) {
+      console.error('initGame error:', error)
+      set((s) => ({
+        terminalLines: [
+          ...s.terminalLines,
+          { text: `> !! ERROR: ${error.message}`, color: 'red', type: 'alert' },
+        ],
+      }))
+    }
+  },
+
+  /**
+   * Load mission state and clues from on-chain data.
+   */
+  loadMissionState: async (missionId) => {
+    try {
+      const mission = await getMission(missionId)
+      const cluesOnChain = await getMissionClues(missionId)
+      const blocksUsed = await getBlocksUsed(missionId)
+
+      // Decrypt clues from on-chain data
+      const decryptedClues = []
+      for (const c of cluesOnChain) {
+        try {
+          const text = await decryptClue(c.ipfsPointer)
+          decryptedClues.push({
+            id: `clue-${c.timestamp}`,
+            locationId: null,
+            text,
+            type: ['text', 'audio', 'image'][c.clueType] || 'text',
+            timestamp: c.timestamp * 1000,
+            decrypted: true,
+          })
+        } catch (err) {
+          console.warn('Failed to decrypt clue:', err)
+          decryptedClues.push({
+            id: `clue-${c.timestamp}`,
+            locationId: null,
+            text: '[ENCRYPTED — decryption failed]',
+            type: 'text',
+            timestamp: c.timestamp * 1000,
+            decrypted: false,
+          })
+        }
+      }
+
+      const statusMap = { 0: 'none', 1: 'active', 2: 'completed', 3: 'failed' }
+
+      set({
+        missionId,
+        missionData: mission,
+        currentMission: {
+          id: `mission-${missionId}`,
+          title: `Mission #${missionId}`,
+          description: `Track Carmen Sandiego across the blockchain. ${blocksUsed} blocks elapsed.`,
+          status: statusMap[mission.status] || 'active',
+        },
+        clues: decryptedClues,
+        // Don't set briefingDone here — let completeBriefing handle it
+        // so the user always sees the briefing screen on new sessions
+      })
+
+      // Set up event listeners
+      const state = get()
+      await state._setupEventListeners(missionId)
+    } catch (error) {
+      console.error('loadMissionState error:', error)
+    }
+  },
+
+  /**
+   * Set up blockchain event listeners for a mission.
+   */
+  _setupEventListeners: async (missionId) => {
+    const { _unsubscribers } = get()
+    // Clean previous listeners
+    _unsubscribers.forEach((unsub) => unsub())
+
+    const newUnsubs = []
+
+    try {
+      // Listen for new clues
+      const unsubClue = await onClueReceived(missionId, async (event) => {
+        set((s) => ({
+          terminalLines: [
+            ...s.terminalLines,
+            { text: '> NEW CLUE RECEIVED from CRE workflow.', color: 'cyan', type: 'system' },
+            { text: '> Decrypting with local private key...', color: 'muted', type: 'system' },
+          ],
+        }))
+
+        try {
+          const text = await decryptClue(event.ipfsPointer)
+          const newClue = {
+            id: `clue-${Date.now()}`,
+            locationId: null,
+            text,
+            type: ['text', 'audio', 'image'][event.clueType] || 'text',
+            timestamp: Date.now(),
+            decrypted: true,
+          }
+
+          set((s) => ({
+            isInvestigating: false,
+            clues: [...s.clues, newClue],
+            activeClue: newClue,
+            showClueModal: true,
+            terminalLines: [
+              ...s.terminalLines,
+              { text: '> CLUE DECRYPTED SUCCESSFULLY.', color: 'yellow', type: 'alert' },
+            ],
+          }))
+        } catch (err) {
+          console.error('Clue decryption failed:', err)
+          set((s) => ({
+            isInvestigating: false,
+            terminalLines: [
+              ...s.terminalLines,
+              { text: '> !! DECRYPTION FAILED — key mismatch?', color: 'red', type: 'alert' },
+            ],
+          }))
+        }
+      })
+      newUnsubs.push(unsubClue)
+
+      // Listen for capture
+      const unsubCapture = await onCarmenCaptured(missionId, (event) => {
+        set((s) => ({
+          rank: s.rank + 1,
+          rankTitle: getRankTitle(s.rank + 1),
+          currentMission: s.currentMission
+            ? { ...s.currentMission, status: 'completed' }
+            : null,
+          terminalLines: [
+            ...s.terminalLines,
+            { text: '> ████████████████████████████████████████', color: 'green', type: 'system' },
+            { text: '> CARMEN SANDIEGO CAPTURED!', color: 'green', type: 'alert' },
+            { text: `> Solved in ${event.blocksUsed} blocks!`, color: 'yellow', type: 'alert' },
+            { text: `> PROMOTED TO: ${getRankTitle(s.rank + 1)}`, color: 'yellow', type: 'alert' },
+            { text: '> MissionNFT minted as trophy!', color: 'cyan', type: 'system' },
+            { text: '> ████████████████████████████████████████', color: 'green', type: 'system' },
+          ],
+        }))
+      })
+      newUnsubs.push(unsubCapture)
+
+      // Listen for mission failure
+      const unsubFail = await onMissionFailed(missionId, () => {
+        set((s) => ({
+          currentMission: s.currentMission
+            ? { ...s.currentMission, status: 'failed' }
+            : null,
+          terminalLines: [
+            ...s.terminalLines,
+            { text: '> !! MISSION FAILED — Carmen escaped!', color: 'red', type: 'alert' },
+            { text: '> Too many blocks elapsed. Start a new mission.', color: 'yellow', type: 'system' },
+          ],
+        }))
+      })
+      newUnsubs.push(unsubFail)
+
+      set({ _unsubscribers: newUnsubs })
+    } catch (error) {
+      console.error('Event listener setup failed:', error)
+    }
+  },
+
+  // ============================================================
+  //  Game actions
+  // ============================================================
+
   selectLocation: (locationId) => set({ selectedLocation: locationId }),
 
   scanLocation: (locationId, scanCost = 30) => {
@@ -171,10 +386,13 @@ export const useGameStore = create((set, get) => ({
     })
     setTimeout(() => set({ gasFlash: false }), 800)
 
+    const loc = CITY_MAP[locationId]
+    const locName = loc ? loc.name : `Chain ${locationId}`
+
     set((s) => ({
       terminalLines: [
         ...s.terminalLines,
-        { text: `> SCANNING NETWORK: ${locationId} [-${scanCost} GAS]`, color: 'cyan', type: 'action' },
+        { text: `> SCANNING NETWORK: ${locName} [-${scanCost} GAS]`, color: 'cyan', type: 'action' },
         { text: '> Deploying scanner nodes across chain...', color: 'muted', type: 'system' },
       ],
     }))
@@ -185,130 +403,250 @@ export const useGameStore = create((set, get) => ({
         scannedLocations: [...s.scannedLocations, locationId],
         terminalLines: [
           ...s.terminalLines,
-          { text: '> SCAN COMPLETE. 3 suspicious contracts found.', color: 'green', type: 'system' },
+          { text: '> SCAN COMPLETE. Suspicious contracts found.', color: 'green', type: 'system' },
           { text: '> Contracts available for investigation.', color: 'cyan', type: 'system' },
         ],
       }))
     }, 2000)
   },
 
-  investigate: (locationId) => {
+  /**
+   * Submit investigation transaction on-chain.
+   * @param {number} chainId - The city's chain ID (421614, 84532, or 51)
+   */
+  investigate: async (chainId) => {
     const state = get()
     if (state.isInvestigating) return
 
     set({ isInvestigating: true })
 
-    // add terminal line
-    const loc = state.locations.find((l) => l.id === locationId)
+    const city = CITY_MAP[chainId]
+    const cityName = city ? `${city.name} [${city.chain}]` : `Chain ${chainId}`
+
     set((s) => ({
       terminalLines: [
         ...s.terminalLines,
-        { text: `> INVESTIGATING: ${loc.name} [${loc.chain}]`, color: 'cyan', type: 'action' },
-        { text: '> Sending tx to Game.sol.investigate()...', color: 'muted', type: 'system' },
+        { text: `> INVESTIGATING: ${cityName}`, color: 'cyan', type: 'action' },
+        { text: '> Sending tx to GameMaster.submitInvestigation()...', color: 'muted', type: 'system' },
       ],
     }))
 
-    // simulate blockchain delay
-    setTimeout(() => {
-      const newClue = {
-        id: `clue-${Date.now()}`,
-        locationId,
-        text: generateClueText(locationId, state.carmenLocation),
-        type: 'audio',
-        timestamp: Date.now(),
-        decrypted: true,
-      }
-
-      const newEvidence = {
-        id: `ev-${Date.now()}`,
-        name: `${loc.chain} Intel`,
-        description: `Data fragment recovered from ${loc.name}`,
-        icon: locationId === state.carmenLocation ? 'hot' : 'cold',
-        fromLocation: locationId,
-        rarity: locationId === state.carmenLocation ? 'legendary' : 'common',
-      }
+    try {
+      await ensureSepoliaNetwork()
+      const receipt = await submitInvestigationOnChain(chainId)
 
       set((s) => ({
-        isInvestigating: false,
         locations: s.locations.map((l) =>
-          l.id === locationId ? { ...l, investigated: true } : l
+          l.id === chainId ? { ...l, investigated: true } : l
         ),
-        clues: [...s.clues, newClue],
-        evidence: [...s.evidence, newEvidence],
-        activeClue: newClue,
-        showClueModal: true,
         terminalLines: [
           ...s.terminalLines,
-          { text: '> TX CONFIRMED. CRE workflow triggered.', color: 'green', type: 'system' },
-          { text: '> Encrypted audio clue received from IPFS.', color: 'cyan', type: 'system' },
-          { text: '> Decrypting with local private key...', color: 'muted', type: 'system' },
-          { text: '> CLUE DECRYPTED SUCCESSFULLY.', color: 'yellow', type: 'alert' },
+          { text: `> TX CONFIRMED: ${receipt.hash}`, color: 'green', type: 'system' },
+          { text: '> Waiting for CRE workflow response...', color: 'cyan', type: 'system' },
         ],
       }))
-    }, 2500)
+
+      // Clue will arrive via ClueReceived event listener
+      // isInvestigating stays true until clue arrives
+    } catch (error) {
+      console.error('Investigation failed:', error)
+      set((s) => ({
+        isInvestigating: false,
+        terminalLines: [
+          ...s.terminalLines,
+          { text: `> !! TX FAILED: ${error.reason || error.message}`, color: 'red', type: 'alert' },
+        ],
+      }))
+    }
   },
 
-  attemptArrest: (locationId) => {
-    const state = get()
-    const success = locationId === state.carmenLocation
+  /**
+   * Complete briefing: register player on-chain + start mission.
+   * If there's already an active mission (loaded by initGame), resumes it
+   * without sending a new startMission TX.
+   */
+  completeBriefing: async () => {
+    const { walletAddress, isRegistered, missionId: existingMissionId } = get()
+
+    console.log('[completeBriefing] START', { walletAddress, isRegistered, existingMissionId })
 
     set((s) => ({
       terminalLines: [
-        ...s.terminalLines,
-        { text: `> ATTEMPTING ARREST at ${locationId}...`, color: 'red', type: 'action' },
-        { text: '> Sending tx to Game.sol.attemptArrest()...', color: 'muted', type: 'system' },
+        { text: '> ACME MAINFRAME :: INITIALIZING MISSION', color: 'cyan', type: 'system' },
+        { text: '> Agent connected. Welcome, Detective.', color: 'green', type: 'system' },
       ],
     }))
 
-    setTimeout(() => {
-      if (success) {
+    try {
+      console.log('[completeBriefing] Ensuring Sepolia network...')
+      await ensureSepoliaNetwork()
+      console.log('[completeBriefing] Network OK')
+
+      // If initGame already loaded an active mission, just resume it
+      if (existingMissionId) {
+        console.log('[completeBriefing] Resuming existing mission #', existingMissionId)
+
+        set({
+          briefingDone: true,
+          tourActive: true,
+          tourStep: 0,
+        })
+
+        // Set up event listeners
+        const state = get()
+        await state._setupEventListeners(existingMissionId)
+
         set((s) => ({
-          rank: s.rank + 1,
-          rankTitle: getRankTitle(s.rank + 1),
           terminalLines: [
             ...s.terminalLines,
-            { text: '> ████████████████████████████████████████', color: 'green', type: 'system' },
-            { text: '> CARMEN SANDIEGO CAPTURED!', color: 'green', type: 'alert' },
-            { text: `> PROMOTED TO: ${getRankTitle(s.rank + 1)}`, color: 'yellow', type: 'alert' },
-            { text: '> ████████████████████████████████████████', color: 'green', type: 'system' },
+            { text: `> RESUMING MISSION #${existingMissionId}. Carmen's location committed.`, color: 'yellow', type: 'alert' },
+            { text: '> Use the MAP to investigate cities and find clues.', color: 'green', type: 'help' },
+          ],
+        }))
+
+        console.log('[completeBriefing] DONE (resumed)')
+        return
+      }
+
+      // Register player with ECIES public key if not already registered
+      if (!isRegistered) {
+        console.log('[completeBriefing] Not registered, generating ECIES keys...')
+        set((s) => ({
+          terminalLines: [
+            ...s.terminalLines,
+            { text: '> Generating ECIES encryption keys...', color: 'muted', type: 'system' },
+          ],
+        }))
+
+        const publicKeyHex = await getPublicKeyHex()
+        console.log('[completeBriefing] ECIES pubkey:', publicKeyHex.slice(0, 20) + '...')
+
+        set((s) => ({
+          terminalLines: [
+            ...s.terminalLines,
+            { text: '> Registering agent on-chain...', color: 'muted', type: 'system' },
+          ],
+        }))
+
+        console.log('[completeBriefing] Calling registerPlayer...')
+        const regReceipt = await registerPlayerOnChain(publicKeyHex)
+        console.log('[completeBriefing] registerPlayer TX:', regReceipt?.hash)
+
+        set((s) => ({
+          isRegistered: true,
+          terminalLines: [
+            ...s.terminalLines,
+            { text: '> AGENT REGISTERED. Public key stored on-chain.', color: 'green', type: 'system' },
           ],
         }))
       } else {
+        console.log('[completeBriefing] Already registered, skipping')
+      }
+
+      // Start mission (triggers VRF)
+      console.log('[completeBriefing] Calling startMission...')
+      set((s) => ({
+        terminalLines: [
+          ...s.terminalLines,
+          { text: '> Starting new mission (requesting VRF randomness)...', color: 'muted', type: 'system' },
+        ],
+      }))
+
+      const receipt = await startMissionOnChain()
+      console.log('[completeBriefing] startMission TX:', receipt?.hash)
+      console.log('[completeBriefing] TX status:', receipt?.status, '(1=success, 0=reverted)')
+
+      if (receipt?.status === 0) {
+        console.error('[completeBriefing] TX REVERTED on-chain!')
         set((s) => ({
-          rank: Math.max(0, s.rank - 1),
-          rankTitle: getRankTitle(Math.max(0, s.rank - 1)),
           terminalLines: [
             ...s.terminalLines,
-            { text: '> !! ARREST FAILED — CARMEN ESCAPED !!', color: 'red', type: 'alert' },
-            { text: `> DEMOTED TO: ${getRankTitle(Math.max(0, s.rank - 1))}`, color: 'red', type: 'alert' },
-            { text: '> Carmen has moved to a new unknown location.', color: 'yellow', type: 'system' },
+            { text: '> !! TX REVERTED — startMission failed on-chain.', color: 'red', type: 'alert' },
           ],
         }))
+        return
       }
-    }, 2000)
+
+      set((s) => ({
+        terminalLines: [
+          ...s.terminalLines,
+          { text: `> MISSION TX CONFIRMED: ${receipt.hash}`, color: 'green', type: 'system' },
+          { text: '> Awaiting VRF callback for target location...', color: 'cyan', type: 'system' },
+        ],
+      }))
+
+      // Fetch the newly created mission — use signer address
+      const signer = await getSigner()
+      const signerAddress = await signer.getAddress()
+      console.log('[completeBriefing] walletAddress (store):', walletAddress)
+      console.log('[completeBriefing] signerAddress (actual):', signerAddress)
+
+      const queryAddress = signerAddress || walletAddress
+      console.log('[completeBriefing] Fetching active mission ID for:', queryAddress)
+      const activeMissionId = await getPlayerActiveMission(queryAddress)
+      console.log('[completeBriefing] Active mission ID:', activeMissionId?.toString())
+
+      if (activeMissionId > 0n) {
+        const missionId = Number(activeMissionId)
+        console.log('[completeBriefing] Loading mission data for #', missionId)
+        const mission = await getMission(missionId)
+        console.log('[completeBriefing] Mission data:', mission)
+
+        set({
+          missionId,
+          missionData: mission,
+          briefingDone: true,
+          tourActive: true,
+          tourStep: 0,
+          clues: [],
+          evidence: [],
+          currentMission: {
+            id: `mission-${missionId}`,
+            title: `Mission #${missionId}`,
+            description: 'Track Carmen Sandiego across the blockchain.',
+            status: 'active',
+          },
+        })
+
+        // Set up event listeners
+        console.log('[completeBriefing] Setting up event listeners...')
+        const state = get()
+        await state._setupEventListeners(missionId)
+        console.log('[completeBriefing] Event listeners ready')
+
+        set((s) => ({
+          terminalLines: [
+            ...s.terminalLines,
+            { text: `> MISSION #${missionId} ACTIVE. Carmen's location committed.`, color: 'yellow', type: 'alert' },
+            { text: '> Use the MAP to investigate cities and find clues.', color: 'green', type: 'help' },
+          ],
+        }))
+      } else {
+        console.warn('[completeBriefing] No active mission found after startMission!')
+      }
+
+      console.log('[completeBriefing] DONE')
+    } catch (error) {
+      console.error('[completeBriefing] FAILED:', error)
+      console.error('[completeBriefing] Error details:', {
+        message: error.message,
+        reason: error.reason,
+        code: error.code,
+        data: error.data,
+      })
+      set((s) => ({
+        terminalLines: [
+          ...s.terminalLines,
+          { text: `> !! ERROR: ${error.reason || error.message}`, color: 'red', type: 'alert' },
+          { text: '> Please check your wallet and try again.', color: 'yellow', type: 'system' },
+        ],
+      }))
+    }
   },
 
-  completeBriefing: () =>
-    set({
-      briefingDone: true,
-      tourActive: true,
-      tourStep: 0,
-      clues: MOCK_CLUES,
-      evidence: MOCK_EVIDENCE,
-      terminalLines: [
-        { text: '> ACME MAINFRAME :: CASE FILE #4091', color: 'cyan', type: 'system' },
-        { text: '> Agent connected. Welcome, Detective.', color: 'green', type: 'system' },
-        { text: '', color: 'muted', type: 'system' },
-        { text: '> You are now looking at the Block Explorer — this is', color: 'green', type: 'help' },
-        { text: '> your main investigation tool. Here you can access all', color: 'green', type: 'help' },
-        { text: '> contract transactions and identify suspicious activity.', color: 'green', type: 'help' },
-        { text: '', color: 'muted', type: 'system' },
-        { text: '> ⚠ WARNING: Our analysts flagged transaction', color: 'yellow', type: 'alert' },
-        { text: '> 0xa81c9...bb12f — a depositNFT call that bridged', color: 'yellow', type: 'alert' },
-        { text: '> the stolen NFT to Polygon. Click on that transaction', color: 'yellow', type: 'alert' },
-        { text: '> to investigate.', color: 'yellow', type: 'alert' },
-      ],
-    }),
+  // ============================================================
+  //  Tour (UI-only, preserved)
+  // ============================================================
 
   advanceTour: () => {
     const state = get()
@@ -316,36 +654,26 @@ export const useGameStore = create((set, get) => ({
     const tourMessages = {
       1: [
         { text: '', color: 'muted', type: 'system' },
-        { text: '> Good. Transaction details loaded.', color: 'green', type: 'system' },
-        { text: '> Now click INVESTIGATE to analyze this transaction.', color: 'green', type: 'help' },
-        { text: '> It will cost some GAS but will reveal critical', color: 'green', type: 'help' },
-        { text: '> information about Carmen\'s escape route.', color: 'green', type: 'help' },
+        { text: '> Good. Mission data loaded.', color: 'green', type: 'system' },
+        { text: '> Click on a city marker on the MAP to investigate.', color: 'green', type: 'help' },
+        { text: '> Each investigation sends a transaction to GameMaster.', color: 'green', type: 'help' },
       ],
       2: [
         { text: '', color: 'muted', type: 'system' },
-        { text: '> TX ANALYZED. Evidence found!', color: 'green', type: 'system' },
-        { text: '> Click + ADD TO EVIDENCE to save this proof.', color: 'yellow', type: 'alert' },
-        { text: '> You will need evidence to arrest Carmen Sandiego.', color: 'yellow', type: 'alert' },
+        { text: '> Investigation submitted. Waiting for CRE clue...', color: 'green', type: 'system' },
+        { text: '> Clues are encrypted with your ECIES public key.', color: 'yellow', type: 'alert' },
+        { text: '> Only you can decrypt them with your local private key.', color: 'yellow', type: 'alert' },
       ],
       3: [
         { text: '', color: 'muted', type: 'system' },
-        { text: '> Evidence collected and stored securely.', color: 'green', type: 'system' },
-        { text: '> Check the EVIDENCE tab on the left panel to', color: 'green', type: 'help' },
-        { text: '> review your findings. Click on it now.', color: 'green', type: 'help' },
+        { text: '> Clues tell you whether Carmen is at this location.', color: 'green', type: 'help' },
+        { text: '> If you guess correctly, Carmen is captured automatically!', color: 'green', type: 'help' },
+        { text: '> A MissionNFT trophy will be minted for you.', color: 'cyan', type: 'system' },
       ],
       4: [
         { text: '', color: 'muted', type: 'system' },
-        { text: '> This is your evidence locker. Every piece of', color: 'cyan', type: 'system' },
-        { text: '> evidence brings you closer to building a case', color: 'cyan', type: 'system' },
-        { text: '> against Carmen and issuing an arrest warrant.', color: 'cyan', type: 'system' },
-        { text: '', color: 'muted', type: 'system' },
-        { text: '> ⚠ INTEL UPDATE: Carmen was tracked heading to', color: 'yellow', type: 'alert' },
-        { text: '> the Polygon network. Click the ⚵ MAP button in', color: 'yellow', type: 'alert' },
-        { text: '> the top-right corner to travel to Polygon and', color: 'yellow', type: 'alert' },
-        { text: '> continue the investigation.', color: 'yellow', type: 'alert' },
-        { text: '', color: 'muted', type: 'system' },
-        { text: '> ⚠ REMINDER: Collect evidence before your GAS runs', color: 'red', type: 'alert' },
-        { text: '> out — you need proof to catch Carmen!', color: 'red', type: 'alert' },
+        { text: '> Good luck, Detective. The hunt begins now.', color: 'cyan', type: 'system' },
+        { text: '> Remember: Carmen may move if you take too long!', color: 'red', type: 'alert' },
       ],
     }
 
@@ -375,7 +703,7 @@ export const useGameStore = create((set, get) => ({
         ...s.terminalLines,
         { text: '', color: 'muted', type: 'system' },
         { text: `> LOADING CONTRACT: ${caseId}`, color: 'cyan', type: 'action' },
-        { text: '> Fetching on-chain data from Polygon...', color: 'muted', type: 'system' },
+        { text: '> Fetching on-chain data...', color: 'muted', type: 'system' },
       ],
     }))
   },
@@ -411,20 +739,4 @@ function getRankTitle(rank) {
     'Master Agent',
   ]
   return titles[Math.min(rank, titles.length - 1)]
-}
-
-function generateClueText(locationId, carmenLocation) {
-  const clueMap = {
-    'defi-bnb':
-      'The suspect manipulated a flash loan of negligible value in an obscure liquidity pool. The receiving address points toward an NFT marketplace on another chain.',
-    'nft-polygon':
-      'Carmen placed a bid on a rare NFT from an unknown artist — priced suspiciously below floor. The token was transferred to a staking contract on Arbitrum.',
-    'staking-arbitrum':
-      'A large amount of tokens was staked from a freshly created wallet. The staking pattern matches Carmen\'s known behavior. She may still be here.',
-    'dao-base':
-      'A new DAO member submitted a governance proposal to redirect treasury funds. The proposal language matches Carmen\'s signature rhetorical style.',
-    'bridge-cross':
-      'A high-value cross-chain transfer was routed through multiple hops. The final destination is obfuscated, but traces lead back to BNB Chain.',
-  }
-  return clueMap[locationId] || 'No significant activity detected at this location.'
 }

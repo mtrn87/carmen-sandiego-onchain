@@ -447,12 +447,21 @@ describe("Carmen Sandiego - Full Game E2E (Commit-Reveal)", function () {
       ).to.be.revertedWith("Register first");
     });
 
-    it("should not allow starting two missions at once", async function () {
+    it("should auto-fail previous mission when starting a new one", async function () {
       await gameMaster.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
       await gameMaster.connect(player).startMission();
+      const mission1Id = await gameMaster.getPlayerActiveMission(player.address);
+
+      // Starting a second mission should auto-fail the first
       await expect(
         gameMaster.connect(player).startMission()
-      ).to.be.revertedWith("Already on a mission");
+      ).to.emit(gameMaster, "MissionFailed").withArgs(mission1Id, player.address);
+
+      // New mission should be active
+      const mission2Id = await gameMaster.getPlayerActiveMission(player.address);
+      expect(mission2Id).to.not.equal(mission1Id);
+      const mission1 = await gameMaster.getMission(mission1Id);
+      expect(mission1.status).to.equal(3); // Failed
     });
 
     it("should allow new mission after completing previous one", async function () {
