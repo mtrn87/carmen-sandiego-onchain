@@ -21,6 +21,7 @@ import {
   parseAbi,
   zeroAddress,
 } from "viem"
+import { eciesEncrypt } from "./ecies"
 
 // ============================================================
 //  Config
@@ -40,6 +41,7 @@ const GameMasterABI = parseAbi([
   "function getMissionSalt(uint256) view returns (bytes32)",
   "function getValidCities() view returns (uint256[])",
   "function getMissionClues(uint256) view returns ((uint8,bytes32,string,uint256)[])",
+  "function getPlayerPublicKey(address) view returns (bytes)",
   "event InvestigationSubmitted(uint256 indexed missionId, address indexed player, uint256 chainId)",
 ])
 
@@ -166,6 +168,30 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
   }) as [string, bigint, string, number, number, number]
   runtime.log(`TargetHash: ${targetHash}, cluesReceived: ${cluesReceived}`)
 
+  // --- 4b. EVMRead: getPlayerPublicKey ---
+  const pubKeyCallData = encodeFunctionData({
+    abi: GameMasterABI,
+    functionName: "getPlayerPublicKey",
+    args: [player],
+  })
+  const pubKeyResult = evmClient
+    .callContract(runtime, {
+      call: encodeCallMsg({
+        from: zeroAddress,
+        to: config.gameMasterAddress as `0x${string}`,
+        data: pubKeyCallData,
+      }),
+      blockNumber: LATEST_BLOCK_NUMBER,
+    })
+    .result()
+
+  const playerPubKeyHex = decodeFunctionResult({
+    abi: GameMasterABI,
+    functionName: "getPlayerPublicKey",
+    data: bytesToHex(pubKeyResult.data),
+  }) as `0x${string}`
+  runtime.log(`Player public key: ${playerPubKeyHex.slice(0, 20)}...`)
+
   // --- 5. Brute-force: find Carmen's city ---
   let carmenCity: bigint | undefined
   for (const city of cities) {
@@ -196,13 +222,23 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
   const clueText = selectedClue.text
   const clueType = selectedClue.type
 
-  // --- 7. Compute contentHash ---
+  // --- 7. Compute contentHash (from plaintext) + encrypt clue ---
   const contentHash = keccak256(toBytes(clueText))
 
+  // Encrypt clue with player's ECIES public key
+  const pubKeyClean = playerPubKeyHex.startsWith("0x") ? playerPubKeyHex.slice(2) : playerPubKeyHex
+  const pubKeyBytes = new Uint8Array(pubKeyClean.length / 2)
+  for (let i = 0; i < pubKeyBytes.length; i++) {
+    pubKeyBytes[i] = parseInt(pubKeyClean.slice(i * 2, i * 2 + 2), 16)
+  }
+  const encryptedClue = eciesEncrypt(pubKeyBytes, clueText)
+  runtime.log(`Clue encrypted (${encryptedClue.length} hex chars)`)
+
   // --- 8. writeReport → proxy → GameMaster.receiveClue() ---
+  // Send contentHash (plaintext hash for verification) + encrypted clue as ipfsPointer
   const clueData = encodeAbiParameters(
     parseAbiParameters("uint256, uint8, bytes32, string"),
-    [missionId, clueType, contentHash as `0x${string}`, clueText]
+    [missionId, clueType, contentHash as `0x${string}`, encryptedClue]
   )
   const clueReport = encodeAbiParameters(
     parseAbiParameters("uint8, bytes"),
