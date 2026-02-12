@@ -75,6 +75,14 @@
   white-space: nowrap;
 }
 
+.nicknameValue {
+  font-size: 0.82rem;
+  color: var(--cyan);
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+}
+
 .rankBadge {
   font-size: 0.72rem;
   color: var(--yellow);
@@ -82,6 +90,19 @@
   border: 1px solid rgba(255, 230, 0, 0.2);
   background: rgba(255, 230, 0, 0.05);
   letter-spacing: 1px;
+}
+
+.rankMid {
+  color: var(--cyan);
+  border-color: rgba(0, 240, 255, 0.2);
+  background: rgba(0, 240, 255, 0.05);
+}
+
+.rankElite {
+  color: var(--magenta, #ff00ff);
+  border-color: rgba(255, 0, 255, 0.3);
+  background: rgba(255, 0, 255, 0.06);
+  text-shadow: 0 0 6px rgba(255, 0, 255, 0.3);
 }
 
 .missionValue {
@@ -182,6 +203,35 @@
 }
 
 /* ── chat input ── */
+/* ── new mission bar ── */
+.newMissionBar {
+  display: flex;
+  justify-content: center;
+  padding: 8px 10px;
+  border-top: 1px solid rgba(0, 240, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.newMissionBtn {
+  background: transparent;
+  border: 1px solid rgba(0, 255, 100, 0.4);
+  color: var(--green, #0f0);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  padding: 8px 24px;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+
+.newMissionBtn:hover {
+  background: rgba(0, 255, 100, 0.08);
+  border-color: rgba(0, 255, 100, 0.7);
+  box-shadow: 0 0 12px rgba(0, 255, 100, 0.15);
+}
+
 .chatInput {
   display: flex;
   align-items: center;

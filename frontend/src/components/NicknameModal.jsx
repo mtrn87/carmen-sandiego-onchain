@@ -3,7 +3,8 @@ import { useGameStore } from '../store/gameStore'
 import NeonButton from './NeonButton'
 import styles from './NicknameModal.module.css'
 
-const MOCK_TAKEN_NICKNAMES = ['admin', 'carmen', 'detective', 'agent', 'sandiego']
+// Reserved names that cannot be used as nicknames
+const RESERVED_NICKNAMES = ['admin', 'carmen', 'sandiego', 'system', 'acme', 'gamemaster']
 
 export default function NicknameModal({ onConfirm }) {
   const [nickname, setNickname] = useState('')
@@ -35,8 +36,8 @@ export default function NicknameModal({ onConfirm }) {
       return false
     }
 
-    if (MOCK_TAKEN_NICKNAMES.includes(value.toLowerCase())) {
-      setError('This nickname is already taken')
+    if (RESERVED_NICKNAMES.includes(value.toLowerCase())) {
+      setError('This nickname is reserved')
       return false
     }
 

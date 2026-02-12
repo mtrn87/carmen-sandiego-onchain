@@ -25,7 +25,7 @@ export default function App() {
       }
     }
 
-    // Restaurar sessão apenas se houver dados salvos
+    // Restore session only if saved data exists
     restoreSession()
   }, [initializeWeb3AuthSession])
 

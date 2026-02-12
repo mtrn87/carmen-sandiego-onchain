@@ -1,50 +1,83 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useGameStore } from '../store/gameStore'
+import scenariosData from '../data/scenarios.json'
 import styles from './MissionBriefing.module.css'
-
-// lines shown instantly on load (ACME header)
-const INSTANT_LINES = [
-  { text: '██████████████████████████████████████████████████████████████████', color: 'red' },
-  { text: '  ACME DETECTIVE AGENCY — PRIORITY ALERT — CLASSIFICATION: CRITICAL', color: 'red' },
-  { text: '██████████████████████████████████████████████████████████████████', color: 'red' },
-  { text: '', color: 'muted' },
-]
-
-// lines typed out with the audio
-const TYPED_LINES = [
-  { text: 'Attention, detective. Carmen Sandiego\'s gang has struck again!', color: 'yellow' },
-  { text: 'This is a top-priority case — all available agents have been mobilized.', color: 'yellow' },
-  { text: '', color: 'muted' },
-  { text: 'In China, the gang stole the legendary CryptoPunk #7804 — valued at', color: 'cyan' },
-  { text: '4,200 BNB — from the digital vault of the collector known as "The Vault"', color: 'cyan' },
-  { text: 'on the Binance network. The asset was stored in a multi-sig custody', color: 'cyan' },
-  { text: 'protocol believed to be impenetrable until now.', color: 'cyan' },
-  { text: '', color: 'muted' },
-  { text: 'The heist was executed through a coordinated flash loan attack,', color: 'cyan' },
-  { text: 'temporarily draining liquidity from the custody protocol and allowing the', color: 'cyan' },
-  { text: 'NFT to be transferred to an unknown wallet in less than 12 seconds.', color: 'cyan' },
-  { text: 'Our forensic blockchain analysts confirmed that the attack exploited a', color: 'cyan' },
-  { text: 're-entrancy vulnerability in the vault\'s withdrawal function.', color: 'cyan' },
-  { text: '', color: 'muted' },
-  { text: 'Our last lead indicates she passed through the Binance network heading', color: 'green' },
-  { text: 'toward Polygon. In the Binance contract 0xCarmenVault... you may find', color: 'green' },
-  { text: 'additional information — our analysts detected a suspicious bridge', color: 'green' },
-  { text: 'transaction targeting a DeFi protocol on Polygon. The transaction was', color: 'green' },
-  { text: 'routed through multiple mixer contracts to obscure the trail.', color: 'green' },
-  { text: '', color: 'muted' },
-  { text: 'WARNING: The NFT has already left the Binance network. Carmen is on the', color: 'yellow' },
-  { text: 'move and the trail is getting cold. Every second counts, detective.', color: 'yellow' },
-  { text: '', color: 'muted' },
-  { text: 'Your mission: track the stolen CryptoPunk across blockchains, follow the', color: 'red' },
-  { text: 'on-chain clues, and bring Carmen Sandiego to justice before she vanishes.', color: 'red' },
-  { text: '', color: 'muted' },
-  { text: 'Good luck, detective. The entire agency is counting on you.', color: 'yellow' },
-]
 
 const LINE_TYPE_SPEED = 28 // ms per character
 
+// Build typed lines from a scenario's briefing text
+function buildTypedLines(scenario) {
+  if (!scenario) return []
+
+  const lines = []
+  const colors = ['yellow', 'cyan', 'green']
+
+  // Title line
+  lines.push({ text: `CASE: ${scenario.title.toUpperCase()}`, color: 'yellow' })
+  lines.push({ text: '', color: 'muted' })
+
+  // Split briefing into sentences and assign colors in blocks
+  const sentences = scenario.briefing
+    .split(/(?<=\.)\s+/)
+    .filter((s) => s.trim())
+
+  let colorIdx = 0
+  for (let i = 0; i < sentences.length; i++) {
+    const sentence = sentences[i].trim()
+    if (!sentence) continue
+
+    // Wrap long sentences at ~70 chars
+    const words = sentence.split(' ')
+    let currentLine = ''
+    for (const word of words) {
+      if (currentLine.length + word.length + 1 > 70 && currentLine) {
+        lines.push({ text: currentLine, color: colors[colorIdx % colors.length] })
+        currentLine = word
+      } else {
+        currentLine = currentLine ? `${currentLine} ${word}` : word
+      }
+    }
+    if (currentLine) {
+      lines.push({ text: currentLine, color: colors[colorIdx % colors.length] })
+    }
+
+    // Blank line between sentences, advance color every 2 sentences
+    if (i < sentences.length - 1) {
+      if ((i + 1) % 2 === 0) {
+        lines.push({ text: '', color: 'muted' })
+        colorIdx++
+      }
+    }
+  }
+
+  // Cities involved
+  if (scenario.cities) {
+    lines.push({ text: '', color: 'muted' })
+    lines.push({ text: 'SUSPECTED LOCATIONS:', color: 'red' })
+    for (const [, city] of Object.entries(scenario.cities)) {
+      lines.push({
+        text: `  ${city.emoji} ${city.name} [${city.chain}]`,
+        color: 'red',
+      })
+    }
+  }
+
+  lines.push({ text: '', color: 'muted' })
+  lines.push({ text: 'Good luck, detective. The entire agency is counting on you.', color: 'yellow' })
+
+  return lines
+}
+
+// Instant header lines (always shown)
+const INSTANT_LINES = [
+  { text: '\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588', color: 'red' },
+  { text: '  ACME DETECTIVE AGENCY \u2014 PRIORITY ALERT \u2014 CLASSIFICATION: CRITICAL', color: 'red' },
+  { text: '\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588', color: 'red' },
+  { text: '', color: 'muted' },
+]
+
 export default function MissionBriefing() {
-  const { completeBriefing } = useGameStore()
+  const { completeBriefing, missionId } = useGameStore()
   const audioRef = useRef(null)
   const [currentLine, setCurrentLine] = useState(0)
   const [currentChar, setCurrentChar] = useState(0)
@@ -52,6 +85,17 @@ export default function MissionBriefing() {
   const [allDone, setAllDone] = useState(false)
   const [skipped, setSkipped] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
+
+  // Select scenario based on missionId
+  const scenarios = scenariosData.scenarios
+  const scenario = useMemo(() => {
+    if (missionId && missionId > 0) {
+      return scenarios[(missionId - 1) % scenarios.length]
+    }
+    return scenarios[0]
+  }, [missionId, scenarios])
+
+  const TYPED_LINES = useMemo(() => buildTypedLines(scenario), [scenario])
 
   const handleStartMission = useCallback(async () => {
     if (isStarting) return
@@ -123,7 +167,7 @@ export default function MissionBriefing() {
       setCurrentChar(0)
     }, 80)
     return () => clearTimeout(timeout)
-  }, [currentLine, currentChar, skipped, allDone])
+  }, [currentLine, currentChar, skipped, allDone, TYPED_LINES])
 
   // 1st Enter: skip typing + stop audio | 2nd Enter: close briefing
   const handleKeyDown = useCallback(
@@ -140,7 +184,7 @@ export default function MissionBriefing() {
         audioRef.current?.pause()
       }
     },
-    [allDone, handleStartMission]
+    [allDone, handleStartMission, TYPED_LINES]
   )
 
   useEffect(() => {
@@ -176,7 +220,7 @@ export default function MissionBriefing() {
               <span className={styles.dot} data-color="green" />
             </div>
             <span className={styles.headerTitle}>
-              acme_alert.exe — PRIORITY: CRITICAL
+              acme_alert.exe &mdash; PRIORITY: CRITICAL
             </span>
             <span className={styles.headerBlink}>&#9679; LIVE</span>
           </div>

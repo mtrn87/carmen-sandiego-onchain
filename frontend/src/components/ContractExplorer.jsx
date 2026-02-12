@@ -15,6 +15,8 @@ export default function ContractExplorer({ onOpenMap }) {
     advanceTour,
     endTour,
     currentCase,
+    missionEvents,
+    missionId,
   } = useGameStore()
 
   const [selectedTx, setSelectedTx] = useState(null)
@@ -210,9 +212,14 @@ export default function ContractExplorer({ onOpenMap }) {
             onClick={() => setActiveSection('events')}
           >
             Events
-            {events.length > 0 && (
-              <span className={styles.sectionTabCount}>{events.length}</span>
-            )}
+            {(() => {
+              const count = missionId && missionEvents.length > 0
+                ? missionEvents.length
+                : events.length
+              return count > 0 ? (
+                <span className={styles.sectionTabCount}>{count}</span>
+              ) : null
+            })()}
           </button>
           <button
             className={`${styles.sectionTab} ${activeSection === 'contract' ? styles.sectionTabActive : ''}`}
@@ -269,11 +276,34 @@ export default function ContractExplorer({ onOpenMap }) {
           </div>
         )}
 
-        {/* events tab */}
-        {activeSection === 'events' && (
-          events.length > 0 ? (
+        {/* events tab — real on-chain events when mission active, fallback to mock */}
+        {activeSection === 'events' && (() => {
+          const displayEvents = missionId && missionEvents.length > 0
+            ? missionEvents
+            : events
+          return displayEvents.length > 0 ? (
             <div className={styles.eventsTable}>
-              {[...events].reverse().map((evt, i) => (
+              {missionId && missionEvents.length > 0 && (
+                <div className={styles.eventRow} style={{ borderLeft: '2px solid var(--green, #0f0)' }}>
+                  <div className={styles.eventHeader}>
+                    <span className={styles.eventName} style={{ color: 'var(--green, #0f0)' }}>
+                      LIVE ON-CHAIN EVENTS
+                    </span>
+                    <span className={styles.eventBlock}>Mission #{missionId}</span>
+                  </div>
+                  <div className={styles.eventData}>
+                    <div className={styles.eventDataRow}>
+                      <span className={styles.eventDataKey}>contract</span>
+                      <span className={styles.eventDataValue}>GameMaster (Sepolia)</span>
+                    </div>
+                    <div className={styles.eventDataRow}>
+                      <span className={styles.eventDataKey}>events</span>
+                      <span className={styles.eventDataValue}>{missionEvents.length} recorded</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {[...displayEvents].reverse().map((evt, i) => (
                 <div key={i} className={styles.eventRow}>
                   <div className={styles.eventHeader}>
                     <span
@@ -311,7 +341,7 @@ export default function ContractExplorer({ onOpenMap }) {
               <span>Event logs will appear here as you investigate.</span>
             </div>
           )
-        )}
+        })()}
 
         {activeSection === 'contract' && (
           <div className={styles.placeholderSection}>

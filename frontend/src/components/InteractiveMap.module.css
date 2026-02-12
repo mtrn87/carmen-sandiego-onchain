@@ -283,6 +283,36 @@
   gap: 10px;
 }
 
+.investigateBtn {
+  width: 100%;
+  padding: 14px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #0f0;
+  background: rgba(0, 255, 0, 0.08);
+  border: 1px solid rgba(0, 255, 0, 0.35);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.investigateBtn:hover:not(:disabled) {
+  background: rgba(0, 255, 0, 0.18);
+  border-color: rgba(0, 255, 0, 0.7);
+  text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+  box-shadow: 0 0 15px rgba(0, 255, 0, 0.15);
+}
+
+.investigateBtnDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  color: var(--text-muted);
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
 .locationPanelTitle {
   display: flex;
   align-items: center;
@@ -746,4 +776,147 @@
   font-size: 0.5rem;
   letter-spacing: 2px;
   opacity: 0.6;
+}
+
+/* ── block counter ── */
+.blockCounter {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(6, 6, 14, 0.85);
+  border: 1px solid;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  animation: blockCounterIn 0.3s ease;
+}
+
+@keyframes blockCounterIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.blockCounter_green {
+  border-color: rgba(0, 255, 65, 0.3);
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.05);
+}
+
+.blockCounter_yellow {
+  border-color: rgba(255, 230, 0, 0.3);
+  box-shadow: 0 0 10px rgba(255, 230, 0, 0.05);
+}
+
+.blockCounter_red {
+  border-color: rgba(255, 42, 109, 0.3);
+  box-shadow: 0 0 10px rgba(255, 42, 109, 0.05);
+  animation: blockCounterIn 0.3s ease, blockCounterPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes blockCounterPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(255, 42, 109, 0.05); }
+  50% { box-shadow: 0 0 18px rgba(255, 42, 109, 0.15); }
+}
+
+.blockCounterIcon {
+  font-size: 0.9rem;
+}
+
+.blockCounter_green .blockCounterIcon { color: var(--green); }
+.blockCounter_yellow .blockCounterIcon { color: var(--yellow); }
+.blockCounter_red .blockCounterIcon { color: var(--red); }
+
+.blockCounterInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.blockCounterValue {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+  font-weight: bold;
+}
+
+.blockCounter_green .blockCounterValue { color: var(--green); }
+.blockCounter_yellow .blockCounterValue { color: var(--yellow); }
+.blockCounter_red .blockCounterValue { color: var(--red); }
+
+.blockCounterLabel {
+  font-family: var(--font-mono);
+  font-size: 0.48rem;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+}
+
+/* ── carmen moved alert ── */
+.carmenAlert {
+  position: absolute;
+  inset: 0;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: carmenAlertFlash 4s ease-out forwards;
+}
+
+@keyframes carmenAlertFlash {
+  0% { background: rgba(255, 42, 109, 0.25); }
+  10% { background: rgba(255, 42, 109, 0.08); }
+  20% { background: rgba(255, 42, 109, 0.15); }
+  40% { background: rgba(255, 42, 109, 0.04); }
+  100% { background: transparent; }
+}
+
+.carmenAlertContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 40px;
+  background: rgba(6, 6, 14, 0.9);
+  border: 1px solid rgba(255, 42, 109, 0.4);
+  box-shadow: 0 0 40px rgba(255, 42, 109, 0.15);
+  animation: carmenAlertIn 0.3s ease, carmenAlertOut 0.5s ease 3.5s forwards;
+}
+
+@keyframes carmenAlertIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes carmenAlertOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.carmenAlertIcon {
+  font-size: 2rem;
+  color: var(--red);
+  animation: carmenAlertPulse 0.5s ease-in-out 3;
+}
+
+@keyframes carmenAlertPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+.carmenAlertTitle {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--red);
+  letter-spacing: 4px;
+  text-shadow: 0 0 12px rgba(255, 42, 109, 0.5);
+}
+
+.carmenAlertSub {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  letter-spacing: 1px;
 }

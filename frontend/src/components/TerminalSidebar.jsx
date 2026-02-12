@@ -44,7 +44,16 @@ export default function TerminalSidebar() {
     tourActive,
     tourStep,
     advanceTour,
+    startNewMission,
+    scannedLocations,
+    blocksElapsed,
+    locations,
+    missionId,
+    playerNickname,
+    rank,
   } = useGameStore()
+
+  const missionEnded = currentMission?.status === 'completed' || currentMission?.status === 'failed'
 
   // auto scroll terminal to bottom
   useEffect(() => {
@@ -75,16 +84,71 @@ export default function TerminalSidebar() {
     return () => audio.removeEventListener('ended', onEnded)
   }, [])
 
+  const getContextualHint = useCallback(() => {
+    const unscanned = locations.filter((l) => !scannedLocations.includes(l.id))
+    const clueCount = clues.length
+
+    // No mission yet
+    if (!missionId) {
+      return 'No active mission. Complete the briefing to start tracking Carmen.'
+    }
+
+    // Mission ended
+    if (currentMission?.status === 'completed') {
+      return 'Mission complete! Start a new mission to continue your detective career.'
+    }
+    if (currentMission?.status === 'failed') {
+      return 'Mission failed. Don\'t give up — start a new mission and try again.'
+    }
+
+    // Block pressure warnings
+    if (blocksElapsed > 40) {
+      return 'CRITICAL: You\'re running out of blocks! Investigate the most likely city NOW before Carmen escapes!'
+    }
+    if (blocksElapsed > 30) {
+      return 'Time is running low. Focus on the city that matches your clues best. Every block counts.'
+    }
+
+    // No locations scanned yet
+    if (scannedLocations.length === 0) {
+      return 'Open the MAP and scan a network to discover contracts. Each scan costs gas but reveals investigation targets.'
+    }
+
+    // Scanned but no clues yet
+    if (clueCount === 0 && scannedLocations.length > 0) {
+      return 'Good, you\'ve scanned networks. Now investigate a contract from the map — this sends a TX to GameMaster and triggers a CRE clue.'
+    }
+
+    // Has some clues, can narrow down
+    if (clueCount === 1) {
+      return 'You have 1 clue. Study it carefully — does it point to a specific city? Investigate another location to triangulate Carmen\'s position.'
+    }
+
+    if (clueCount === 2) {
+      if (unscanned.length > 0) {
+        const hint = unscanned[0]
+        return `You have 2 clues. Consider investigating ${hint.name} next — with 3+ clues the system can attempt capture.`
+      }
+      return 'You have 2 clues. One more investigation could trigger a capture attempt if you guess correctly!'
+    }
+
+    if (clueCount >= 3) {
+      return 'You have enough clues for a capture attempt. If your next investigation hits the right city, Carmen is caught!'
+    }
+
+    return 'Keep investigating. Follow the blockchain trail and cross-reference your clues to find Carmen.'
+  }, [missionId, currentMission, clues, scannedLocations, locations, blocksElapsed])
+
   const handleSendMessage = () => {
     const msg = chatInput.trim()
     if (!msg) return
     addTerminalLine(`> ${msg}`, 'cyan', 'user')
     setChatInput('')
-    // simulate AI response
     setTimeout(() => {
       addTerminalLine('> ACME AI: Processing your request...', 'muted', 'system')
       setTimeout(() => {
-        addTerminalLine('> ACME AI: Keep investigating the contracts and follow the blockchain trail. Check transaction logs for suspicious activity.', 'green', 'system')
+        const hint = getContextualHint()
+        addTerminalLine(`> ACME AI: ${hint}`, 'green', 'system')
       }, 1200)
     }, 600)
   }
@@ -110,17 +174,27 @@ export default function TerminalSidebar() {
 
       {/* agent info */}
       <div className={styles.agentBar}>
+        {playerNickname && (
+          <div className={styles.agentRow}>
+            <span className={styles.agentLabel}>ALIAS</span>
+            <span className={styles.nicknameValue}>{playerNickname}</span>
+          </div>
+        )}
         <div className={styles.agentRow}>
           <span className={styles.agentLabel}>AGENT</span>
-          <span className={styles.agentValue}>{walletAddress || '—'}</span>
+          <span className={styles.agentValue}>
+            {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '\u2014'}
+          </span>
         </div>
         <div className={styles.agentRow}>
           <span className={styles.agentLabel}>RANK</span>
-          <span className={styles.rankBadge}>{rankTitle}</span>
+          <span className={`${styles.rankBadge} ${rank >= 4 ? styles.rankElite : rank >= 2 ? styles.rankMid : ''}`}>
+            {rankTitle}
+          </span>
         </div>
         <div className={styles.agentRow}>
           <span className={styles.agentLabel}>MISSION</span>
-          <span className={styles.missionValue}>{currentMission?.title || '—'}</span>
+          <span className={styles.missionValue}>{currentMission?.title || '\u2014'}</span>
         </div>
       </div>
 
@@ -163,6 +237,20 @@ export default function TerminalSidebar() {
             ))}
             <span className={styles.cursor}>_</span>
           </div>
+
+          {/* new mission button — shown after completion/failure */}
+          {missionEnded && (
+            <div className={styles.newMissionBar}>
+              <button
+                className={styles.newMissionBtn}
+                onClick={startNewMission}
+              >
+                {currentMission.status === 'completed'
+                  ? '[ NEW MISSION ]'
+                  : '[ RETRY MISSION ]'}
+              </button>
+            </div>
+          )}
 
           {/* chat input */}
           <div className={styles.chatInput}>

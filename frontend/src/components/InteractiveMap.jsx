@@ -118,8 +118,14 @@ export default function InteractiveMap({ onSelectCase }) {
     scannedLocations,
     isScanning,
     scanLocation,
+    investigate,
     gas,
+    missionId,
+    blocksElapsed,
+    carmenMovedAlert,
   } = useGameStore()
+
+  const blockColor = blocksElapsed <= 20 ? 'green' : blocksElapsed <= 35 ? 'yellow' : 'red'
 
   const [selectedMarker, setSelectedMarker] = useState(null)
 
@@ -288,6 +294,23 @@ export default function InteractiveMap({ onSelectCase }) {
               </div>
             ) : (
               <div className={styles.locationPanelContent}>
+                {/* On-chain investigation button */}
+                <button
+                  className={`${styles.investigateBtn} ${isInvestigating ? styles.investigateBtnDisabled : ''}`}
+                  style={{ '--chain-color': loc.chainColor }}
+                  disabled={isInvestigating || !missionId}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    investigate(loc.id)
+                  }}
+                >
+                  {isInvestigating
+                    ? '&#9203; INVESTIGATING...'
+                    : !missionId
+                      ? '&#9888; START MISSION FIRST'
+                      : `&#128269; INVESTIGATE ${loc.name.toUpperCase()}`}
+                </button>
+
                 <div className={styles.locationPanelTitle}>
                   <span>CONTRACTS FOUND</span>
                   <span className={styles.locationPanelCount}>{loc.cases.length}</span>
@@ -377,6 +400,28 @@ export default function InteractiveMap({ onSelectCase }) {
         <span>WEB3 NETWORK MAP</span>
         <span className={styles.mapLabelSub}>MULTI-CHAIN TOPOLOGY</span>
       </div>
+
+      {/* carmen moved alert */}
+      {carmenMovedAlert && (
+        <div className={styles.carmenAlert}>
+          <div className={styles.carmenAlertContent}>
+            <span className={styles.carmenAlertIcon}>&#9888;</span>
+            <span className={styles.carmenAlertTitle}>CARMEN HAS MOVED</span>
+            <span className={styles.carmenAlertSub}>Target hash updated &mdash; previous intel may be outdated</span>
+          </div>
+        </div>
+      )}
+
+      {/* block counter */}
+      {missionId && (
+        <div className={`${styles.blockCounter} ${styles[`blockCounter_${blockColor}`]}`}>
+          <span className={styles.blockCounterIcon}>&#9638;</span>
+          <div className={styles.blockCounterInfo}>
+            <span className={styles.blockCounterValue}>{blocksElapsed}</span>
+            <span className={styles.blockCounterLabel}>BLOCKS</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

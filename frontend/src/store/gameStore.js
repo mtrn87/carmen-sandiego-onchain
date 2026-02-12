@@ -8,8 +8,10 @@ import {
   getMission,
   getMissionClues,
   getBlocksUsed,
+  getMissionEvents,
   onClueReceived,
   onCarmenCaptured,
+  onCarmenMoved,
   onMissionFailed,
   ensureSepoliaNetwork,
   getSigner,
@@ -63,14 +65,9 @@ const CITY_LOCATIONS = [
 
 export const useGameStore = create((set, get) => ({
   // auth
-  player: null,
   walletAddress: null,
   isConnected: false,
   playerNickname: null,
-  isFirstLogin: false,
-  web3authProvider: null,
-  multiChainAddresses: {},
-  userInfo: null,
 
   // gas (UI-only element)
   gas: 100,
@@ -86,7 +83,6 @@ export const useGameStore = create((set, get) => ({
   rankTitle: 'Detective Rookie',
   currentMission: null,
   locations: CITY_LOCATIONS,
-  selectedLocation: null,
   clues: [],
   evidence: [],
   scannedLocations: [],
@@ -100,6 +96,18 @@ export const useGameStore = create((set, get) => ({
   showClueModal: false,
   activeClue: null,
 
+  // on-chain events for ContractExplorer
+  missionEvents: [],
+
+  // mission outcome modal
+  showOutcomeModal: false,
+  missionOutcome: null, // { type: 'captured'|'failed', blocksUsed, reward, rewardLabel, newRank }
+
+  // block counter
+  blocksElapsed: 0,
+  carmenMovedAlert: false,
+  _blockPollInterval: null,
+
   // event unsubscribers
   _unsubscribers: [],
 
@@ -111,15 +119,13 @@ export const useGameStore = create((set, get) => ({
     set({ walletAddress: address, isConnected: true }),
 
   disconnectWallet: () => {
-    const { _unsubscribers } = get()
+    const { _unsubscribers, _blockPollInterval } = get()
     _unsubscribers.forEach((unsub) => unsub())
+    if (_blockPollInterval) clearInterval(_blockPollInterval)
     set({
       walletAddress: null,
       isConnected: false,
-      player: null,
       playerNickname: null,
-      web3authProvider: null,
-      multiChainAddresses: {},
       missionId: null,
       missionData: null,
       isRegistered: false,
@@ -127,34 +133,18 @@ export const useGameStore = create((set, get) => ({
     })
   },
 
-  registerPlayer: (name) =>
-    set((state) => ({
-      player: { name, address: state.walletAddress, rank: 0, rankTitle: 'Detective Rookie' },
-    })),
-
-  setWeb3AuthProvider: (provider) =>
-    set({ web3authProvider: provider }),
-
-  setUserInfo: (userInfo) =>
-    set({ userInfo }),
-
   setPlayerNickname: (nickname) =>
     set({ playerNickname: nickname }),
 
-  setIsFirstLogin: (isFirst) =>
-    set({ isFirstLogin: isFirst }),
-
-  setMultiChainAddresses: (addresses) =>
-    set({ multiChainAddresses: addresses }),
-
-  initializeWeb3AuthSession: (address, userInfo, addresses, nickname) =>
+  /**
+   * Restore session from localStorage on app load.
+   * Called by App.jsx with data from authPersistence.loadAuthSession().
+   */
+  initializeWeb3AuthSession: (address, _userInfo, _addresses, nickname) =>
     set({
       walletAddress: address,
       isConnected: true,
-      userInfo,
-      multiChainAddresses: addresses,
       playerNickname: nickname,
-      isFirstLogin: false,
     }),
 
   // ============================================================
@@ -241,9 +231,18 @@ export const useGameStore = create((set, get) => ({
 
       const statusMap = { 0: 'none', 1: 'active', 2: 'completed', 3: 'failed' }
 
+      // Fetch real on-chain events for ContractExplorer
+      let events = []
+      try {
+        events = await getMissionEvents(missionId)
+      } catch (err) {
+        console.warn('Failed to load mission events:', err)
+      }
+
       set({
         missionId,
         missionData: mission,
+        missionEvents: events,
         currentMission: {
           id: `mission-${missionId}`,
           title: `Mission #${missionId}`,
@@ -267,11 +266,26 @@ export const useGameStore = create((set, get) => ({
    * Set up blockchain event listeners for a mission.
    */
   _setupEventListeners: async (missionId) => {
-    const { _unsubscribers } = get()
+    const { _unsubscribers, _blockPollInterval } = get()
     // Clean previous listeners
     _unsubscribers.forEach((unsub) => unsub())
+    if (_blockPollInterval) clearInterval(_blockPollInterval)
 
     const newUnsubs = []
+
+    // Poll blocks elapsed every 12s (~ 1 Sepolia block)
+    try {
+      const blocks = await getBlocksUsed(missionId)
+      set({ blocksElapsed: blocks })
+    } catch (_) { /* ignore initial fetch error */ }
+
+    const pollId = setInterval(async () => {
+      try {
+        const blocks = await getBlocksUsed(missionId)
+        set({ blocksElapsed: blocks })
+      } catch (_) { /* ignore poll error */ }
+    }, 12000)
+    set({ _blockPollInterval: pollId })
 
     try {
       // Listen for new clues
@@ -285,6 +299,10 @@ export const useGameStore = create((set, get) => ({
         }))
 
         try {
+          // Clear investigation timeout — CRE responded
+          const tid = get()._investigateTimeoutId
+          if (tid) { clearTimeout(tid); set({ _investigateTimeoutId: null }) }
+
           const text = await decryptClue(event.ipfsPointer)
           const newClue = {
             id: `clue-${Date.now()}`,
@@ -300,6 +318,17 @@ export const useGameStore = create((set, get) => ({
             clues: [...s.clues, newClue],
             activeClue: newClue,
             showClueModal: true,
+            missionEvents: [...s.missionEvents, {
+              name: 'ClueReceived',
+              block: 'latest',
+              color: 'yellow',
+              data: {
+                missionId: event.missionId,
+                clueType: ['Text', 'Audio', 'Image'][event.clueType] || 'Unknown',
+                contentHash: `${event.contentHash.slice(0, 14)}...`,
+                encrypted: 'ECIES-secp256k1',
+              },
+            }],
             terminalLines: [
               ...s.terminalLines,
               { text: '> CLUE DECRYPTED SUCCESSFULLY.', color: 'yellow', type: 'alert' },
@@ -307,6 +336,8 @@ export const useGameStore = create((set, get) => ({
           }))
         } catch (err) {
           console.error('Clue decryption failed:', err)
+          const tid2 = get()._investigateTimeoutId
+          if (tid2) { clearTimeout(tid2); set({ _investigateTimeoutId: null }) }
           set((s) => ({
             isInvestigating: false,
             terminalLines: [
@@ -320,17 +351,38 @@ export const useGameStore = create((set, get) => ({
 
       // Listen for capture
       const unsubCapture = await onCarmenCaptured(missionId, (event) => {
+        const rewardLabel = event.reward >= 100 ? 'GOLD' : event.reward >= 75 ? 'SILVER' : 'BRONZE'
+        const newRank = get().rank + 1
         set((s) => ({
-          rank: s.rank + 1,
-          rankTitle: getRankTitle(s.rank + 1),
+          rank: newRank,
+          rankTitle: getRankTitle(newRank),
+          showOutcomeModal: true,
+          missionOutcome: {
+            type: 'captured',
+            blocksUsed: event.blocksUsed,
+            reward: event.reward,
+            rewardLabel,
+            newRank,
+            newRankTitle: getRankTitle(newRank),
+          },
           currentMission: s.currentMission
             ? { ...s.currentMission, status: 'completed' }
             : null,
+          missionEvents: [...s.missionEvents, {
+            name: 'CarmenCaptured',
+            block: 'latest',
+            color: 'green',
+            data: {
+              missionId: event.missionId,
+              blocksUsed: event.blocksUsed,
+              reward: `${event.reward} pts (${rewardLabel})`,
+            },
+          }],
           terminalLines: [
             ...s.terminalLines,
             { text: '> ████████████████████████████████████████', color: 'green', type: 'system' },
             { text: '> CARMEN SANDIEGO CAPTURED!', color: 'green', type: 'alert' },
-            { text: `> Solved in ${event.blocksUsed} blocks!`, color: 'yellow', type: 'alert' },
+            { text: `> Solved in ${event.blocksUsed} blocks — ${rewardLabel} rating!`, color: 'yellow', type: 'alert' },
             { text: `> PROMOTED TO: ${getRankTitle(s.rank + 1)}`, color: 'yellow', type: 'alert' },
             { text: '> MissionNFT minted as trophy!', color: 'cyan', type: 'system' },
             { text: '> ████████████████████████████████████████', color: 'green', type: 'system' },
@@ -339,12 +391,44 @@ export const useGameStore = create((set, get) => ({
       })
       newUnsubs.push(unsubCapture)
 
+      // Listen for Carmen moving
+      const unsubMoved = await onCarmenMoved(missionId, (event) => {
+        set({ carmenMovedAlert: true })
+        setTimeout(() => set({ carmenMovedAlert: false }), 4000)
+        set((s) => ({
+          missionEvents: [...s.missionEvents, {
+            name: 'CarmenMoved',
+            block: 'latest',
+            color: 'red',
+            data: {
+              missionId: event.missionId,
+              newTargetHash: `${event.newTargetHash.slice(0, 14)}...`,
+              status: 'Carmen relocated!',
+            },
+          }],
+          terminalLines: [
+            ...s.terminalLines,
+            { text: '> !! ALERT: Carmen has MOVED to a different city!', color: 'red', type: 'alert' },
+            { text: '> Target hash updated. Previous intel may be outdated.', color: 'yellow', type: 'system' },
+          ],
+        }))
+      })
+      newUnsubs.push(unsubMoved)
+
       // Listen for mission failure
       const unsubFail = await onMissionFailed(missionId, () => {
         set((s) => ({
+          showOutcomeModal: true,
+          missionOutcome: { type: 'failed' },
           currentMission: s.currentMission
             ? { ...s.currentMission, status: 'failed' }
             : null,
+          missionEvents: [...s.missionEvents, {
+            name: 'MissionFailed',
+            block: 'latest',
+            color: 'red',
+            data: { missionId, status: 'Carmen escaped!' },
+          }],
           terminalLines: [
             ...s.terminalLines,
             { text: '> !! MISSION FAILED — Carmen escaped!', color: 'red', type: 'alert' },
@@ -363,8 +447,6 @@ export const useGameStore = create((set, get) => ({
   // ============================================================
   //  Game actions
   // ============================================================
-
-  selectLocation: (locationId) => set({ selectedLocation: locationId }),
 
   scanLocation: (locationId, scanCost = 30) => {
     const state = get()
@@ -410,6 +492,9 @@ export const useGameStore = create((set, get) => ({
     }, 2000)
   },
 
+  // Safety timeout ID for investigation — cleared when clue arrives
+  _investigateTimeoutId: null,
+
   /**
    * Submit investigation transaction on-chain.
    * @param {number} chainId - The city's chain ID (421614, 84532, or 51)
@@ -435,10 +520,37 @@ export const useGameStore = create((set, get) => ({
       await ensureSepoliaNetwork()
       const receipt = await submitInvestigationOnChain(chainId)
 
+      // Safety timeout: if CRE doesn't respond within 90s, unlock the UI
+      const timeoutId = setTimeout(() => {
+        if (get().isInvestigating) {
+          set((s) => ({
+            isInvestigating: false,
+            _investigateTimeoutId: null,
+            terminalLines: [
+              ...s.terminalLines,
+              { text: '> !! CRE TIMEOUT — no response after 90s.', color: 'red', type: 'alert' },
+              { text: '> You may investigate again.', color: 'yellow', type: 'system' },
+            ],
+          }))
+        }
+      }, 90_000)
+      set({ _investigateTimeoutId: timeoutId })
+
       set((s) => ({
         locations: s.locations.map((l) =>
           l.id === chainId ? { ...l, investigated: true } : l
         ),
+        missionEvents: [...s.missionEvents, {
+          name: 'InvestigationSubmitted',
+          block: receipt.blockNumber || 'latest',
+          color: 'cyan',
+          data: {
+            missionId: s.missionId,
+            city: `${cityName}`,
+            chainId,
+            txHash: `${receipt.hash.slice(0, 14)}...`,
+          },
+        }],
         terminalLines: [
           ...s.terminalLines,
           { text: `> TX CONFIRMED: ${receipt.hash}`, color: 'green', type: 'system' },
@@ -447,7 +559,7 @@ export const useGameStore = create((set, get) => ({
       }))
 
       // Clue will arrive via ClueReceived event listener
-      // isInvestigating stays true until clue arrives
+      // isInvestigating stays true until clue arrives or timeout fires
     } catch (error) {
       console.error('Investigation failed:', error)
       set((s) => ({
@@ -709,6 +821,42 @@ export const useGameStore = create((set, get) => ({
   },
 
   closeClueModal: () => set({ showClueModal: false, activeClue: null }),
+  closeOutcomeModal: () => set({ showOutcomeModal: false }),
+
+  /**
+   * Start a new mission after completion or failure.
+   * Resets game state and goes back to briefing flow.
+   */
+  startNewMission: async () => {
+    const { _unsubscribers, _blockPollInterval } = get()
+    _unsubscribers.forEach((unsub) => unsub())
+    if (_blockPollInterval) clearInterval(_blockPollInterval)
+
+    set({
+      missionId: null,
+      missionData: null,
+      missionEvents: [],
+      clues: [],
+      evidence: [],
+      locations: CITY_LOCATIONS,
+      scannedLocations: [],
+      briefingDone: false,
+      isInvestigating: false,
+      showClueModal: false,
+      activeClue: null,
+      showOutcomeModal: false,
+      missionOutcome: null,
+      currentMission: null,
+      gas: 100,
+      blocksElapsed: 0,
+      carmenMovedAlert: false,
+      _blockPollInterval: null,
+      _unsubscribers: [],
+      terminalLines: [
+        { text: '> MISSION RESET. Preparing new assignment...', color: 'cyan', type: 'system' },
+      ],
+    })
+  },
 
   spendGas: (amount) => {
     set((s) => ({

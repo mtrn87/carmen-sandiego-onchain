@@ -7,10 +7,12 @@ import TypeWriter from '../components/TypeWriter'
 import NeonButton from '../components/NeonButton'
 import NicknameModal from '../components/NicknameModal'
 import { useGameStore } from '../store/gameStore'
-import { getEthereumAddressFromPrivy, generateMultiChainAddressesFromPrivy, getUserInfoFromPrivy, getProviderFromPrivy } from '../utils/privyProvider'
+import { getEthereumAddressFromPrivy, generateMultiChainAddressesFromPrivy, getUserInfoFromPrivy } from '../utils/privyProvider'
 import { saveAuthSession, clearAuthSession } from '../utils/authPersistence'
 import { getOrCreateKeyPair } from '../utils/ecies'
 import { isPlayerRegistered, registerPlayer as registerPlayerOnChain, ensureSepoliaNetwork, getSigner } from '../services/contractService'
+
+const LEADERBOARD_MSG = 'Leaderboard coming soon! Complete missions to build your rank.'
 import styles from './LoginPage.module.css'
 
 const BOOT_LINES = [
@@ -31,7 +33,7 @@ export default function LoginPage() {
   const [connecting, setConnecting] = useState(false)
   const [flickerClass, setFlickerClass] = useState('')
   const [showNicknameModal, setShowNicknameModal] = useState(false)
-  const { connectWallet, isConnected, walletAddress, playerNickname, setWeb3AuthProvider, setUserInfo, setMultiChainAddresses, initializeWeb3AuthSession, disconnectWallet, initGame } = useGameStore()
+  const { connectWallet, isConnected, walletAddress, playerNickname, disconnectWallet } = useGameStore()
 
   // boot sequence
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function LoginPage() {
     try {
       console.log('Connecting with Privy...')
       
-      // Privy login dispara modal de autenticação social
+      // Privy login opens the social auth modal
       await login()
       
       setConnecting(false)
@@ -90,39 +92,30 @@ export default function LoginPage() {
     }
   }, [logout, disconnectWallet])
 
-  // Sincroniza com Privy quando usuário faz login
+  // Sync with Privy when user logs in
   useEffect(() => {
     if (user && !isConnected) {
       (async () => {
         try {
           console.log('Syncing Privy user...', user)
-          
-          // Se tem wallet (MetaMask), extrai endereço
+
+          // Extract wallet address if user connected via MetaMask/wallet
           let address = null
-          let ethProvider = null
           let addresses = null
-          
+
           if (user.wallet) {
             try {
               address = await getEthereumAddressFromPrivy(user)
-              ethProvider = await getProviderFromPrivy(user)
               addresses = await generateMultiChainAddressesFromPrivy(user)
             } catch (walletError) {
               console.warn('Wallet error:', walletError)
               address = user.wallet.address
             }
-          } else if (user.email || user.google) {
-            // Login with Google/email — no embedded wallet, no valid ETH address
-            address = null
-            ethProvider = null
-            addresses = null
           }
-          
+          // Login with Google/email — no embedded wallet, no valid ETH address
+
           const userInfo = getUserInfoFromPrivy(user)
 
-          if (ethProvider) setWeb3AuthProvider(ethProvider)
-          setUserInfo(userInfo)
-          if (addresses) setMultiChainAddresses(addresses)
           if (address) connectWallet(address)
 
           saveAuthSession(address, userInfo, addresses, null)
@@ -147,8 +140,7 @@ export default function LoginPage() {
                 await registerPlayerOnChain(publicKeyHex)
                 console.log('Player registered on-chain.')
               }
-              // Load on-chain state (active mission, clues, etc.)
-              await initGame()
+              // initGame() is called by GamePage on mount — no need to call here
             } catch (regErr) {
               console.warn('On-chain registration skipped:', regErr.message)
             }
@@ -160,7 +152,7 @@ export default function LoginPage() {
         }
       })()
     }
-  }, [user, isConnected, connectWallet, setWeb3AuthProvider, setUserInfo, setMultiChainAddresses])
+  }, [user, isConnected, connectWallet])
 
   const handleNicknameConfirm = useCallback((nickname) => {
     localStorage.setItem('player_nickname', nickname)
@@ -265,7 +257,7 @@ export default function LoginPage() {
                     Start Investigation
                   </NeonButton>
 
-                  <NeonButton variant="magenta" onClick={() => {}}>
+                  <NeonButton variant="magenta" onClick={() => alert(LEADERBOARD_MSG)}>
                     Leaderboard
                   </NeonButton>
 

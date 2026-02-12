@@ -243,6 +243,129 @@ export async function onMissionFailed(missionId, callback) {
 }
 
 /**
+ * Listen for CarmenMoved events for a specific mission.
+ */
+export async function onCarmenMoved(missionId, callback) {
+  const contract = await getReadContract()
+  const filter = contract.filters.CarmenMoved(missionId)
+  const handler = (mId, newTargetHash) => {
+    callback({ missionId: Number(mId), newTargetHash })
+  }
+  contract.on(filter, handler)
+  return () => contract.off(filter, handler)
+}
+
+/**
+ * Fetch historical events for a mission from the GameMaster contract.
+ * Returns all events in chronological order.
+ * @param {number|bigint} missionId
+ * @returns {Array<{ name, block, data, color }>}
+ */
+export async function getMissionEvents(missionId) {
+  const contract = await getReadContract()
+  const provider = await getProvider()
+  const currentBlock = await provider.getBlockNumber()
+  // Look back up to 5000 blocks (more than enough for any mission)
+  const fromBlock = Math.max(0, currentBlock - 5000)
+
+  const events = []
+
+  try {
+    // Fetch InvestigationSubmitted events
+    const investFilter = contract.filters.InvestigationSubmitted(missionId)
+    const investLogs = await contract.queryFilter(investFilter, fromBlock)
+    for (const log of investLogs) {
+      const chainId = Number(log.args[2])
+      const city = CITY_MAP[chainId]
+      events.push({
+        name: "InvestigationSubmitted",
+        block: log.blockNumber,
+        color: "cyan",
+        data: {
+          missionId: Number(log.args[0]),
+          player: `${log.args[1].slice(0, 8)}...${log.args[1].slice(-4)}`,
+          city: city ? `${city.name} (${city.chain})` : `Chain ${chainId}`,
+          chainId,
+        },
+      })
+    }
+
+    // Fetch ClueReceived events
+    const clueFilter = contract.filters.ClueReceived(missionId)
+    const clueLogs = await contract.queryFilter(clueFilter, fromBlock)
+    const clueTypes = ["Text", "Audio", "Image"]
+    for (const log of clueLogs) {
+      events.push({
+        name: "ClueReceived",
+        block: log.blockNumber,
+        color: "yellow",
+        data: {
+          missionId: Number(log.args[0]),
+          clueType: clueTypes[Number(log.args[1])] || "Unknown",
+          contentHash: `${log.args[2].slice(0, 14)}...`,
+          encrypted: "ECIES-secp256k1",
+        },
+      })
+    }
+
+    // Fetch CarmenMoved events
+    const movedFilter = contract.filters.CarmenMoved(missionId)
+    const movedLogs = await contract.queryFilter(movedFilter, fromBlock)
+    for (const log of movedLogs) {
+      events.push({
+        name: "CarmenMoved",
+        block: log.blockNumber,
+        color: "red",
+        data: {
+          missionId: Number(log.args[0]),
+          newTargetHash: `${log.args[1].slice(0, 14)}...`,
+          status: "Carmen relocated!",
+        },
+      })
+    }
+
+    // Fetch CarmenCaptured events
+    const capturedFilter = contract.filters.CarmenCaptured(missionId)
+    const capturedLogs = await contract.queryFilter(capturedFilter, fromBlock)
+    for (const log of capturedLogs) {
+      events.push({
+        name: "CarmenCaptured",
+        block: log.blockNumber,
+        color: "green",
+        data: {
+          missionId: Number(log.args[0]),
+          player: `${log.args[1].slice(0, 8)}...${log.args[1].slice(-4)}`,
+          blocksUsed: Number(log.args[2]),
+          reward: Number(log.args[3]),
+        },
+      })
+    }
+
+    // Fetch MissionFailed events
+    const failedFilter = contract.filters.MissionFailed(missionId)
+    const failedLogs = await contract.queryFilter(failedFilter, fromBlock)
+    for (const log of failedLogs) {
+      events.push({
+        name: "MissionFailed",
+        block: log.blockNumber,
+        color: "red",
+        data: {
+          missionId: Number(log.args[0]),
+          player: `${log.args[1].slice(0, 8)}...${log.args[1].slice(-4)}`,
+          status: "Carmen escaped!",
+        },
+      })
+    }
+  } catch (err) {
+    console.warn("Failed to fetch mission events:", err)
+  }
+
+  // Sort chronologically
+  events.sort((a, b) => a.block - b.block)
+  return events
+}
+
+/**
  * Ensure wallet is connected to Sepolia. Prompts chain switch if needed.
  */
 export async function ensureSepoliaNetwork() {

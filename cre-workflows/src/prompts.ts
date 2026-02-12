@@ -1,7 +1,17 @@
 // ============================================================
 //  Prompt Templates for AI-powered clue generation
-//  Used by CRE workflows to generate dynamic game content
-//  Supports: Gemini (primary) + OpenAI (fallback)
+//
+//  STATUS: Prepared for future use — NOT currently imported by
+//  any CRE workflow. The workflows currently use scenario-based
+//  fallback content because CRE WASM handlers don't support
+//  async/await (needed for AI API calls).
+//
+//  When CRE v2 supports async handlers, these templates can be
+//  imported and used with generateAIBriefing() in
+//  generate-briefing/main.ts and similar AI functions in
+//  mission-start/main.ts.
+//
+//  Supports: OpenAI (primary) + any OpenAI-compatible API
 // ============================================================
 
 export type CityInfo = {

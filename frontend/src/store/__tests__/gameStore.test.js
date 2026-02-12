@@ -287,10 +287,5 @@ describe('gameStore', () => {
       expect(useGameStore.getState().activeClue).toBeNull()
     })
 
-    it('selectLocation sets selectedLocation', () => {
-      const { selectLocation } = useGameStore.getState()
-      selectLocation(84532)
-      expect(useGameStore.getState().selectedLocation).toBe(84532)
-    })
   })
 })

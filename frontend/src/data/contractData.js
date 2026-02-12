@@ -1,11 +1,10 @@
 // ─── contract exploration data per case ───
 
 export const CHAIN_CONFIG = {
-  'BNB Chain': { color: '#F0B90B', logo: 'BNB', name: 'BNB Chain', symbol: 'BNB', location: 'Shanghai', flag: '\u{1F1E8}\u{1F1F3}' },
-  'Polygon Amoy': { color: '#8247e5', logo: 'MATIC', name: 'Polygon Amoy', symbol: 'MATIC', location: 'Dubai', flag: '\u{1F1E6}\u{1F1EA}' },
   'Arbitrum Sepolia': { color: '#28a0f0', logo: 'ARB', name: 'Arbitrum Sepolia', symbol: 'ETH', location: 'Tokyo', flag: '\u{1F1EF}\u{1F1F5}' },
-  'Base Testnet': { color: '#0052ff', logo: 'BASE', name: 'Base Testnet', symbol: 'ETH', location: '', flag: '' },
-  'Multi-Chain': { color: '#ff6b00', logo: 'CCIP', name: 'Multi-Chain', symbol: 'ETH', location: '', flag: '' },
+  'Base Sepolia': { color: '#0052ff', logo: 'BASE', name: 'Base Sepolia', symbol: 'ETH', location: 'Paris', flag: '\u{1F1EB}\u{1F1F7}' },
+  'XDC Apothem': { color: '#ff6b00', logo: 'XDC', name: 'XDC Apothem', symbol: 'XDC', location: 'London', flag: '\u{1F1EC}\u{1F1E7}' },
+  'Multi-Chain': { color: '#00f0ff', logo: 'CCIP', name: 'Multi-Chain', symbol: 'ETH', location: '', flag: '' },
 }
 
 // ─── Shanghai / BNB Chain ───
@@ -439,41 +438,83 @@ const MALL_EVENTS = [
 ]
 
 // ─── all cases registry ───
+// Keys must match the case IDs in InteractiveMap.jsx's MAP_LOCATIONS
+
+const TOKYO_SENSOJI_CASE = {
+  chain: 'Arbitrum Sepolia',
+  headerType: 'nft',
+  locationImage: '/tokyo_1.png',
+  nft: SHANGHAI_NFT,
+  transactions: SHANGHAI_TXS,
+  events: SHANGHAI_EVENTS,
+}
+
+const TOKYO_TOWER_CASE = {
+  chain: 'Arbitrum Sepolia',
+  headerType: 'contract',
+  locationImage: '/tokyo_2.png',
+  contract: { ...AIRPORT_CONTRACT, name: 'TokyoTowerBeacon.sol', caseId: 'CASE-ARB-001', type: 'Signal Router' },
+  transactions: AIRPORT_TXS,
+  events: AIRPORT_EVENTS,
+}
+
+const TOKYO_CHOCHIN_CASE = {
+  chain: 'Arbitrum Sepolia',
+  headerType: 'contract',
+  locationImage: '/tokyo_3.png',
+  contract: { ...MALL_CONTRACT, name: 'ChochinMarket.sol', caseId: 'CASE-ARB-002', type: 'Swap Protocol' },
+  transactions: MALL_TXS,
+  events: MALL_EVENTS,
+}
+
+const PARIS_EIFFEL_CASE = {
+  chain: 'Base Sepolia',
+  headerType: 'contract',
+  locationImage: '/dubai_1.png',
+  contract: { ...BURJ_CONTRACT, name: 'EiffelTowerRelay.sol', caseId: 'CASE-BASE-001', type: 'Monitoring Beacon' },
+  transactions: BURJ_TXS,
+  events: BURJ_EVENTS,
+}
+
+const PARIS_LOUVRE_CASE = {
+  chain: 'Base Sepolia',
+  headerType: 'contract',
+  locationImage: '/dubai_2.png',
+  contract: { ...AIRPORT_CONTRACT, name: 'LouvreCustody.sol', caseId: 'CASE-BASE-002', type: 'Custody Router' },
+  transactions: AIRPORT_TXS,
+  events: AIRPORT_EVENTS,
+}
+
+const PARIS_MARKET_CASE = {
+  chain: 'Base Sepolia',
+  headerType: 'contract',
+  locationImage: '/dubai_3.png',
+  contract: { ...MALL_CONTRACT, name: 'MaraisMarket.sol', caseId: 'CASE-BASE-003', type: 'Market Router' },
+  transactions: MALL_TXS,
+  events: MALL_EVENTS,
+}
+
+const LONDON_BRIDGE_CASE = {
+  chain: 'XDC Apothem',
+  headerType: 'contract',
+  locationImage: '/shanghai_1.png',
+  contract: { ...AIRPORT_CONTRACT, name: 'TowerBridgeNode.sol', caseId: 'CASE-XDC-001', type: 'Cross-Chain Bridge' },
+  transactions: AIRPORT_TXS,
+  events: AIRPORT_EVENTS,
+}
 
 export const CASE_DATA = {
-  'cryptopunk-7804': {
-    chain: 'BNB Chain',
-    headerType: 'nft',
-    locationImage: '/shanghai_1.png',
-    nft: SHANGHAI_NFT,
-    transactions: SHANGHAI_TXS,
-    events: SHANGHAI_EVENTS,
-  },
-  'dubai-burj': {
-    chain: 'Polygon Amoy',
-    headerType: 'contract',
-    locationImage: '/dubai_1.png',
-    contract: BURJ_CONTRACT,
-    transactions: BURJ_TXS,
-    events: BURJ_EVENTS,
-  },
-  'dubai-airport': {
-    chain: 'Polygon Amoy',
-    headerType: 'contract',
-    locationImage: '/dubai_2.png',
-    contract: AIRPORT_CONTRACT,
-    transactions: AIRPORT_TXS,
-    events: AIRPORT_EVENTS,
-  },
-  'dubai-mall': {
-    chain: 'Polygon Amoy',
-    headerType: 'contract',
-    locationImage: '/dubai_3.png',
-    contract: MALL_CONTRACT,
-    transactions: MALL_TXS,
-    events: MALL_EVENTS,
-  },
+  // Tokyo — Arbitrum Sepolia (chainId 421614)
+  'tokyo-sensoji': TOKYO_SENSOJI_CASE,
+  'tokyo-tower': TOKYO_TOWER_CASE,
+  'tokyo-chochin': TOKYO_CHOCHIN_CASE,
+  // Paris — Base Sepolia (chainId 84532)
+  'paris-eiffel': PARIS_EIFFEL_CASE,
+  'paris-louvre': PARIS_LOUVRE_CASE,
+  'paris-market': PARIS_MARKET_CASE,
+  // London — XDC Apothem (chainId 51)
+  'london-bridge': LONDON_BRIDGE_CASE,
 }
 
 // default case for initial load
-export const DEFAULT_CASE = 'cryptopunk-7804'
+export const DEFAULT_CASE = 'tokyo-sensoji'

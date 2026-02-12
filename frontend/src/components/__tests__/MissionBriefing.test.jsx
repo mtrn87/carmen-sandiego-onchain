@@ -7,7 +7,7 @@ const mockCompleteBriefing = vi.fn(async () => {})
 // Mock gameStore
 vi.mock('../../store/gameStore', () => ({
   useGameStore: vi.fn((selector) => {
-    const state = { completeBriefing: mockCompleteBriefing }
+    const state = { completeBriefing: mockCompleteBriefing, missionId: null }
     return selector ? selector(state) : state
   }),
 }))

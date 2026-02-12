@@ -16,7 +16,7 @@ export const generateMultiChainAddressesFromPrivy = async (privyUser) => {
   try {
     const address = await getEthereumAddressFromPrivy(privyUser)
     
-    // Privy usa o mesmo endereço em todas as chains EVM
+    // Privy uses the same address across all EVM chains
     return {
       sepolia: address,
       polygonAmoy: address,
@@ -55,13 +55,13 @@ export const getProviderFromPrivy = async (privyUser) => {
       throw new Error('No wallet found')
     }
 
-    // Privy fornece um provider EIP-1193 compatível via walletClient
-    // Para MetaMask/Privy wallet, usamos window.ethereum ou o provider do walletClient
+    // Privy provides an EIP-1193 compatible provider via walletClient
+    // For MetaMask/Privy wallet, use window.ethereum or the walletClient provider
     if (window.ethereum) {
       return window.ethereum
     }
     
-    // Fallback: retorna null se não houver provider disponível
+    // Fallback: return null if no provider is available
     return null
   } catch (error) {
     console.error('Error getting provider:', error)

@@ -31,9 +31,11 @@ contracts/cache/
 contracts/artifacts/
 contracts/typechain-types/
 
-# CRE
+# CRE build artifacts
 cre-workflows/dist/
-cre-workflows/*.wasm
+cre-workflows/**/tmp.js
+cre-workflows/**/tmp.wasm
+cre-workflows/**/*.wasm
 
 # Coverage
 coverage/
