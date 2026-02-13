@@ -11,7 +11,12 @@ import { ethers } from "ethers"
 //  Constants
 // ============================================================
 
-export const GAME_MASTER_ADDRESS = "0x19281fB23Fa8C423c22A8856DD168c1eb0e9a8aD"
+export const GAME_MASTER_ADDRESS = import.meta.env.VITE_GAME_MASTER_ADDRESS
+if (!GAME_MASTER_ADDRESS) {
+  throw new Error(
+    "VITE_GAME_MASTER_ADDRESS is not set. Copy frontend/.env.example to frontend/.env and fill in the deployed address."
+  )
+}
 export const SEPOLIA_CHAIN_ID = 11155111
 
 export const CITY_MAP = {
