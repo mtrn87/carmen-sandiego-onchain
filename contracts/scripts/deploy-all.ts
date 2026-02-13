@@ -101,6 +101,12 @@ async function main() {
   const nftAddress = await missionNFT.getAddress();
   console.log("   MissionNFT:", nftAddress);
 
+  // --- 5. Connect MissionNFT to GameMaster ---
+  console.log("5. Setting MissionNFT on GameMaster...");
+  const tx2 = await gameMaster.setMissionNFT(nftAddress);
+  await tx2.wait();
+  console.log("   MissionNFT linked to GameMaster");
+
   // --- Summary ---
   console.log("\n=== DEPLOYED ADDRESSES ===");
   console.log(`GameMaster:      ${gmAddress}`);

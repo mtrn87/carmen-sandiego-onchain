@@ -97,10 +97,11 @@ describe("Carmen Sandiego - Full Game E2E (Commit-Reveal)", function () {
     // 5. Add GameMaster as VRF consumer
     await vrfCoordinator.addConsumer(subId, await gameMaster.getAddress());
 
-    // 6. Deploy MissionNFT
+    // 6. Deploy MissionNFT and connect to GameMaster
     const MissionNFTFactory = await ethers.getContractFactory("MissionNFT");
     missionNFT = await MissionNFTFactory.deploy(await gameMaster.getAddress()) as MissionNFT;
     await missionNFT.waitForDeployment();
+    await gameMaster.connect(owner).setMissionNFT(await missionNFT.getAddress());
 
     // 7. Deploy CityNode contracts
     const CityNodeFactory = await ethers.getContractFactory("CityNode");
@@ -231,6 +232,17 @@ describe("Carmen Sandiego - Full Game E2E (Commit-Reveal)", function () {
       const finalMission = await gameMaster.getMission(missionId);
       expect(finalMission.status).to.equal(2); // Completed
       expect(await gameMaster.getPlayerActiveMission(player.address)).to.equal(0);
+
+      // --- Verify NFT minted ---
+      const nftBalance = await missionNFT.balanceOf(player.address);
+      expect(nftBalance).to.equal(1);
+
+      const record = await missionNFT.getMissionRecord(1);
+      expect(record.missionId).to.equal(missionId);
+      expect(record.player).to.equal(player.address);
+      expect(record.capturedChainId).to.equal(ARBITRUM_SEPOLIA);
+      expect(record.cluesCollected).to.equal(3);
+      expect(record.reward).to.equal(100); // Gold
     });
   });
 
@@ -434,6 +446,68 @@ describe("Carmen Sandiego - Full Game E2E (Commit-Reveal)", function () {
     it("should have correct name and symbol", async function () {
       expect(await missionNFT.name()).to.equal("Carmen Sandiego Mission");
       expect(await missionNFT.symbol()).to.equal("CARMEN");
+    });
+
+    it("should mint NFT on capture via resolveCapture", async function () {
+      const missionId = await setupMission(player, 3);
+      await deliverClue(missionId, 0);
+      await deliverClue(missionId, 1);
+      await deliverClue(missionId, 2);
+
+      const { salt } = computeTargetHash(ARBITRUM_SEPOLIA, 3, Number(missionId));
+      await gameMaster.connect(creOracle).resolveCapture(missionId, ARBITRUM_SEPOLIA, salt);
+
+      // NFT minted to player
+      expect(await missionNFT.balanceOf(player.address)).to.equal(1);
+      expect(await missionNFT.ownerOf(1)).to.equal(player.address);
+
+      // Record stored correctly
+      const record = await missionNFT.getMissionRecord(1);
+      expect(record.missionId).to.equal(missionId);
+      expect(record.player).to.equal(player.address);
+      expect(record.capturedChainId).to.equal(ARBITRUM_SEPOLIA);
+      expect(record.cluesCollected).to.equal(3);
+      expect(record.reward).to.equal(100);
+    });
+
+    it("should emit MissionNFTMinted event on capture", async function () {
+      const missionId = await setupMission(player, 3);
+      await deliverClue(missionId, 0);
+      await deliverClue(missionId, 1);
+      await deliverClue(missionId, 2);
+
+      const { salt } = computeTargetHash(ARBITRUM_SEPOLIA, 3, Number(missionId));
+      await expect(
+        gameMaster.connect(creOracle).resolveCapture(missionId, ARBITRUM_SEPOLIA, salt)
+      ).to.emit(missionNFT, "MissionNFTMinted");
+    });
+
+    it("should mint multiple NFTs for multiple captures", async function () {
+      const [, , , player2] = await ethers.getSigners();
+
+      // Player 1 captures
+      const m1 = await setupMission(player, 3);
+      await deliverClue(m1, 0); await deliverClue(m1, 1); await deliverClue(m1, 2);
+      const p1 = computeTargetHash(ARBITRUM_SEPOLIA, 3, Number(m1));
+      await gameMaster.connect(creOracle).resolveCapture(m1, ARBITRUM_SEPOLIA, p1.salt);
+
+      // Player 2 captures
+      await gameMaster.connect(player2).registerPlayer(MOCK_PUBLIC_KEY);
+      await gameMaster.connect(player2).startMission();
+      const gmAddr = await gameMaster.getAddress();
+      const m2 = await gameMaster.getPlayerActiveMission(player2.address);
+      await vrfCoordinator.fulfillRandomWordsWithOverride(m2, gmAddr, [4]); // Paris
+      await deliverClue(m2, 0); await deliverClue(m2, 1); await deliverClue(m2, 2);
+      const p2 = computeTargetHash(BASE_SEPOLIA, 4, Number(m2));
+      await gameMaster.connect(creOracle).resolveCapture(m2, BASE_SEPOLIA, p2.salt);
+
+      expect(await missionNFT.balanceOf(player.address)).to.equal(1);
+      expect(await missionNFT.balanceOf(player2.address)).to.equal(1);
+
+      const r1 = await missionNFT.getMissionRecord(1);
+      const r2 = await missionNFT.getMissionRecord(2);
+      expect(r1.capturedChainId).to.equal(ARBITRUM_SEPOLIA);
+      expect(r2.capturedChainId).to.equal(BASE_SEPOLIA);
     });
   });
 

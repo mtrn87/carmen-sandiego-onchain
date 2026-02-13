@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 import {IGameMaster} from "./interfaces/IGameMaster.sol";
+import {IMissionNFT} from "./interfaces/IMissionNFT.sol";
 
 /**
  * @title GameMaster
@@ -42,6 +43,9 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
 
     // --- Access Control ---
     address public creOracle;    // CRE workflow address allowed to write results
+
+    // --- NFT ---
+    IMissionNFT public missionNFT;  // Trophy NFT contract (set after deployment)
 
     // ============================================================
     //                      MODIFIERS
@@ -221,7 +225,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
         bytes32 expectedHash = keccak256(abi.encodePacked(revealedChainId, salt));
         require(expectedHash == mission.targetHash, "Invalid reveal");
 
-        _captureCarmen(missionId);
+        _captureCarmen(missionId, revealedChainId);
     }
 
     /**
@@ -309,6 +313,12 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
         creOracle = _creOracle;
     }
 
+    function setMissionNFT(address _missionNFT) external onlyOwner {
+        require(_missionNFT != address(0), "Invalid address");
+        missionNFT = IMissionNFT(_missionNFT);
+        emit MissionNFTSet(_missionNFT);
+    }
+
     function setValidChainIds(uint256[] calldata _chainIds) external onlyOwner {
         require(_chainIds.length >= 2, "Need at least 2 cities");
         validChainIds = _chainIds;
@@ -318,7 +328,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
     //                   INTERNAL FUNCTIONS
     // ============================================================
 
-    function _captureCarmen(uint256 missionId) internal {
+    function _captureCarmen(uint256 missionId, uint256 revealedChainId) internal {
         Mission storage mission = missions[missionId];
         mission.status = MissionStatus.Completed;
 
@@ -328,6 +338,24 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
         activePlayerMission[mission.player] = 0;
 
         emit CarmenCaptured(missionId, mission.player, blocksUsed, reward);
+
+        // Mint trophy NFT if MissionNFT contract is set
+        if (address(missionNFT) != address(0)) {
+            missionNFT.mintMissionComplete(
+                mission.player,
+                IMissionNFT.MissionRecord({
+                    missionId: missionId,
+                    player: mission.player,
+                    capturedChainId: revealedChainId,
+                    cluesCollected: mission.cluesReceived,
+                    investigationsUsed: mission.investigationsCount,
+                    blocksUsed: blocksUsed,
+                    reward: reward,
+                    timestamp: block.timestamp
+                }),
+                "" // URI set later by CRE (AI-generated trophy image)
+            );
+        }
     }
 
     function _failMission(uint256 missionId) internal {

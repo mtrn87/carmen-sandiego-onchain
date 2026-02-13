@@ -24,31 +24,27 @@
  *      be SYNCHRONOUS — async/await is not supported in CRE WASM.
  *    - To read on-chain data, use EVMClient.callContract() (EVM Read).
  *    - To write on-chain data, use runtime.report() → evmClient.writeReport().
- *    - The report goes through the DON consensus → signed by multiple nodes
- *      → delivered to the receiver contract (GameMasterProxy).
  *
  *  FLOW:
  *    1. Decode the InvestigationSubmitted(missionId, player, chainId) event
  *    2. Read on-chain: getMissionSalt, getValidCities, getMission, getPlayerPublicKey
  *    3. Brute-force the targetHash to find Carmen's actual city
- *       (targetHash = keccak256(cityChainId, salt) — only 3 cities to try)
  *    4. Compare player's investigated city with Carmen's city → true/false
  *    5. Select a clue from the scenario data (rotate through clues by index)
  *    6. ECIES-encrypt the clue with the player's registered public key
  *    7. Send an EVM Write report: ACTION_RECEIVE_CLUE → proxy → GameMaster.receiveClue()
  *    8. If correct city + 3+ clues → also send ACTION_RESOLVE_CAPTURE
  *
- *  CONFIG (from workflow.yaml staging/production targets):
- *    - chainSelectorName: "ethereum-testnet-sepolia"
- *    - gameMasterAddress: the deployed GameMaster contract
- *    - proxyAddress: the deployed GameMasterProxy (receives CRE reports)
- *    - gasLimit: gas limit for the on-chain write transaction
+ *  AI CLUE GENERATION:
+ *    The workflow includes a generateAIClue function (async, for CRE v2)
+ *    that creates contextual clues via OpenAI based on the scenario,
+ *    city details, and whether the investigation was correct.
+ *    Currently uses scenario-based clues as fallback.
  *
- *  DEPENDENCIES:
- *    - @chainlink/cre-sdk: CRE runtime, EVM client, encoding utilities
- *    - viem: ABI encoding/decoding, keccak256, event parsing
- *    - ./ecies.ts: ECIES encryption (secp256k1 + AES-256-GCM)
- *    - ../data/scenarios.json: game scenario data with true/false clues
+ *  CONFIG:
+ *    - chainSelectorName, gameMasterAddress, proxyAddress, gasLimit
+ *    - openaiApiKey: (optional) for AI-generated clues in CRE v2
+ *    - openaiModel: (optional) model name
  *
  *  IMPORTANT CONSTRAINTS:
  *    - @noble/* libs MUST stay on v1.x (v2.x breaks CRE WASM compilation)
@@ -86,43 +82,40 @@ import { eciesEncrypt } from "./ecies"
 //  Config — populated from workflow.yaml target settings
 // ============================================================
 type Config = {
-  chainSelectorName: string   // e.g. "ethereum-testnet-sepolia"
-  gameMasterAddress: string    // GameMaster.sol deployment address
-  proxyAddress: string         // GameMasterProxy.sol (CRE report receiver)
-  gasLimit: string             // Gas limit for writeReport transactions
+  chainSelectorName: string
+  gameMasterAddress: string
+  proxyAddress: string
+  gasLimit: string
+  openaiApiKey?: string   // Optional — for AI-generated clues (CRE v2)
+  openaiModel?: string    // Optional — model name
 }
 
 // ============================================================
-//  ABI fragments — only the functions/events this workflow uses
-//  Parsed once at module level for efficiency
+//  ABI fragments
 // ============================================================
 const GameMasterABI = parseAbi([
-  // View functions for reading on-chain game state
   "function getMission(uint256) view returns (address,uint256,bytes32,uint8,uint8,uint8)",
   "function getMissionSalt(uint256) view returns (bytes32)",
   "function getValidCities() view returns (uint256[])",
   "function getMissionClues(uint256) view returns ((uint8,bytes32,string,uint256)[])",
   "function getPlayerPublicKey(address) view returns (bytes)",
-  // The event we listen for — emitted when a player investigates a city
   "event InvestigationSubmitted(uint256 indexed missionId, address indexed player, uint256 chainId)",
 ])
 
 // ============================================================
-//  Scenarios — pre-written game content with true/false clues
-//  Each scenario has clue pools; the workflow cycles through them
+//  Scenarios
 // ============================================================
 import scenariosData from "../data/scenarios.json"
 
 type ScenarioClue = { type: number; text: string }
 type Scenario = {
   id: string
+  title: string
+  cities: Record<string, { name: string; emoji: string; chain: string }>
+  cityClues: Record<string, { landmark: string; culture: string }>
   clues: { true: ScenarioClue[]; false: ScenarioClue[] }
 }
 
-/**
- * Select a scenario based on missionId (cycles through available scenarios).
- * Mission #1 → scenario[0], Mission #2 → scenario[1], etc.
- */
 function getScenario(missionId: bigint): Scenario {
   const scenarios = scenariosData.scenarios
   if (!scenarios || scenarios.length === 0) {
@@ -132,19 +125,137 @@ function getScenario(missionId: bigint): Scenario {
   return scenarios[index] as Scenario
 }
 
-// Action codes — must match the constants in GameMasterProxy.sol
-// These tell the proxy which GameMaster function to forward the report to
-const ACTION_RECEIVE_CLUE = 1      // → GameMaster.receiveClue()
-const ACTION_RESOLVE_CAPTURE = 2   // → GameMaster.resolveCapture()
+// Action codes — must match GameMasterProxy.sol constants
+const ACTION_RECEIVE_CLUE = 1
+const ACTION_RESOLVE_CAPTURE = 2
+
+const ZERO_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000"
+
+// ============================================================
+//  Helper: read contract — reduces boilerplate for EVM reads
+// ============================================================
+function readContract(
+  evmClient: EVMClient,
+  runtime: Runtime<Config>,
+  address: string,
+  callData: `0x${string}`,
+): Uint8Array {
+  return evmClient
+    .callContract(runtime, {
+      call: encodeCallMsg({
+        from: zeroAddress,
+        to: address as `0x${string}`,
+        data: callData,
+      }),
+      blockNumber: LATEST_BLOCK_NUMBER,
+    })
+    .result()
+    .data
+}
+
+// ============================================================
+//  Helper: convert hex public key to Uint8Array
+// ============================================================
+function parsePubKey(pubKeyHex: string, log: (msg: string) => void): Uint8Array | null {
+  const clean = pubKeyHex.startsWith("0x") ? pubKeyHex.slice(2) : pubKeyHex
+  if (clean.length !== 130 || !/^[0-9a-fA-F]+$/.test(clean)) {
+    log(`ERROR: Invalid public key format (length=${clean.length})`)
+    return null
+  }
+  const bytes = new Uint8Array(clean.length / 2)
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16)
+  }
+  return bytes
+}
+
+// ============================================================
+//  AI Clue Generation (async — for CRE v2)
+//
+//  Creates contextual, dynamic clues via OpenAI API based on
+//  the scenario, the investigated city, and whether it's correct.
+//  Falls back to scenario-based clues when unavailable.
+// ============================================================
+async function generateAIClue(
+  scenario: Scenario,
+  carmenCityId: string,
+  investigatedCityId: string,
+  isCorrect: boolean,
+  clueNumber: number,
+  apiKey: string,
+  model: string,
+  log: (msg: string) => void,
+): Promise<{ type: number; text: string }> {
+  const carmenCity = scenario.cities[carmenCityId]
+  const investigatedCity = scenario.cities[investigatedCityId]
+  const carmenClue = scenario.cityClues[carmenCityId]
+  const investigatedClue = scenario.cityClues[investigatedCityId]
+
+  const systemPrompt = `You are a clue generator for "Carmen Sandiego On-Chain," a blockchain mystery game. You write concise, atmospheric clues in a noir detective style. Each clue should blend real-world cultural details with blockchain/Web3 references. Keep clues under 80 words.`
+
+  let userPrompt: string
+  if (isCorrect) {
+    userPrompt = `Write a TRUE clue (#${clueNumber + 1}) for a detective game.
+
+Carmen IS in: ${carmenCity?.name || "unknown"} (${carmenCity?.chain || "unknown"})
+Landmarks: ${carmenClue?.landmark || "unknown"}, Culture: ${carmenClue?.culture || "unknown"}
+Scenario: "${scenario.title}"
+
+The clue should subtly hint at ${carmenCity?.name} through cultural references and blockchain activity. Do NOT name the city directly. Make it feel like intelligence gathered from the field.`
+  } else {
+    userPrompt = `Write a FALSE (misleading) clue (#${clueNumber + 1}) for a detective game.
+
+Player investigated: ${investigatedCity?.name || "unknown"} — Carmen is NOT here.
+City details: ${investigatedClue?.landmark || "unknown"}, ${investigatedClue?.culture || "unknown"}
+Scenario: "${scenario.title}"
+
+The clue should suggest Carmen MIGHT be in ${investigatedCity?.name} but include subtle hints it's a dead end. End with a slightly mocking tone.`
+  }
+
+  try {
+    log(`Calling AI API for ${isCorrect ? "true" : "false"} clue...`)
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: 200,
+        temperature: 0.85,
+      }),
+    })
+
+    if (!response.ok) throw new Error(`AI API returned ${response.status}`)
+
+    const data = await response.json() as {
+      choices: Array<{ message: { content: string } }>
+    }
+
+    const clueText = data.choices?.[0]?.message?.content
+    if (!clueText) throw new Error("Empty AI response")
+
+    log(`AI clue generated (${clueText.length} chars)`)
+    return { type: 0, text: clueText }
+  } catch (err) {
+    log(`AI clue generation failed: ${err}. Using scenario clue.`)
+    const pool = isCorrect ? scenario.clues.true : scenario.clues.false
+    return pool[clueNumber % pool.length]
+  }
+}
 
 // ============================================================
 //  Handler: onInvestigationSubmitted
-//  Called by CRE when an InvestigationSubmitted event is detected
 // ============================================================
 const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record<string, never> => {
   const config = runtime.config
 
-  // Resolve the chain network from CRE's chain selector registry
   const network = getNetwork({
     chainFamily: "evm",
     chainSelectorName: config.chainSelectorName,
@@ -152,11 +263,10 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
   })
   if (!network) throw new Error(`Network not found: ${config.chainSelectorName}`)
 
-  // EVMClient provides callContract (read) and writeReport (write) capabilities
   const evmClient = new EVMClient(network.chainSelector.selector)
+  const gm = config.gameMasterAddress
 
-  // ── Step 1: Decode the InvestigationSubmitted event from the raw log ──
-  // CRE provides raw log bytes; we use viem's decodeEventLog to parse them
+  // ── Step 1: Decode InvestigationSubmitted event ──
   const topics = log.topics.map((t) => bytesToHex(t)) as [`0x${string}`, ...`0x${string}`[]]
   const data = bytesToHex(log.data)
 
@@ -173,131 +283,71 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
   const { missionId, player, chainId: investigatedChainId } = decoded.args
   runtime.log(`Investigation: mission=${missionId}, player=${player}, chainId=${investigatedChainId}`)
 
-  // ── Step 2: EVM Read — getMissionSalt ──
-  // The salt is a secret random value (from VRF) stored on-chain.
-  // Only the CRE workflow can read it (via getMissionSalt which is access-controlled).
-  // targetHash = keccak256(carmenCityChainId, salt)
-  const saltCallData = encodeFunctionData({
+  // ── Step 2: Read salt ──
+  const saltData = readContract(evmClient, runtime, gm, encodeFunctionData({
     abi: GameMasterABI,
     functionName: "getMissionSalt",
     args: [missionId],
-  })
-  const saltResult = evmClient
-    .callContract(runtime, {
-      call: encodeCallMsg({
-        from: zeroAddress,
-        to: config.gameMasterAddress as `0x${string}`,
-        data: saltCallData,
-      }),
-      blockNumber: LATEST_BLOCK_NUMBER,
-    })
-    .result() // .result() blocks synchronously in CRE — this is the CRE pattern for reads
-
+  }))
   const salt = decodeFunctionResult({
     abi: GameMasterABI,
     functionName: "getMissionSalt",
-    data: bytesToHex(saltResult.data),
-  })
+    data: bytesToHex(saltData),
+  }) as `0x${string}`
   runtime.log(`Salt: ${salt}`)
 
-  // Guard: if salt is zero, VRF callback hasn't arrived yet — skip this event.
-  // The player's investigation was submitted before VRF set the target.
-  // CRE will process subsequent investigations once VRF fulfills.
-  if (salt === "0x0000000000000000000000000000000000000000000000000000000000000000") {
-    runtime.log("WARN: Salt is zero — VRF not yet fulfilled. Skipping investigation.")
+  if (salt === ZERO_HASH) {
+    runtime.log("WARN: Salt is zero — VRF not yet fulfilled. Skipping.")
     return {}
   }
 
-  // ── Step 3: EVM Read — getValidCities ──
-  // Returns the array of valid city chain IDs [421614, 84532, 51]
-  const citiesCallData = encodeFunctionData({
+  // ── Step 3: Read valid cities ──
+  const citiesData = readContract(evmClient, runtime, gm, encodeFunctionData({
     abi: GameMasterABI,
     functionName: "getValidCities",
-  })
-  const citiesResult = evmClient
-    .callContract(runtime, {
-      call: encodeCallMsg({
-        from: zeroAddress,
-        to: config.gameMasterAddress as `0x${string}`,
-        data: citiesCallData,
-      }),
-      blockNumber: LATEST_BLOCK_NUMBER,
-    })
-    .result()
-
+  }))
   const cities = decodeFunctionResult({
     abi: GameMasterABI,
     functionName: "getValidCities",
-    data: bytesToHex(citiesResult.data),
+    data: bytesToHex(citiesData),
   }) as bigint[]
   runtime.log(`Valid cities: ${cities.join(", ")}`)
 
-  // ── Step 4a: EVM Read — getMission → targetHash + cluesReceived ──
-  // We need targetHash to find Carmen's city, and cluesReceived to know
-  // which clue index to select from the scenario pool
-  const missionCallData = encodeFunctionData({
+  // ── Step 4a: Read mission state ──
+  const missionData = readContract(evmClient, runtime, gm, encodeFunctionData({
     abi: GameMasterABI,
     functionName: "getMission",
     args: [missionId],
-  })
-  const missionResultData = evmClient
-    .callContract(runtime, {
-      call: encodeCallMsg({
-        from: zeroAddress,
-        to: config.gameMasterAddress as `0x${string}`,
-        data: missionCallData,
-      }),
-      blockNumber: LATEST_BLOCK_NUMBER,
-    })
-    .result()
-
-  // getMission returns: (player, startBlock, targetHash, cluesReceived, investigationsCount, status)
+  }))
   const [, , targetHash, cluesReceived, ,] = decodeFunctionResult({
     abi: GameMasterABI,
     functionName: "getMission",
-    data: bytesToHex(missionResultData.data),
+    data: bytesToHex(missionData),
   }) as [string, bigint, string, number, number, number]
   runtime.log(`TargetHash: ${targetHash}, cluesReceived: ${cluesReceived}`)
 
-  // ── Step 4b: EVM Read — getPlayerPublicKey ──
-  // The player registered their ECIES public key when they first registered.
-  // We need it to encrypt the clue so only the player can decrypt it.
-  const pubKeyCallData = encodeFunctionData({
+  // ── Step 4b: Read player public key ──
+  const pubKeyData = readContract(evmClient, runtime, gm, encodeFunctionData({
     abi: GameMasterABI,
     functionName: "getPlayerPublicKey",
     args: [player],
-  })
-  const pubKeyResult = evmClient
-    .callContract(runtime, {
-      call: encodeCallMsg({
-        from: zeroAddress,
-        to: config.gameMasterAddress as `0x${string}`,
-        data: pubKeyCallData,
-      }),
-      blockNumber: LATEST_BLOCK_NUMBER,
-    })
-    .result()
-
+  }))
   const playerPubKeyHex = decodeFunctionResult({
     abi: GameMasterABI,
     functionName: "getPlayerPublicKey",
-    data: bytesToHex(pubKeyResult.data),
+    data: bytesToHex(pubKeyData),
   }) as `0x${string}`
   runtime.log(`Player public key: ${playerPubKeyHex.slice(0, 20)}...`)
 
   // ── Step 5: Brute-force — find Carmen's actual city ──
-  // The commit-reveal pattern stores targetHash = keccak256(cityChainId, salt).
-  // Since there are only 3 possible cities, we try each one until we find
-  // the matching hash. This is the "reveal" step that only CRE can do
-  // (because only CRE can read the salt via getMissionSalt).
   let carmenCity: bigint | undefined
   for (const city of cities) {
     const candidateHash = keccak256(
-      encodeAbiParameters(parseAbiParameters("uint256, bytes32"), [city, salt as `0x${string}`])
+      encodeAbiParameters(parseAbiParameters("uint256, bytes32"), [city, salt])
     )
     if (candidateHash === targetHash) {
       carmenCity = city
-      break;
+      break
     }
   }
 
@@ -308,42 +358,33 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
   }
   runtime.log(`Carmen is in city: ${carmenCity}`)
 
-  // ── Step 6: Decide — true clue (correct city) or false clue (wrong city) ──
+  // ── Step 6: Select clue (true or false) ──
   const isCorrectCity = investigatedChainId === carmenCity
   runtime.log(`Player investigated ${investigatedChainId}, correct=${isCorrectCity}`)
 
-  // Select a clue from the scenario's pre-written pool.
-  // True clues hint at the correct city; false clues are misleading.
-  // We cycle through the pool using cluesReceived as index.
   const scenario = getScenario(missionId)
+
+  // Scenario-based clue selection (AI path ready for CRE v2)
+  // TODO: When CRE supports async handlers, replace with:
+  // const aiClue = await generateAIClue(scenario, carmenCity.toString(), investigatedChainId.toString(),
+  //   isCorrectCity, cluesReceived, config.openaiApiKey!, config.openaiModel!, runtime.log)
+  // clueText = aiClue.text; clueType = aiClue.type;
   const cluePool = isCorrectCity ? scenario.clues.true : scenario.clues.false
   const clueIndex = Number(cluesReceived) % cluePool.length
   const selectedClue = cluePool[clueIndex]
   const clueText = selectedClue.text
   const clueType = selectedClue.type
 
-  // ── Step 7: Encrypt the clue with ECIES ──
-  // contentHash is keccak256 of the plaintext — stored on-chain for verification.
-  // The actual clue text is encrypted so only the player can read it.
+  // ── Step 7: Encrypt clue with ECIES ──
   const contentHash = keccak256(toBytes(clueText))
 
-  // Convert hex public key to bytes for the ECIES encrypt function
-  const pubKeyClean = playerPubKeyHex.startsWith("0x") ? playerPubKeyHex.slice(2) : playerPubKeyHex
-  if (pubKeyClean.length !== 130 || !/^[0-9a-fA-F]+$/.test(pubKeyClean)) {
-    runtime.log(`ERROR: Invalid public key format (length=${pubKeyClean.length})`)
-    return {}
-  }
-  const pubKeyBytes = new Uint8Array(pubKeyClean.length / 2)
-  for (let i = 0; i < pubKeyBytes.length; i++) {
-    pubKeyBytes[i] = parseInt(pubKeyClean.slice(i * 2, i * 2 + 2), 16)
-  }
+  const pubKeyBytes = parsePubKey(playerPubKeyHex, runtime.log)
+  if (!pubKeyBytes) return {}
+
   const encryptedClue = eciesEncrypt(pubKeyBytes, clueText)
   runtime.log(`Clue encrypted (${encryptedClue.length} hex chars)`)
 
-  // ── Step 8: EVM Write — deliver the clue via GameMasterProxy ──
-  // The report format is: ABI-encode(actionCode, actionData)
-  // ACTION_RECEIVE_CLUE = 1 tells the proxy to call GameMaster.receiveClue()
-  // The actionData contains: (missionId, clueType, contentHash, encryptedClueHex)
+  // ── Step 8: Send clue report ──
   const clueData = encodeAbiParameters(
     parseAbiParameters("uint256, uint8, bytes32, string"),
     [missionId, clueType, contentHash as `0x${string}`, encryptedClue]
@@ -353,9 +394,6 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
     [ACTION_RECEIVE_CLUE, clueData as `0x${string}`]
   )
 
-  // runtime.report() creates a signed report through the DON consensus mechanism.
-  // Multiple CRE nodes sign the report, ensuring the data is trustworthy.
-  // The report is then delivered to the proxy contract via writeReport().
   runtime.log("Sending clue report to proxy...")
   const clueReportResponse = runtime
     .report({
@@ -366,8 +404,6 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
     })
     .result()
 
-  // writeReport sends the DON-signed report to the proxy contract on-chain.
-  // The proxy verifies the DON signatures, then forwards to GameMaster.
   evmClient
     .writeReport(runtime, {
       receiver: config.proxyAddress,
@@ -379,20 +415,15 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
   runtime.log("Clue delivered successfully!")
 
   // ── Step 9: Check capture conditions ──
-  // If the player investigated the correct city AND has now accumulated
-  // 3+ clues (including the one just sent), trigger capture resolution.
-  // This ends the mission and mints a MissionNFT trophy for the player.
-  const totalClues = cluesReceived + 1 // including the one we just sent
-  runtime.log(`Clue count: ${cluesReceived} on-chain + 1 new = ${totalClues} total (need 3 for capture)`)
+  const totalClues = cluesReceived + 1
+  runtime.log(`Clues: ${cluesReceived} on-chain + 1 new = ${totalClues} total (need 3)`)
 
   if (isCorrectCity && totalClues >= 3) {
     runtime.log(`CAPTURE! Player found Carmen in city ${carmenCity} with ${totalClues} clues.`)
 
-    // ACTION_RESOLVE_CAPTURE = 2 tells the proxy to call GameMaster.resolveCapture()
-    // It needs the missionId, the correct city, and the salt as proof
     const captureData = encodeAbiParameters(
       parseAbiParameters("uint256, uint256, bytes32"),
-      [missionId, carmenCity, salt as `0x${string}`]
+      [missionId, carmenCity, salt]
     )
     const captureReport = encodeAbiParameters(
       parseAbiParameters("uint8, bytes"),
@@ -423,23 +454,8 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
 }
 
 // ============================================================
-//  Workflow initialization — sets up the event trigger
+//  Workflow initialization
 // ============================================================
-
-/**
- * initWorkflow is called once when the CRE workflow starts.
- * It configures the LogTrigger to listen for InvestigationSubmitted events
- * from the GameMaster contract address.
- *
- * CRE pattern:
- *   1. Create an EVMClient for the target chain
- *   2. Compute the event topic hash (keccak256 of the event signature)
- *   3. Set up a logTrigger that watches for that topic from the contract
- *   4. Return an array of handler(trigger, handlerFn) pairs
- *
- * The Runner will keep the workflow alive, invoking the handler each time
- * the trigger detects a matching event.
- */
 const initWorkflow = (config: Config) => {
   const network = getNetwork({
     chainFamily: "evm",
@@ -449,28 +465,23 @@ const initWorkflow = (config: Config) => {
   if (!network) throw new Error(`Network not found: ${config.chainSelectorName}`)
 
   const evmClient = new EVMClient(network.chainSelector.selector)
-
-  // The event topic is the keccak256 hash of the event signature.
-  // CRE's logTrigger watches for this topic in new blocks.
   const eventHash = keccak256(toBytes("InvestigationSubmitted(uint256,address,uint256)"))
 
   return [
     handler(
       evmClient.logTrigger({
-        addresses: [hexToBase64(config.gameMasterAddress)],  // Only from GameMaster
-        topics: [{ values: [hexToBase64(eventHash)] }],      // Only InvestigationSubmitted
+        addresses: [hexToBase64(config.gameMasterAddress)],
+        topics: [{ values: [hexToBase64(eventHash)] }],
       }),
       onInvestigationSubmitted
     ),
   ]
 }
 
-/**
- * Entry point — CRE calls main() when the workflow is deployed.
- * Runner.newRunner<Config>() reads configuration from workflow.yaml
- * and starts the event loop.
- */
 export async function main() {
   const runner = await Runner.newRunner<Config>()
   await runner.run(initWorkflow)
 }
+
+// Export for testing
+export { generateAIClue }

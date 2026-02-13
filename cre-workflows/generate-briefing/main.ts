@@ -6,56 +6,41 @@
  *  PURPOSE:
  *    Listens for the on-chain `MissionStarted` event emitted when a
  *    player starts a new mission. The workflow generates a narrative
- *    briefing (either AI-generated or from scenario templates),
+ *    briefing (AI-generated or from enriched scenario templates),
  *    encrypts it with the player's ECIES public key, and delivers
  *    it on-chain as the first "clue" (clueType=0 / Text).
- *
- *    The frontend recognizes early clues as briefings and displays
- *    them in the MissionBriefing screen.
  *
  *  HOW IT DIFFERS FROM mission-start:
  *    - Trigger: MissionStarted (not InvestigationSubmitted)
  *    - No brute-force needed (we don't check Carmen's location)
  *    - Generates narrative content (briefing text) instead of clues
  *    - Always sends ACTION_RECEIVE_CLUE with clueType=0
- *    - Has AI generation capability (currently using fallback due to
- *      CRE WASM async limitations)
+ *    - Has AI generation capability (OpenAI integration ready)
  *
  *  FLOW:
  *    1. Decode MissionStarted(missionId, player, startBlock) event
  *    2. Read on-chain: getPlayerPublicKey, getValidCities
  *    3. Select a scenario based on missionId
- *    4. Generate briefing text (AI with fallback to template)
+ *    4. Generate briefing text (AI with fallback to enriched template)
  *    5. ECIES-encrypt the briefing with the player's public key
  *    6. Compute contentHash and send via ACTION_RECEIVE_CLUE
  *
  *  AI GENERATION:
  *    The workflow includes a full OpenAI integration (generateAIBriefing)
- *    that creates unique noir-style briefings for each mission. However,
- *    CRE WASM currently doesn't support async/await in handlers, so the
- *    AI path falls back to buildFallbackBriefing which uses scenario data.
- *    When CRE v2 supports async handlers, the AI path can be enabled.
+ *    that creates unique noir-style briefings for each mission. CRE WASM
+ *    currently doesn't support async/await in handlers, so the AI path
+ *    uses buildEnrichedBriefing as fallback. When CRE v2 supports async
+ *    handlers, the AI path can be enabled with a one-line change.
  *
  *  CONFIG:
- *    - chainSelectorName: "ethereum-testnet-sepolia"
- *    - gameMasterAddress: GameMaster contract
- *    - proxyAddress: GameMasterProxy (CRE report receiver)
- *    - gasLimit: gas limit for the on-chain write
- *    - openaiApiKey: OpenAI API key (optional, for AI briefings)
+ *    - chainSelectorName, gameMasterAddress, proxyAddress, gasLimit
+ *    - openaiApiKey: OpenAI API key (optional — empty = use fallback)
  *    - openaiModel: model to use (e.g. "gpt-4o-mini")
- *
- *  DEPENDENCIES:
- *    - @chainlink/cre-sdk: CRE runtime, EVM client, encoding
- *    - viem: ABI encoding/decoding, keccak256, event parsing
- *    - ./ecies.ts: ECIES encryption (encrypt-only copy from mission-start)
- *    - ../data/scenarios.json: scenario templates for fallback briefings
  *
  *  NOTE ON ecies.ts DUPLICATION:
  *    This workflow has its own copy of ecies.ts (encrypt-only) rather
- *    than importing from mission-start. This is because CRE workflows
- *    are compiled independently — each is a self-contained WASM module.
- *    Cross-workflow imports are not supported in CRE's build system.
- *    Both copies use identical encryption logic.
+ *    than importing from mission-start. CRE compiles each workflow into
+ *    a self-contained WASM module — cross-workflow imports are not supported.
  *
  *  IMPORTANT CONSTRAINTS:
  *    - @noble/* libs MUST stay on v1.x (v2.x breaks CRE WASM)
@@ -93,30 +78,27 @@ import { eciesEncrypt } from "./ecies"
 //  Config — populated from workflow.yaml target settings
 // ============================================================
 type Config = {
-  chainSelectorName: string   // e.g. "ethereum-testnet-sepolia"
-  gameMasterAddress: string    // GameMaster.sol deployment address
-  proxyAddress: string         // GameMasterProxy.sol (CRE report receiver)
-  gasLimit: string             // Gas limit for writeReport transactions
-  openaiApiKey: string         // OpenAI API key (optional — empty string = use fallback)
-  openaiModel: string          // OpenAI model name (e.g. "gpt-4o-mini")
+  chainSelectorName: string
+  gameMasterAddress: string
+  proxyAddress: string
+  gasLimit: string
+  openaiApiKey: string    // OpenAI API key (optional — empty = use fallback)
+  openaiModel: string     // OpenAI model name (e.g. "gpt-4o-mini")
 }
 
 // ============================================================
-//  ABI fragments — view functions + the event we listen for
+//  ABI fragments
 // ============================================================
 const GameMasterABI = parseAbi([
-  // View functions for reading game state
   "function getMission(uint256) view returns (address,uint256,bytes32,uint8,uint8,uint8)",
   "function getMissionSalt(uint256) view returns (bytes32)",
   "function getValidCities() view returns (uint256[])",
   "function getPlayerPublicKey(address) view returns (bytes)",
-  // The event we listen for — emitted when a player starts a new mission
   "event MissionStarted(uint256 indexed missionId, address indexed player, uint256 startBlock)",
 ])
 
 // ============================================================
-//  Scenarios — game content with city details for briefings
-//  Each scenario has a title, briefing template, and per-city info
+//  Scenarios
 // ============================================================
 import scenariosData from "../data/scenarios.json"
 
@@ -128,10 +110,6 @@ type ScenarioData = {
   cityClues: Record<string, { landmark: string; culture: string }>
 }
 
-/**
- * Select a scenario based on missionId (cycles through available scenarios).
- * Same logic as mission-start — ensures consistency across workflows.
- */
 function getScenario(missionId: bigint): ScenarioData {
   const scenarios = scenariosData.scenarios
   if (!scenarios || scenarios.length === 0) {
@@ -141,32 +119,53 @@ function getScenario(missionId: bigint): ScenarioData {
   return scenarios[index] as ScenarioData
 }
 
-// Action code — must match GameMasterProxy.sol
-const ACTION_RECEIVE_CLUE = 1  // → GameMaster.receiveClue()
+const ACTION_RECEIVE_CLUE = 1
 
 // ============================================================
-//  AI Briefing Generation
-//  Currently behind a TODO due to CRE WASM async limitations.
-//  When CRE supports async handlers, this function can be called
-//  directly in the handler instead of buildFallbackBriefing.
+//  Helper: read contract — reduces boilerplate for EVM reads
 // ============================================================
+function readContract(
+  evmClient: EVMClient,
+  runtime: Runtime<Config>,
+  address: string,
+  callData: `0x${string}`,
+): Uint8Array {
+  return evmClient
+    .callContract(runtime, {
+      call: encodeCallMsg({
+        from: zeroAddress,
+        to: address as `0x${string}`,
+        data: callData,
+      }),
+      blockNumber: LATEST_BLOCK_NUMBER,
+    })
+    .result()
+    .data
+}
 
-/**
- * Generate a unique mission briefing using OpenAI API.
- *
- * This function is ASYNC — it uses fetch() to call the OpenAI API.
- * CRE WASM handlers are currently SYNCHRONOUS, so this function
- * cannot be called directly in the handler. It's kept here for
- * future use when CRE v2 supports async handlers.
- *
- * @param scenario - The scenario data with city details
- * @param missionId - The on-chain mission ID
- * @param cities - Array of valid city chain IDs
- * @param apiKey - OpenAI API key
- * @param model - OpenAI model name
- * @param log - CRE runtime logger function
- * @returns The AI-generated briefing text
- */
+// ============================================================
+//  Helper: convert hex public key to Uint8Array
+// ============================================================
+function parsePubKey(pubKeyHex: string, log: (msg: string) => void): Uint8Array | null {
+  const clean = pubKeyHex.startsWith("0x") ? pubKeyHex.slice(2) : pubKeyHex
+  if (clean.length !== 130 || !/^[0-9a-fA-F]+$/.test(clean)) {
+    log(`ERROR: Invalid public key format (length=${clean.length})`)
+    return null
+  }
+  const bytes = new Uint8Array(clean.length / 2)
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16)
+  }
+  return bytes
+}
+
+// ============================================================
+//  AI Briefing Generation (async — for CRE v2)
+//
+//  Creates unique noir-style briefings via OpenAI API.
+//  Currently cannot be called from the synchronous handler.
+//  When CRE v2 supports async handlers, enable with one-line change.
+// ============================================================
 async function generateAIBriefing(
   scenario: ScenarioData,
   missionId: bigint,
@@ -175,20 +174,17 @@ async function generateAIBriefing(
   model: string,
   log: (msg: string) => void,
 ): Promise<string> {
-  // Build city descriptions for the prompt context
   const cityDescriptions = cities
     .map((c) => {
       const info = scenario.cities[c.toString()]
-      const clueInfo = scenario.cityClues?.[c.toString()]
+      const clue = scenario.cityClues?.[c.toString()]
       if (!info) return `Chain ${c}`
-      return `${info.name} (${info.chain}) — landmark: ${clueInfo?.landmark || "unknown"}, known for: ${clueInfo?.culture || "unknown"}`
+      return `${info.name} (${info.chain}) — landmark: ${clue?.landmark || "unknown"}, known for: ${clue?.culture || "unknown"}`
     })
     .join("\n    ")
 
-  // System prompt sets the narrator's persona
   const systemPrompt = `You are the narrator for "Carmen Sandiego On-Chain," a blockchain mystery game. You write immersive, suspenseful mission briefings in the style of a Cold War intelligence dossier crossed with cyberpunk noir. Keep it under 250 words. Use vivid language. Address the player as "detective" or "agent." Reference blockchain terminology naturally (hashes, wallets, bridges, protocols). End with urgency — Carmen is on the move.`
 
-  // User prompt provides mission-specific context
   const userPrompt = `Write a unique mission briefing for Mission #${missionId}.
 
 SCENARIO: "${scenario.title}"
@@ -208,7 +204,7 @@ Requirements:
 - Write in English with a noir detective tone`
 
   try {
-    log("Calling AI API to generate dynamic briefing...")
+    log("Calling AI API for dynamic briefing...")
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -243,51 +239,98 @@ Requirements:
     log(`AI briefing generated (${briefingText.length} chars)`)
     return briefingText
   } catch (err) {
-    log(`AI generation failed: ${err}. Falling back to scenario data.`)
-    return buildFallbackBriefing(scenario, missionId, cities)
+    log(`AI generation failed: ${err}. Using enriched template.`)
+    return buildEnrichedBriefing(scenario, missionId, cities)
   }
 }
 
-/**
- * Build a briefing from scenario template data (no API call needed).
- * Used as fallback when AI generation is unavailable or fails.
- * Produces a structured, professional briefing using the scenario's
- * pre-written content and city names.
- */
-function buildFallbackBriefing(
+// ============================================================
+//  Enriched Briefing Generation (synchronous fallback)
+//
+//  Builds a detailed, noir-style briefing using scenario data,
+//  city landmarks, culture details, and blockchain context.
+//  Richer than a basic template — includes formatted intel sections.
+// ============================================================
+function buildEnrichedBriefing(
   scenario: ScenarioData,
   missionId: bigint,
   cities: bigint[],
 ): string {
-  const cityNames = cities
+  const cityIntel = cities
     .map((c) => {
       const info = scenario.cities[c.toString()]
-      return info ? `${info.name} ${info.emoji}` : `Chain ${c}`
+      const clue = scenario.cityClues?.[c.toString()]
+      if (!info) return `  - Chain ${c}: Unknown location`
+      const landmark = clue?.landmark ? ` (near ${clue.landmark})` : ""
+      return `  - ${info.emoji} ${info.name}${landmark} — ${info.chain}`
     })
-    .join(", ")
+    .join("\n")
+
+  const cultureHints = cities
+    .map((c) => {
+      const clue = scenario.cityClues?.[c.toString()]
+      const info = scenario.cities[c.toString()]
+      if (!clue || !info) return null
+      return `${info.name}: ${clue.culture}`
+    })
+    .filter(Boolean)
+    .join(" | ")
 
   return [
-    `=== ACME DETECTIVE AGENCY ===`,
-    `CLASSIFIED — Mission #${missionId}: ${scenario.title}`,
+    `╔══════════════════════════════════════════════╗`,
+    `║     ACME DETECTIVE AGENCY — CLASSIFIED       ║`,
+    `╚══════════════════════════════════════════════╝`,
+    ``,
+    `MISSION #${missionId}: ${scenario.title.toUpperCase()}`,
+    `CLASSIFICATION: TOP SECRET / BLOCKCHAIN-SENSITIVE`,
+    `PRIORITY: CRITICAL — TIME-SENSITIVE`,
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `SITUATION BRIEFING:`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
     ``,
     scenario.briefing,
     ``,
-    `Intel suggests Carmen may be hiding in one of these locations: ${cityNames}`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `SUSPECT LOCATIONS — ACTIVE CHAINS:`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
     ``,
-    `Your ECIES encryption keys are active. All clues will be encrypted — only you can read them.`,
-    `Investigate cities, collect clues, and capture Carmen before she escapes.`,
-    `The clock is ticking, detective. Move fast.`,
+    cityIntel,
+    ``,
+    `CULTURAL INTEL: ${cultureHints}`,
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `OPERATIONAL DETAILS:`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    ``,
+    `Your ECIES encryption keys are active. All clues will be`,
+    `encrypted with your public key — only you can decrypt them.`,
+    ``,
+    `PROCEDURE:`,
+    `  1. Select a city to investigate`,
+    `  2. Submit investigation on-chain (costs gas)`,
+    `  3. CRE oracle will analyze and deliver encrypted clue`,
+    `  4. Collect 3+ clues to enable capture`,
+    `  5. Investigate the correct city to capture Carmen`,
+    ``,
+    `WARNING: Carmen relocates every 3 minutes. Previous clues`,
+    `may become stale. Move fast, detective.`,
+    ``,
+    `MAX INVESTIGATIONS: 10 | MAX BLOCKS: 50`,
+    ``,
+    `The clock is ticking. Carmen won't wait.`,
+    `Good luck, detective.`,
+    ``,
+    `— Chief, ACME Detective Agency`,
   ].join("\n")
 }
 
 // ============================================================
 //  Handler: onMissionStarted
-//  Called by CRE when a MissionStarted event is detected
 // ============================================================
 const onMissionStarted = (runtime: Runtime<Config>, log: EVMLog): Record<string, never> => {
   const config = runtime.config
 
-  // Resolve the chain network
   const network = getNetwork({
     chainFamily: "evm",
     chainSelectorName: config.chainSelectorName,
@@ -296,8 +339,9 @@ const onMissionStarted = (runtime: Runtime<Config>, log: EVMLog): Record<string,
   if (!network) throw new Error(`Network not found: ${config.chainSelectorName}`)
 
   const evmClient = new EVMClient(network.chainSelector.selector)
+  const gm = config.gameMasterAddress
 
-  // ── Step 1: Decode the MissionStarted event from the raw log ──
+  // ── Step 1: Decode MissionStarted event ──
   const topics = log.topics.map((t) => bytesToHex(t)) as [`0x${string}`, ...`0x${string}`[]]
   const data = bytesToHex(log.data)
 
@@ -314,104 +358,63 @@ const onMissionStarted = (runtime: Runtime<Config>, log: EVMLog): Record<string,
   const { missionId, player } = decoded.args
   runtime.log(`MissionStarted: mission=${missionId}, player=${player}`)
 
-  // ── Step 2: EVM Read — getPlayerPublicKey ──
-  // Needed to encrypt the briefing so only the player can read it
-  const pubKeyCallData = encodeFunctionData({
+  // ── Step 2: Read player's ECIES public key ──
+  const pubKeyData = readContract(evmClient, runtime, gm, encodeFunctionData({
     abi: GameMasterABI,
     functionName: "getPlayerPublicKey",
     args: [player],
-  })
-  const pubKeyResult = evmClient
-    .callContract(runtime, {
-      call: encodeCallMsg({
-        from: zeroAddress,
-        to: config.gameMasterAddress as `0x${string}`,
-        data: pubKeyCallData,
-      }),
-      blockNumber: LATEST_BLOCK_NUMBER,
-    })
-    .result()
-
+  }))
   const playerPubKeyHex = decodeFunctionResult({
     abi: GameMasterABI,
     functionName: "getPlayerPublicKey",
-    data: bytesToHex(pubKeyResult.data),
+    data: bytesToHex(pubKeyData),
   }) as `0x${string}`
   runtime.log(`Player public key: ${playerPubKeyHex.slice(0, 20)}...`)
 
-  // ── Step 3: EVM Read — getValidCities ──
-  // We need city IDs to include city names in the briefing text
-  const citiesCallData = encodeFunctionData({
+  // ── Step 3: Read valid cities ──
+  const citiesData = readContract(evmClient, runtime, gm, encodeFunctionData({
     abi: GameMasterABI,
     functionName: "getValidCities",
-  })
-  const citiesResult = evmClient
-    .callContract(runtime, {
-      call: encodeCallMsg({
-        from: zeroAddress,
-        to: config.gameMasterAddress as `0x${string}`,
-        data: citiesCallData,
-      }),
-      blockNumber: LATEST_BLOCK_NUMBER,
-    })
-    .result()
-
+  }))
   const cities = decodeFunctionResult({
     abi: GameMasterABI,
     functionName: "getValidCities",
-    data: bytesToHex(citiesResult.data),
+    data: bytesToHex(citiesData),
   }) as bigint[]
   runtime.log(`Valid cities: ${cities.join(", ")}`)
 
-  // ── Step 4: Select scenario and generate briefing text ──
+  // ── Step 4: Generate briefing text ──
   const scenario = getScenario(missionId)
   runtime.log(`Scenario: "${scenario.title}"`)
 
   let briefingText: string
 
-  // Check if AI generation is configured
   if (config.openaiApiKey && config.openaiApiKey !== "" && config.openaiApiKey !== "YOUR_OPENAI_API_KEY") {
-    // AI path — currently falls back to template because CRE WASM
-    // doesn't support async/await in handler functions
     try {
-      briefingText = buildFallbackBriefing(scenario, missionId, cities)
-      runtime.log("Using scenario-based briefing (async AI call planned for CRE v2)")
-
-      // TODO: When CRE supports async handlers, replace the line above with:
+      briefingText = buildEnrichedBriefing(scenario, missionId, cities)
+      runtime.log("Using enriched briefing (async AI planned for CRE v2)")
+      // TODO: When CRE supports async handlers, replace with:
       // briefingText = await generateAIBriefing(scenario, missionId, cities, config.openaiApiKey, config.openaiModel, runtime.log)
     } catch {
-      briefingText = buildFallbackBriefing(scenario, missionId, cities)
+      briefingText = buildEnrichedBriefing(scenario, missionId, cities)
     }
   } else {
-    // No API key configured — use scenario template directly
-    briefingText = buildFallbackBriefing(scenario, missionId, cities)
-    runtime.log("No AI API key configured — using scenario data")
+    briefingText = buildEnrichedBriefing(scenario, missionId, cities)
+    runtime.log("No AI API key — using enriched scenario briefing")
   }
 
   runtime.log(`Briefing ready (${briefingText.length} chars)`)
 
   // ── Step 5: ECIES-encrypt the briefing ──
-  // Convert the player's hex public key to bytes
-  const pubKeyClean = playerPubKeyHex.startsWith("0x") ? playerPubKeyHex.slice(2) : playerPubKeyHex
-  if (pubKeyClean.length !== 130 || !/^[0-9a-fA-F]+$/.test(pubKeyClean)) {
-    runtime.log(`ERROR: Invalid public key format (length=${pubKeyClean.length})`)
-    return {}
-  }
-  const pubKeyBytes = new Uint8Array(pubKeyClean.length / 2)
-  for (let i = 0; i < pubKeyBytes.length; i++) {
-    pubKeyBytes[i] = parseInt(pubKeyClean.slice(i * 2, i * 2 + 2), 16)
-  }
+  const pubKeyBytes = parsePubKey(playerPubKeyHex, runtime.log)
+  if (!pubKeyBytes) return {}
 
   const encryptedBriefing = eciesEncrypt(pubKeyBytes, briefingText)
   runtime.log(`Briefing encrypted (${encryptedBriefing.length} hex chars)`)
 
-  // ── Step 6: Compute contentHash ──
-  // Hash of the plaintext briefing — stored on-chain for verification
+  // ── Step 6: Compute contentHash and send report ──
   const contentHash = keccak256(toBytes(briefingText))
 
-  // ── Step 7: EVM Write — deliver encrypted briefing via GameMasterProxy ──
-  // Delivered as clueType=0 (Text) — the frontend recognizes early clues
-  // (before any investigation) as the mission briefing.
   const clueData = encodeAbiParameters(
     parseAbiParameters("uint256, uint8, bytes32, string"),
     [missionId, 0, contentHash as `0x${string}`, encryptedBriefing]
@@ -421,7 +424,6 @@ const onMissionStarted = (runtime: Runtime<Config>, log: EVMLog): Record<string,
     [ACTION_RECEIVE_CLUE, clueData as `0x${string}`]
   )
 
-  // Create DON-signed report and deliver to proxy
   runtime.log("Sending encrypted briefing to proxy...")
   const reportResponse = runtime
     .report({
@@ -446,13 +448,8 @@ const onMissionStarted = (runtime: Runtime<Config>, log: EVMLog): Record<string,
 }
 
 // ============================================================
-//  Workflow initialization — sets up the event trigger
+//  Workflow initialization
 // ============================================================
-
-/**
- * initWorkflow configures the LogTrigger to listen for MissionStarted events.
- * Same pattern as mission-start but watches for a different event.
- */
 const initWorkflow = (config: Config) => {
   const network = getNetwork({
     chainFamily: "evm",
@@ -462,28 +459,23 @@ const initWorkflow = (config: Config) => {
   if (!network) throw new Error(`Network not found: ${config.chainSelectorName}`)
 
   const evmClient = new EVMClient(network.chainSelector.selector)
-
-  // Topic hash for MissionStarted(uint256,address,uint256)
   const eventHash = keccak256(toBytes("MissionStarted(uint256,address,uint256)"))
 
   return [
     handler(
       evmClient.logTrigger({
-        addresses: [hexToBase64(config.gameMasterAddress)],  // Only from GameMaster
-        topics: [{ values: [hexToBase64(eventHash)] }],      // Only MissionStarted
+        addresses: [hexToBase64(config.gameMasterAddress)],
+        topics: [{ values: [hexToBase64(eventHash)] }],
       }),
       onMissionStarted
     ),
   ]
 }
 
-/**
- * Entry point — CRE calls main() when the workflow is deployed.
- */
 export async function main() {
   const runner = await Runner.newRunner<Config>()
   await runner.run(initWorkflow)
 }
 
 // Export for testing
-export { generateAIBriefing, buildFallbackBriefing }
+export { generateAIBriefing, buildEnrichedBriefing }
