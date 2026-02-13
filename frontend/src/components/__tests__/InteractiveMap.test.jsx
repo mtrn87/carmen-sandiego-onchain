@@ -43,11 +43,13 @@ Element.prototype.getBoundingClientRect = vi.fn(() => ({
 }))
 
 describe('InteractiveMap', () => {
-  it('renders 3 city markers', () => {
+  it('renders key city markers', () => {
     render(<InteractiveMap />)
     expect(screen.getByText(/Tokyo/)).toBeInTheDocument()
     expect(screen.getByText(/Paris/)).toBeInTheDocument()
     expect(screen.getByText(/London/)).toBeInTheDocument()
+    expect(screen.getByText(/Sydney/)).toBeInTheDocument()
+    expect(screen.getByText(/New York City/)).toBeInTheDocument()
   })
 
   it('opens location panel on marker click', async () => {
