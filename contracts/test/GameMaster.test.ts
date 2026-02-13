@@ -153,6 +153,146 @@ describe("GameMaster", function () {
     });
   });
 
+  describe("Pausable", function () {
+    it("should allow owner to pause", async function () {
+      await expect(gameMaster.connect(owner).pause())
+        .to.emit(gameMaster, "Paused")
+        .withArgs(owner.address);
+    });
+
+    it("should allow owner to unpause", async function () {
+      await gameMaster.connect(owner).pause();
+      await expect(gameMaster.connect(owner).unpause())
+        .to.emit(gameMaster, "Unpaused")
+        .withArgs(owner.address);
+    });
+
+    it("should reject pause from non-owner", async function () {
+      await expect(
+        gameMaster.connect(player).pause()
+      ).to.be.revertedWith("Only callable by owner");
+    });
+
+    it("should reject unpause from non-owner", async function () {
+      await gameMaster.connect(owner).pause();
+      await expect(
+        gameMaster.connect(player).unpause()
+      ).to.be.revertedWith("Only callable by owner");
+    });
+
+    it("should revert startMission when paused", async function () {
+      await gameMaster.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gameMaster.connect(owner).pause();
+      await expect(
+        gameMaster.connect(player).startMission()
+      ).to.be.revertedWithCustomError(gameMaster, "EnforcedPause");
+    });
+
+    it("should revert submitInvestigation when paused", async function () {
+      await gameMaster.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gameMaster.connect(owner).pause();
+      await expect(
+        gameMaster.connect(player).submitInvestigation(ARBITRUM_SEPOLIA)
+      ).to.be.revertedWithCustomError(gameMaster, "EnforcedPause");
+    });
+
+    it("should allow receiveClue when paused (CRE callback)", async function () {
+      // Deploy with real VRF mock for full mission flow
+      const VRFMock = await ethers.getContractFactory("VRFCoordinatorV2PlusMock");
+      const vrfCoordinator = await VRFMock.deploy(0, 0, 0);
+      const createSubTx = await vrfCoordinator.createSubscription();
+      const createSubReceipt = await createSubTx.wait();
+      const subCreatedEvent = createSubReceipt?.logs.find((log: any) => {
+        try {
+          return vrfCoordinator.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "SubscriptionCreated";
+        } catch { return false; }
+      });
+      const subId = vrfCoordinator.interface.parseLog({
+        topics: [...subCreatedEvent!.topics], data: subCreatedEvent!.data
+      })!.args[0];
+      await vrfCoordinator.fundSubscription(subId, 1000000);
+
+      const GMFactory = await ethers.getContractFactory("GameMaster");
+      const gm = await GMFactory.deploy(
+        await vrfCoordinator.getAddress(), subId, VRF_KEY_HASH, validChainIds, creOracle.address
+      ) as GameMaster;
+      await gm.waitForDeployment();
+      await vrfCoordinator.addConsumer(subId, await gm.getAddress());
+
+      // Setup mission
+      await gm.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm.connect(player).startMission();
+      const missionId = await gm.getPlayerActiveMission(player.address);
+      await vrfCoordinator.fulfillRandomWordsWithOverride(missionId, await gm.getAddress(), [42]);
+
+      // Pause
+      await gm.connect(owner).pause();
+
+      // CRE should still be able to deliver clues
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("clue data"));
+      await expect(
+        gm.connect(creOracle).receiveClue(missionId, 0, contentHash, "ipfs://Qm...")
+      ).to.emit(gm, "ClueReceived");
+    });
+
+    it("should allow resolveCapture when paused (CRE callback)", async function () {
+      // Deploy with real VRF mock for full mission flow
+      const VRFMock = await ethers.getContractFactory("VRFCoordinatorV2PlusMock");
+      const vrfCoordinator = await VRFMock.deploy(0, 0, 0);
+      const createSubTx = await vrfCoordinator.createSubscription();
+      const createSubReceipt = await createSubTx.wait();
+      const subCreatedEvent = createSubReceipt?.logs.find((log: any) => {
+        try {
+          return vrfCoordinator.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "SubscriptionCreated";
+        } catch { return false; }
+      });
+      const subId = vrfCoordinator.interface.parseLog({
+        topics: [...subCreatedEvent!.topics], data: subCreatedEvent!.data
+      })!.args[0];
+      await vrfCoordinator.fundSubscription(subId, 1000000);
+
+      const GMFactory = await ethers.getContractFactory("GameMaster");
+      const gm = await GMFactory.deploy(
+        await vrfCoordinator.getAddress(), subId, VRF_KEY_HASH, validChainIds, creOracle.address
+      ) as GameMaster;
+      await gm.waitForDeployment();
+      await vrfCoordinator.addConsumer(subId, await gm.getAddress());
+
+      // Setup mission
+      await gm.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm.connect(player).startMission();
+      const missionId = await gm.getPlayerActiveMission(player.address);
+      const vrfWord = 42;
+      await vrfCoordinator.fulfillRandomWordsWithOverride(missionId, await gm.getAddress(), [vrfWord]);
+
+      // Deliver 3 clues
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("clue"));
+      for (let i = 0; i < 3; i++) {
+        await gm.connect(creOracle).receiveClue(Number(missionId), 0, contentHash, "ipfs://Qm...");
+      }
+
+      // Find revealed chainId
+      const mission = await gm.getMission(missionId);
+      const salt = await gm.getMissionSalt(missionId);
+      let revealedChainId = 0n;
+      for (const cid of validChainIds) {
+        const hash = ethers.keccak256(ethers.solidityPacked(["uint256", "bytes32"], [cid, salt]));
+        if (hash === mission.targetHash) {
+          revealedChainId = BigInt(cid);
+          break;
+        }
+      }
+
+      // Pause
+      await gm.connect(owner).pause();
+
+      // CRE should still be able to resolve captures
+      await expect(
+        gm.connect(creOracle).resolveCapture(missionId, revealedChainId, salt)
+      ).to.emit(gm, "CarmenCaptured");
+    });
+  });
+
   describe("Admin Functions", function () {
     it("should allow owner to update valid chain IDs", async function () {
       const newChainIds = [421614, 84532, 11155111];
