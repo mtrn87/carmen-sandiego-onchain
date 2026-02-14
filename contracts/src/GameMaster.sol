@@ -3,7 +3,9 @@ pragma solidity ^0.8.24;
 
 import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {IGameMaster} from "./interfaces/IGameMaster.sol";
+import {IMissionNFT} from "./interfaces/IMissionNFT.sol";
 
 /**
  * @title GameMaster
@@ -12,7 +14,7 @@ import {IGameMaster} from "./interfaces/IGameMaster.sol";
  *         never in plaintext. CRE validates off-chain and reveals on capture.
  *         VRF v2.5 provides verifiable randomness for Carmen's location.
  */
-contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
+contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
     // ============================================================
     //                        STATE
     // ============================================================
@@ -42,6 +44,9 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
 
     // --- Access Control ---
     address public creOracle;    // CRE workflow address allowed to write results
+
+    // --- NFT ---
+    IMissionNFT public missionNFT;  // Trophy NFT contract (set after deployment)
 
     // ============================================================
     //                      MODIFIERS
@@ -98,7 +103,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
      *         Triggers VRF to select Carmen's hiding location.
      *         Location is stored as hash (commit-reveal pattern).
      */
-    function startMission() external {
+    function startMission() external whenNotPaused {
         require(playerPublicKeys[msg.sender].length > 0, "Register first");
 
         // Auto-close any existing active mission so player can start fresh
@@ -145,7 +150,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
      *         The contract does NOT check if the guess is correct — CRE does that off-chain.
      * @param chainId The chain ID the player is investigating.
      */
-    function submitInvestigation(uint256 chainId) external hasActiveMission(msg.sender) {
+    function submitInvestigation(uint256 chainId) external whenNotPaused hasActiveMission(msg.sender) {
         uint256 missionId = activePlayerMission[msg.sender];
         Mission storage mission = missions[missionId];
 
@@ -221,7 +226,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
         bytes32 expectedHash = keccak256(abi.encodePacked(revealedChainId, salt));
         require(expectedHash == mission.targetHash, "Invalid reveal");
 
-        _captureCarmen(missionId);
+        _captureCarmen(missionId, revealedChainId);
     }
 
     /**
@@ -305,8 +310,22 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
     //                   ADMIN FUNCTIONS
     // ============================================================
 
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     function setCREOracle(address _creOracle) external onlyOwner {
         creOracle = _creOracle;
+    }
+
+    function setMissionNFT(address _missionNFT) external onlyOwner {
+        require(_missionNFT != address(0), "Invalid address");
+        missionNFT = IMissionNFT(_missionNFT);
+        emit MissionNFTSet(_missionNFT);
     }
 
     function setValidChainIds(uint256[] calldata _chainIds) external onlyOwner {
@@ -318,7 +337,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
     //                   INTERNAL FUNCTIONS
     // ============================================================
 
-    function _captureCarmen(uint256 missionId) internal {
+    function _captureCarmen(uint256 missionId, uint256 revealedChainId) internal {
         Mission storage mission = missions[missionId];
         mission.status = MissionStatus.Completed;
 
@@ -328,6 +347,24 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster {
         activePlayerMission[mission.player] = 0;
 
         emit CarmenCaptured(missionId, mission.player, blocksUsed, reward);
+
+        // Mint trophy NFT if MissionNFT contract is set
+        if (address(missionNFT) != address(0)) {
+            missionNFT.mintMissionComplete(
+                mission.player,
+                IMissionNFT.MissionRecord({
+                    missionId: missionId,
+                    player: mission.player,
+                    capturedChainId: revealedChainId,
+                    cluesCollected: mission.cluesReceived,
+                    investigationsUsed: mission.investigationsCount,
+                    blocksUsed: blocksUsed,
+                    reward: reward,
+                    timestamp: block.timestamp
+                }),
+                "" // URI set later by CRE (AI-generated trophy image)
+            );
+        }
     }
 
     function _failMission(uint256 missionId) internal {

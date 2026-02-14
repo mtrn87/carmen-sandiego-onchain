@@ -37,4 +37,5 @@ interface IGameMaster {
     event CarmenCaptured(uint256 indexed missionId, address indexed player, uint256 blocksUsed, uint256 reward);
     event CarmenMoved(uint256 indexed missionId, bytes32 newTargetHash);
     event MissionFailed(uint256 indexed missionId, address indexed player);
+    event MissionNFTSet(address indexed missionNFT);
 }
