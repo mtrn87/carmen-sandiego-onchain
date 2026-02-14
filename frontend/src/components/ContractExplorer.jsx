@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useGameStore } from '../store/gameStore'
-import { CHAIN_CONFIG, CASE_DATA, DEFAULT_CASE } from '../data/contractData'
+import { CHAIN_CONFIG, LOCATION_DATA, DEFAULT_LOCATION } from '../data/contractData'
 import styles from './ContractExplorer.module.css'
 
 export default function ContractExplorer({ onOpenMap }) {
@@ -31,7 +31,7 @@ export default function ContractExplorer({ onOpenMap }) {
     setInvestigationModal(null)
   }, [currentCase])
 
-  const caseData = CASE_DATA[currentCase] || CASE_DATA[DEFAULT_CASE]
+  const caseData = LOCATION_DATA[currentCase] || LOCATION_DATA[DEFAULT_LOCATION]
   const chain = CHAIN_CONFIG[caseData.chain] || CHAIN_CONFIG['BNB Chain']
   const transactions = caseData.transactions
   const events = caseData.events || []
@@ -113,51 +113,8 @@ export default function ContractExplorer({ onOpenMap }) {
 
       {/* scrollable content */}
       <div className={styles.content}>
-        {/* header card — NFT or Contract depending on case */}
-        {caseData.headerType === 'nft' && caseData.nft && (
-          <div className={styles.nftCard}>
-            <div className={styles.nftImageWrap}>
-              <img src={caseData.locationImage} alt={caseData.nft.name} className={styles.nftImage} />
-              <div className={styles.nftImageOverlay} />
-            </div>
-            <div className={styles.nftDetails}>
-              <div className={styles.nftHeader}>
-                <div>
-                  <span className={styles.nftCollection}>{caseData.nft.collection}</span>
-                  <h2 className={styles.nftName}>{caseData.nft.name}</h2>
-                </div>
-                <div className={styles.nftValuation}>
-                  <span className={styles.nftEth}>{caseData.nft.valuationBnb}</span>
-                  <span className={styles.nftUsd}>{caseData.nft.valuationUsd}</span>
-                </div>
-              </div>
-              <div className={styles.nftMeta}>
-                <div className={styles.nftMetaRow}>
-                  <span className={styles.metaLabel}>Contract</span>
-                  <span className={styles.metaValueMono}>{caseData.nft.contractAddress.slice(0, 20)}...{caseData.nft.contractAddress.slice(-4)}</span>
-                </div>
-                <div className={styles.nftMetaRow}>
-                  <span className={styles.metaLabel}>Token ID</span>
-                  <span className={styles.metaValue}>{caseData.nft.tokenId}</span>
-                </div>
-                <div className={styles.nftMetaRow}>
-                  <span className={styles.metaLabel}>Standard</span>
-                  <span className={styles.metaValue}>{caseData.nft.standard}</span>
-                </div>
-                <div className={styles.nftMetaRow}>
-                  <span className={styles.metaLabel}>Current Owner</span>
-                  <span className={styles.metaValueMono}>{caseData.nft.owner}</span>
-                </div>
-                <div className={styles.nftMetaRow}>
-                  <span className={styles.metaLabel}>Previous Owner</span>
-                  <span className={styles.metaValueMono}>{caseData.nft.previousOwner.slice(0, 12)}...{caseData.nft.previousOwner.slice(-4)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {caseData.headerType === 'contract' && caseData.contract && (
+        {/* header card — contract info */}
+        {caseData.contract && (
           <div className={styles.contractCard}>
             <div className={styles.contractImageWrap}>
               <img src={caseData.locationImage} alt={caseData.contract.name} className={styles.contractImage} />
@@ -231,49 +188,56 @@ export default function ContractExplorer({ onOpenMap }) {
 
         {/* transactions table */}
         {activeSection === 'transactions' && (
-          <div className={styles.txTable}>
-            <div className={styles.txTableHead}>
-              <span className={styles.thStatus} />
-              <span className={styles.thHash}>Tx Hash</span>
-              <span className={styles.thMethod}>Method</span>
-              <span className={styles.thBlock}>Block</span>
-              <span className={styles.thAge}>Age</span>
-              <span className={styles.thFrom}>From</span>
-              <span className={styles.thArrow} />
-              <span className={styles.thTo}>To</span>
-              <span className={styles.thValue}>Value</span>
-              <span className={styles.thFee}>Tx Fee</span>
-            </div>
-            {transactions.map((tx) => (
-              <div
-                key={tx.id}
-                className={`
-                  ${styles.txTableRow}
-                  ${selectedTx === tx.id ? styles.txSelected : ''}
-                  ${tourActive && tourStep === 0 && tx.id === 'tx-bridge' ? styles.tourHighlight : ''}
-                `}
-                data-tour={tx.id === 'tx-bridge' ? 'tx-bridge' : undefined}
-                onClick={() => handleTxClick(tx)}
-              >
-                <span className={styles.tdStatus}>
-                  <span className={`${styles.statusDot} ${tx.status === 'success' ? styles.statusSuccess : styles.statusFail}`} />
-                </span>
-                <span className={styles.tdHash}>{tx.hash}</span>
-                <span className={styles.tdMethod}>
-                  <span className={styles.methodBadge}>{tx.method}</span>
-                </span>
-                <span className={styles.tdBlock}>{tx.block}</span>
-                <span className={styles.tdAge}>{tx.age}</span>
-                <span className={styles.tdFrom}>{tx.from}</span>
-                <span className={styles.tdArrow}>
-                  <span className={styles.arrowIcon}>&#10132;</span>
-                </span>
-                <span className={styles.tdTo}>{tx.to}</span>
-                <span className={styles.tdValue}>{tx.value}</span>
-                <span className={styles.tdFee}>{tx.fee}</span>
+          transactions.length > 0 ? (
+            <div className={styles.txTable}>
+              <div className={styles.txTableHead}>
+                <span className={styles.thStatus} />
+                <span className={styles.thHash}>Tx Hash</span>
+                <span className={styles.thMethod}>Method</span>
+                <span className={styles.thBlock}>Block</span>
+                <span className={styles.thAge}>Age</span>
+                <span className={styles.thFrom}>From</span>
+                <span className={styles.thArrow} />
+                <span className={styles.thTo}>To</span>
+                <span className={styles.thValue}>Value</span>
+                <span className={styles.thFee}>Tx Fee</span>
               </div>
-            ))}
-          </div>
+              {transactions.map((tx) => (
+                <div
+                  key={tx.id}
+                  className={`
+                    ${styles.txTableRow}
+                    ${selectedTx === tx.id ? styles.txSelected : ''}
+                    ${tourActive && tourStep === 0 && tx.id === 'tx-bridge' ? styles.tourHighlight : ''}
+                  `}
+                  data-tour={tx.id === 'tx-bridge' ? 'tx-bridge' : undefined}
+                  onClick={() => handleTxClick(tx)}
+                >
+                  <span className={styles.tdStatus}>
+                    <span className={`${styles.statusDot} ${tx.status === 'success' ? styles.statusSuccess : styles.statusFail}`} />
+                  </span>
+                  <span className={styles.tdHash}>{tx.hash}</span>
+                  <span className={styles.tdMethod}>
+                    <span className={styles.methodBadge}>{tx.method}</span>
+                  </span>
+                  <span className={styles.tdBlock}>{tx.block}</span>
+                  <span className={styles.tdAge}>{tx.age}</span>
+                  <span className={styles.tdFrom}>{tx.from}</span>
+                  <span className={styles.tdArrow}>
+                    <span className={styles.arrowIcon}>&#10132;</span>
+                  </span>
+                  <span className={styles.tdTo}>{tx.to}</span>
+                  <span className={styles.tdValue}>{tx.value}</span>
+                  <span className={styles.tdFee}>{tx.fee}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.placeholderSection}>
+              <span className={styles.placeholderIcon}>&#128269;</span>
+              <span>Awaiting mission... Start investigating a city to see on-chain activity.</span>
+            </div>
+          )
         )}
 
         {/* events tab — real on-chain events when mission active, fallback to mock */}
