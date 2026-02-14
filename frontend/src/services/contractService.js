@@ -19,6 +19,30 @@ if (!GAME_MASTER_ADDRESS) {
 }
 export const SEPOLIA_CHAIN_ID = 11155111
 
+const DEFAULT_CITY_NODE_RPCS = {
+  421614: "https://sepolia-rollup.arbitrum.io/rpc",
+  84532: "https://sepolia.base.org",
+  51: "https://erpc.apothem.network",
+}
+
+const CITY_NODE_META = {
+  421614: { name: "Tokyo", chain: "Arbitrum Sepolia" },
+  84532: { name: "Paris", chain: "Base Sepolia" },
+  51: { name: "London", chain: "XDC Apothem" },
+}
+
+const CITY_NODE_ADDRESSES = {
+  421614: import.meta.env.VITE_CITYNODE_TOKYO_ADDRESS,
+  84532: import.meta.env.VITE_CITYNODE_PARIS_ADDRESS,
+  51: import.meta.env.VITE_CITYNODE_LONDON_ADDRESS,
+}
+
+const CITY_NODE_RPC_URLS = {
+  421614: import.meta.env.VITE_ARBITRUM_SEPOLIA_RPC_URL || DEFAULT_CITY_NODE_RPCS[421614],
+  84532: import.meta.env.VITE_BASE_SEPOLIA_RPC_URL || DEFAULT_CITY_NODE_RPCS[84532],
+  51: import.meta.env.VITE_XDC_APOTHEM_RPC_URL || DEFAULT_CITY_NODE_RPCS[51],
+}
+
 export const CITY_MAP = {
   421614: { name: "Tokyo", chain: "Arbitrum Sepolia", color: "#28a0f0", emoji: "\u{1F5FE}" },
   84532:  { name: "Paris", chain: "Base Sepolia",     color: "#0052ff", emoji: "\u{1F5FC}" },
@@ -49,6 +73,14 @@ const GAME_MASTER_ABI = [
   "event CarmenCaptured(uint256 indexed missionId, address indexed player, uint256 blocksUsed, uint256 reward)",
   "event CarmenMoved(uint256 indexed missionId, bytes32 newTargetHash)",
   "event MissionFailed(uint256 indexed missionId, address indexed player)",
+]
+
+const CITY_NODE_ABI = [
+  "function cityName() view returns (string)",
+  "function chainId() view returns (uint256)",
+  "function owner() view returns (address)",
+  "function creOracle() view returns (address)",
+  "function getCarmenStatus(uint256 missionId) view returns (bool)",
 ]
 
 // ============================================================
@@ -86,6 +118,144 @@ export async function getReadContract() {
 export function resetConnection() {
   _provider = null
   _signer = null
+}
+
+// ============================================================
+//  Dev / Debug Helpers
+// ============================================================
+
+/**
+ * Get signer wallet address currently connected in browser wallet.
+ * @returns {Promise<string>}
+ */
+export async function getConnectedWalletAddress() {
+  const signer = await getSigner()
+  return signer.getAddress()
+}
+
+/**
+ * Return configured CityNode contracts for debug panel.
+ */
+export function getConfiguredCityNodes() {
+  return Object.entries(CITY_NODE_META).map(([chainId, meta]) => {
+    const id = Number(chainId)
+    return {
+      chainId: id,
+      ...meta,
+      address: CITY_NODE_ADDRESSES[id] || null,
+      rpcUrl: CITY_NODE_RPC_URLS[id] || null,
+      configured: Boolean(CITY_NODE_ADDRESSES[id]),
+    }
+  })
+}
+
+function getCityNodeReadContract(chainId) {
+  const address = CITY_NODE_ADDRESSES[chainId]
+  const rpcUrl = CITY_NODE_RPC_URLS[chainId]
+
+  if (!address) {
+    throw new Error(`CityNode address not configured for chainId ${chainId}`)
+  }
+  if (!rpcUrl) {
+    throw new Error(`RPC URL not configured for chainId ${chainId}`)
+  }
+
+  const provider = new ethers.JsonRpcProvider(rpcUrl)
+  return new ethers.Contract(address, CITY_NODE_ABI, provider)
+}
+
+/**
+ * Get debug state from a CityNode.
+ * @param {number} chainId
+ * @param {number|bigint} missionId
+ */
+export async function getCityNodeState(chainId, missionId) {
+  const nodeMeta = CITY_NODE_META[chainId]
+  const address = CITY_NODE_ADDRESSES[chainId]
+
+  if (!address) {
+    return {
+      chainId,
+      name: nodeMeta?.name || `Chain ${chainId}`,
+      chain: nodeMeta?.chain || `Chain ${chainId}`,
+      address: null,
+      configured: false,
+      error: "Address not configured",
+    }
+  }
+
+  try {
+    const contract = getCityNodeReadContract(chainId)
+    const [cityName, nodeChainId, owner, creOracle, carmenPresent] = await Promise.all([
+      contract.cityName(),
+      contract.chainId(),
+      contract.owner(),
+      contract.creOracle(),
+      contract.getCarmenStatus(BigInt(missionId || 0)),
+    ])
+
+    return {
+      chainId,
+      name: cityName,
+      chain: nodeMeta?.chain || cityName,
+      address,
+      configured: true,
+      nodeChainId: Number(nodeChainId),
+      owner,
+      creOracle,
+      carmenPresent: Boolean(carmenPresent),
+    }
+  } catch (error) {
+    return {
+      chainId,
+      name: nodeMeta?.name || `Chain ${chainId}`,
+      chain: nodeMeta?.chain || `Chain ${chainId}`,
+      address,
+      configured: true,
+      error: error.message || "Failed to read CityNode",
+    }
+  }
+}
+
+/**
+ * Get GameMaster state scoped to wallet and active mission.
+ * @param {string} walletAddress
+ */
+export async function getGameMasterDebugState(walletAddress) {
+  if (!walletAddress) throw new Error("walletAddress is required")
+
+  const [registered, activeMissionId, validCities] = await Promise.all([
+    isPlayerRegistered(walletAddress),
+    getPlayerActiveMission(walletAddress),
+    getValidCities(),
+  ])
+
+  let mission = null
+  let clues = []
+  let blocksUsed = 0
+  let carmenLocation = null
+
+  if (activeMissionId > 0n) {
+    const missionNumber = Number(activeMissionId)
+    ;[mission, clues, blocksUsed] = await Promise.all([
+      getMission(missionNumber),
+      getMissionClues(missionNumber),
+      getBlocksUsed(missionNumber),
+    ])
+    carmenLocation = await getCurrentCarmenLocation(missionNumber)
+  }
+
+  return {
+    walletAddress,
+    gameMasterAddress: GAME_MASTER_ADDRESS,
+    registered,
+    activeMissionId: Number(activeMissionId),
+    validCities,
+    mission,
+    carmenLocation,
+    cluesCount: clues.length,
+    blocksUsed,
+  }
 }
 
 // ============================================================
@@ -162,6 +332,12 @@ export async function getMission(missionId) {
   }
 }
 
+/** Get mission salt (used by CRE to derive Carmen city). */
+export async function getMissionSalt(missionId) {
+  const contract = await getReadContract()
+  return contract.getMissionSalt(missionId)
+}
+
 /**
  * Get all clues for a mission.
  * @param {number|bigint} missionId
@@ -183,6 +359,42 @@ export async function getValidCities() {
   const contract = await getReadContract()
   const cities = await contract.getValidCities()
   return cities.map((c) => Number(c))
+}
+
+/**
+ * Derive Carmen's current city for a mission by matching keccak256(chainId, salt) against targetHash.
+ * Intended for non-production debugging only.
+ */
+export async function getCurrentCarmenLocation(missionId) {
+  if (!missionId) return null
+
+  const [mission, salt, cities] = await Promise.all([
+    getMission(missionId),
+    getMissionSalt(missionId),
+    getValidCities(),
+  ])
+
+  if (!mission?.targetHash || !salt) return null
+
+  const targetHash = String(mission.targetHash).toLowerCase()
+
+  for (const chainId of cities) {
+    const candidate = ethers.solidityPackedKeccak256(
+      ["uint256", "bytes32"],
+      [BigInt(chainId), salt]
+    ).toLowerCase()
+
+    if (candidate === targetHash) {
+      const cityMeta = CITY_MAP[chainId]
+      return {
+        chainId,
+        name: cityMeta?.name || `Chain ${chainId}`,
+        chain: cityMeta?.chain || `Chain ${chainId}`,
+      }
+    }
+  }
+
+  return null
 }
 
 /** Get blocks used in a mission. */

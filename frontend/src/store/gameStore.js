@@ -18,12 +18,81 @@ import {
   CITY_MAP,
 } from '../services/contractService'
 import { getPublicKeyHex, decryptClue } from '../utils/ecies'
+import scenariosData from '../data/scenarios.json'
+
+const MISSION_PLOT_STORAGE_KEY = 'carmen_current_mission_plot'
+
+function getScenarioForMission(missionId) {
+  const scenarios = scenariosData?.scenarios || []
+  if (!scenarios.length) return null
+  const safeMissionId = Number(missionId) > 0 ? Number(missionId) : 1
+  return scenarios[(safeMissionId - 1) % scenarios.length]
+}
+
+function buildPlotFromScenario(missionId, scenario) {
+  if (!scenario) return null
+  return {
+    missionId,
+    scenarioId: scenario.id,
+    title: scenario.title,
+    briefing: scenario.briefing,
+    cities: scenario.cities || {},
+  }
+}
+
+function saveMissionPlot(plot) {
+  if (!plot) return
+  localStorage.setItem(MISSION_PLOT_STORAGE_KEY, JSON.stringify(plot))
+}
+
+function loadSavedMissionPlot() {
+  try {
+    const raw = localStorage.getItem(MISSION_PLOT_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function clearSavedMissionPlot() {
+  localStorage.removeItem(MISSION_PLOT_STORAGE_KEY)
+}
+
+function getLastKnownLocationFromEvents(events = []) {
+  if (!Array.isArray(events) || events.length === 0) return null
+  const latestInvestigation = [...events].reverse().find((e) => e?.name === 'InvestigationSubmitted')
+  if (!latestInvestigation) return null
+
+  const chainId = Number(latestInvestigation?.data?.chainId)
+  if (!Number.isFinite(chainId)) return null
+
+  const city = CITY_MAP[chainId]
+  return {
+    chainId,
+    name: city?.name || `Chain ${chainId}`,
+    chain: city?.chain || `Chain ${chainId}`,
+  }
+}
 
 // ============================================================
 //  City locations derived from real chain IDs
 // ============================================================
 
 const CITY_LOCATIONS = [
+  {
+    id: 11155111,
+    name: 'New York',
+    chain: 'Ethereum Sepolia',
+    chainColor: '#627EEA',
+    type: 'hq',
+    description: 'ACME mission control where the briefing and plot originate.',
+    coords: { x: 27, y: 34 },
+    investigated: false,
+    connections: [421614],
+  },
   {
     id: 421614,
     name: 'Tokyo',
@@ -33,7 +102,7 @@ const CITY_LOCATIONS = [
     description: 'A yield staking vault on Arbitrum. An unusual amount of tokens was locked recently from an unknown address.',
     coords: { x: 78, y: 55 },
     investigated: false,
-    connections: [84532],
+    connections: [84532, 11155111],
   },
   {
     id: 84532,
@@ -91,6 +160,9 @@ export const useGameStore = create((set, get) => ({
   tourActive: false,
   tourStep: 0,
   currentCase: null,
+  currentPlot: null,
+  showPlotModal: false,
+  lastKnownLocation: null,
   terminalLines: [],
   isInvestigating: false,
   showClueModal: false,
@@ -128,6 +200,9 @@ export const useGameStore = create((set, get) => ({
       playerNickname: null,
       missionId: null,
       missionData: null,
+      currentPlot: null,
+      showPlotModal: false,
+      lastKnownLocation: null,
       isRegistered: false,
       _unsubscribers: [],
     })
@@ -243,6 +318,7 @@ export const useGameStore = create((set, get) => ({
         missionId,
         missionData: mission,
         missionEvents: events,
+        lastKnownLocation: getLastKnownLocationFromEvents(events),
         currentMission: {
           id: `mission-${missionId}`,
           title: `Mission #${missionId}`,
@@ -254,8 +330,10 @@ export const useGameStore = create((set, get) => ({
         // so the user always sees the briefing screen on new sessions
       })
 
-      // Set up event listeners
       const state = get()
+      state.hydrateMissionPlot(missionId)
+
+      // Set up event listeners
       await state._setupEventListeners(missionId)
     } catch (error) {
       console.error('loadMissionState error:', error)
@@ -540,6 +618,11 @@ export const useGameStore = create((set, get) => ({
         locations: s.locations.map((l) =>
           l.id === chainId ? { ...l, investigated: true } : l
         ),
+        lastKnownLocation: {
+          chainId,
+          name: city?.name || `Chain ${chainId}`,
+          chain: city?.chain || `Chain ${chainId}`,
+        },
         missionEvents: [...s.missionEvents, {
           name: 'InvestigationSubmitted',
           block: receipt.blockNumber || 'latest',
@@ -598,6 +681,9 @@ export const useGameStore = create((set, get) => ({
       if (existingMissionId) {
         console.log('[completeBriefing] Resuming existing mission #', existingMissionId)
 
+        const state = get()
+        state.hydrateMissionPlot(existingMissionId)
+
         set({
           briefingDone: true,
           tourActive: true,
@@ -605,7 +691,6 @@ export const useGameStore = create((set, get) => ({
         })
 
         // Set up event listeners
-        const state = get()
         await state._setupEventListeners(existingMissionId)
 
         set((s) => ({
@@ -613,6 +698,7 @@ export const useGameStore = create((set, get) => ({
             ...s.terminalLines,
             { text: `> RESUMING MISSION #${existingMissionId}. Carmen's location committed.`, color: 'yellow', type: 'alert' },
             { text: '> Use the MAP to investigate cities and find clues.', color: 'green', type: 'help' },
+            { text: '> Type /MISSION in terminal to read your current assignment.', color: 'cyan', type: 'help' },
           ],
         }))
 
@@ -720,9 +806,11 @@ export const useGameStore = create((set, get) => ({
           },
         })
 
+        const state = get()
+        state.hydrateMissionPlot(missionId)
+
         // Set up event listeners
         console.log('[completeBriefing] Setting up event listeners...')
-        const state = get()
         await state._setupEventListeners(missionId)
         console.log('[completeBriefing] Event listeners ready')
 
@@ -731,6 +819,7 @@ export const useGameStore = create((set, get) => ({
             ...s.terminalLines,
             { text: `> MISSION #${missionId} ACTIVE. Carmen's location committed.`, color: 'yellow', type: 'alert' },
             { text: '> Use the MAP to investigate cities and find clues.', color: 'green', type: 'help' },
+            { text: '> Type /MISSION in terminal to read your current assignment.', color: 'cyan', type: 'help' },
           ],
         }))
       } else {
@@ -838,15 +927,18 @@ export const useGameStore = create((set, get) => ({
       missionEvents: [],
       clues: [],
       evidence: [],
+      lastKnownLocation: null,
       locations: CITY_LOCATIONS,
       scannedLocations: [],
       briefingDone: false,
       isInvestigating: false,
       showClueModal: false,
       activeClue: null,
+      showPlotModal: false,
       showOutcomeModal: false,
       missionOutcome: null,
       currentMission: null,
+      currentPlot: null,
       gas: 100,
       blocksElapsed: 0,
       carmenMovedAlert: false,
@@ -856,7 +948,57 @@ export const useGameStore = create((set, get) => ({
         { text: '> MISSION RESET. Preparing new assignment...', color: 'cyan', type: 'system' },
       ],
     })
+
+    clearSavedMissionPlot()
   },
+
+  hydrateMissionPlot: (missionIdParam = null) => {
+    const missionId = missionIdParam ?? get().missionId
+    if (!missionId) {
+      set({ currentPlot: null })
+      return null
+    }
+
+    const saved = loadSavedMissionPlot()
+    if (saved && Number(saved.missionId) === Number(missionId)) {
+      set({ currentPlot: saved })
+      return saved
+    }
+
+    const scenario = getScenarioForMission(missionId)
+    const plot = buildPlotFromScenario(missionId, scenario)
+    if (plot) {
+      saveMissionPlot(plot)
+      set({ currentPlot: plot })
+      return plot
+    }
+
+    set({ currentPlot: null })
+    return null
+  },
+
+  openMissionPlotModal: () => {
+    const state = get()
+    const plot = state.currentPlot || state.hydrateMissionPlot(state.missionId)
+
+    if (!plot) {
+      set((s) => ({
+        terminalLines: [
+          ...s.terminalLines,
+          { text: '> No mission plot available. Start or resume a mission first.', color: 'yellow', type: 'help' },
+        ],
+      }))
+      return
+    }
+
+    set({ showPlotModal: true })
+  },
+
+  printCurrentMissionPlot: () => {
+    get().openMissionPlotModal()
+  },
+
+  closeMissionPlotModal: () => set({ showPlotModal: false }),
 
   spendGas: (amount) => {
     set((s) => ({

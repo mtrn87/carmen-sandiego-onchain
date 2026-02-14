@@ -82,6 +82,66 @@ describe("CityNode", function () {
     });
   });
 
+  describe("Departure Hints", function () {
+    it("should allow CRE to record departure hint", async function () {
+      const hintHash = ethers.keccak256(ethers.toUtf8Bytes("headed to a city with a famous river"));
+      const ipfsPointer = "ipfs://bafyhint1";
+
+      await cityNode.connect(creOracle).recordDepartureHint(1, hintHash, ipfsPointer);
+
+      const hints = await cityNode.getDepartureHints(1);
+      expect(hints.length).to.equal(1);
+      expect(hints[0].contentHash).to.equal(hintHash);
+      expect(hints[0].ipfsPointer).to.equal(ipfsPointer);
+      expect(hints[0].timestamp).to.be.gt(0);
+    });
+
+    it("should emit DepartureHintRecorded", async function () {
+      const hintHash = ethers.keccak256(ethers.toUtf8Bytes("port city route"));
+      const ipfsPointer = "ipfs://bafyhint2";
+
+      await expect(cityNode.connect(creOracle).recordDepartureHint(1, hintHash, ipfsPointer))
+        .to.emit(cityNode, "DepartureHintRecorded")
+        .withArgs(1, hintHash, ipfsPointer);
+    });
+
+    it("should reject non-CRE hint writes", async function () {
+      const hintHash = ethers.keccak256(ethers.toUtf8Bytes("timezone clue"));
+
+      await expect(
+        cityNode.connect(otherUser).recordDepartureHint(1, hintHash, "ipfs://bafyhint3")
+      ).to.be.revertedWith("Not CRE oracle");
+    });
+
+    it("should reject invalid hints", async function () {
+      await expect(
+        cityNode.connect(creOracle).recordDepartureHint(1, ethers.ZeroHash, "ipfs://bafyhint4")
+      ).to.be.revertedWith("Invalid hint");
+
+      const hintHash = ethers.keccak256(ethers.toUtf8Bytes("coastal clue"));
+      await expect(
+        cityNode.connect(creOracle).recordDepartureHint(1, hintHash, "")
+      ).to.be.revertedWith("Invalid hint");
+    });
+
+    it("should track hints per mission", async function () {
+      const hintHash1 = ethers.keccak256(ethers.toUtf8Bytes("mission one clue"));
+      const hintHash2 = ethers.keccak256(ethers.toUtf8Bytes("mission two clue"));
+
+      await cityNode.connect(creOracle).recordDepartureHint(1, hintHash1, "ipfs://bafyhint5");
+      await cityNode.connect(creOracle).recordDepartureHint(2, hintHash2, "ipfs://bafyhint6");
+
+      const mission1Hints = await cityNode.getDepartureHints(1);
+      const mission2Hints = await cityNode.getDepartureHints(2);
+
+      expect(mission1Hints.length).to.equal(1);
+      expect(mission1Hints[0].contentHash).to.equal(hintHash1);
+
+      expect(mission2Hints.length).to.equal(1);
+      expect(mission2Hints[0].contentHash).to.equal(hintHash2);
+    });
+  });
+
   describe("Admin", function () {
     it("should allow owner to update CRE oracle", async function () {
       await cityNode.connect(owner).setCREOracle(otherUser.address);

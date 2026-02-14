@@ -51,6 +51,8 @@ export default function TerminalSidebar() {
     missionId,
     playerNickname,
     rank,
+    currentPlot,
+    openMissionPlotModal,
   } = useGameStore()
 
   const missionEnded = currentMission?.status === 'completed' || currentMission?.status === 'failed'
@@ -144,6 +146,13 @@ export default function TerminalSidebar() {
     if (!msg) return
     addTerminalLine(`> ${msg}`, 'cyan', 'user')
     setChatInput('')
+
+    const command = msg.toLowerCase()
+    if (command === '/mission') {
+      openMissionPlotModal()
+      return
+    }
+
     setTimeout(() => {
       addTerminalLine('> ACME AI: Processing your request...', 'muted', 'system')
       setTimeout(() => {
@@ -259,11 +268,18 @@ export default function TerminalSidebar() {
               ref={inputRef}
               className={styles.chatField}
               type="text"
-              placeholder="Ask ACME AI for help..."
+              placeholder="Ask ACME AI or type /mission"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={handleKeyDown}
             />
+            <button
+              className={styles.quickMissionBtn}
+              onClick={openMissionPlotModal}
+              disabled={!currentPlot && !missionId}
+            >
+              MISSION
+            </button>
             <button
               className={styles.chatSend}
               onClick={handleSendMessage}

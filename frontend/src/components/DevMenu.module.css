@@ -1,0 +1,158 @@
+.container {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.toggle {
+  border: 1px solid rgba(255, 0, 128, 0.55);
+  background: rgba(10, 10, 20, 0.92);
+  color: #ff6db1;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 1.5px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.panel {
+  width: 420px;
+  max-height: min(78vh, 760px);
+  overflow: auto;
+  border: 1px solid rgba(255, 0, 128, 0.45);
+  background: rgba(8, 10, 16, 0.96);
+  box-shadow: 0 0 24px rgba(255, 0, 128, 0.18);
+  padding: 12px;
+  color: #d2e9ff;
+  font-family: var(--font-mono);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.title {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #ff9ccd;
+}
+
+.mode {
+  font-size: 0.62rem;
+  color: #89d8ff;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.btn,
+.btnSmall {
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  background: rgba(0, 240, 255, 0.08);
+  color: #b9f6ff;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.btn:disabled,
+.btnSmall:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 0.62rem;
+  color: #9bc8e6;
+}
+
+.input {
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  background: rgba(0, 0, 0, 0.32);
+  color: #dff6ff;
+  padding: 6px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.investigateRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.section {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.sectionTitle {
+  color: #ffd0e8;
+  font-size: 0.68rem;
+  margin-bottom: 6px;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: 115px 1fr;
+  gap: 8px;
+  font-size: 0.62rem;
+  margin-bottom: 4px;
+}
+
+.nodeCard {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px;
+  margin-top: 6px;
+}
+
+.nodeTop {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  margin-bottom: 6px;
+}
+
+.error {
+  border: 1px solid rgba(255, 80, 80, 0.5);
+  background: rgba(120, 0, 0, 0.2);
+  color: #ff9a9a;
+  padding: 7px;
+  margin-bottom: 8px;
+  font-size: 0.62rem;
+}
+
+.errorInline {
+  margin-top: 6px;
+  color: #ff8b8b;
+  font-size: 0.58rem;
+}
+
+.empty {
+  font-size: 0.62rem;
+  color: #8ab3ce;
+}
+
+@media (max-width: 768px) {
+  .panel {
+    width: min(92vw, 420px);
+  }
+}

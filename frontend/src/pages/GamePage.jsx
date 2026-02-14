@@ -5,12 +5,14 @@ import InteractiveMap from '../components/InteractiveMap'
 import ContractExplorer from '../components/ContractExplorer'
 import MissionBriefing from '../components/MissionBriefing'
 import MissionOutcome from '../components/MissionOutcome'
+import MissionPlotModal from '../components/MissionPlotModal'
+import DevMenu from '../components/DevMenu'
 import { useGameStore } from '../store/gameStore'
 import styles from './GamePage.module.css'
 
 export default function GamePage() {
   const navigate = useNavigate()
-  const { isConnected, briefingDone, showOutcomeModal, setCurrentCase, initGame } = useGameStore()
+  const { isConnected, briefingDone, showOutcomeModal, showPlotModal, setCurrentCase, initGame } = useGameStore()
   const [showMap, setShowMap] = useState(false)
 
   // redirect to login if not connected
@@ -42,6 +44,9 @@ export default function GamePage() {
       {/* victory/defeat overlay — shown when mission ends */}
       {showOutcomeModal && <MissionOutcome />}
 
+      {/* mission plot overlay — opened from terminal command */}
+      {showPlotModal && <MissionPlotModal />}
+
       {/* left sidebar — terminal (empty until briefing done) */}
       <aside className={styles.sidebar}>
         <TerminalSidebar />
@@ -68,6 +73,8 @@ export default function GamePage() {
           )}
         </div>
       </main>
+
+      {!import.meta.env.PROD && <DevMenu />}
     </div>
   )
 }

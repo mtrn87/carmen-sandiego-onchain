@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
+import { PLATFORM_CITY_OPTIONS } from '../data/contractData'
 import styles from './InteractiveMap.module.css'
 
 const SCAN_COST = 30
@@ -653,6 +654,7 @@ export default function InteractiveMap({ onSelectCase }) {
   const blockColor = blocksElapsed <= 20 ? 'green' : blocksElapsed <= 35 ? 'yellow' : 'red'
 
   const [selectedMarker, setSelectedMarker] = useState(null)
+  const mapLocations = PLATFORM_CITY_OPTIONS
 
   // background canvas animation
   useEffect(() => {
@@ -751,8 +753,8 @@ export default function InteractiveMap({ onSelectCase }) {
       <canvas ref={canvasRef} className={styles.canvas} />
 
       {/* blockchain entities on map */}
-      {MAP_LOCATIONS.map((loc) => {
-        const isScanned = scannedLocations.includes(loc.id)
+      {mapLocations.map((loc) => {
+        const isScanned = loc.alwaysScanned || scannedLocations.includes(loc.id)
         return (
           <div
             key={loc.id}
@@ -771,9 +773,9 @@ export default function InteractiveMap({ onSelectCase }) {
 
       {/* location panel */}
       {selectedMarker && (() => {
-        const loc = MAP_LOCATIONS.find((l) => l.id === selectedMarker)
+        const loc = mapLocations.find((l) => l.id === selectedMarker)
         if (!loc) return null
-        const isScanned = scannedLocations.includes(loc.id)
+        const isScanned = loc.alwaysScanned || scannedLocations.includes(loc.id)
         return (
           <div className={styles.locationPanel} style={{ '--chain-color': loc.chainColor }}>
             <div className={styles.locationPanelImage}>
@@ -823,15 +825,18 @@ export default function InteractiveMap({ onSelectCase }) {
                 <button
                   className={`${styles.investigateBtn} ${isInvestigating ? styles.investigateBtnDisabled : ''}`}
                   style={{ '--chain-color': loc.chainColor }}
-                  disabled={isInvestigating || !missionId}
+                  disabled={isInvestigating || !missionId || !loc.investigable}
                   onClick={(e) => {
                     e.stopPropagation()
+                    if (!loc.investigable) return
                     investigate(loc.id)
                   }}
                 >
                   {isInvestigating
                     ? '&#9203; INVESTIGATING...'
-                    : !missionId
+                    : !loc.investigable
+                      ? '&#127968; PLOT ORIGIN — BRIEFING NODE'
+                      : !missionId
                       ? '&#9888; START MISSION FIRST'
                       : `&#128269; INVESTIGATE ${loc.name.toUpperCase()}`}
                 </button>

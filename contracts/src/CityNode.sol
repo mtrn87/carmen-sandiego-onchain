@@ -21,6 +21,7 @@ contract CityNode is ICityNode {
 
     // missionId => whether Carmen is present on this chain
     mapping(uint256 => bool) private carmenPresence;
+    mapping(uint256 => DepartureHint[]) private departureHints;
 
     // ============================================================
     //                      MODIFIERS
@@ -71,6 +72,32 @@ contract CityNode is ICityNode {
         }
     }
 
+    /**
+     * @notice Called by CRE workflow when Carmen leaves this city.
+     *         Stores a directional hint about where she may have gone.
+     * @param missionId The mission ID.
+     * @param contentHash Hash of hint content for integrity verification.
+     * @param ipfsPointer IPFS CID for hint payload.
+     */
+    function recordDepartureHint(
+        uint256 missionId,
+        bytes32 contentHash,
+        string calldata ipfsPointer
+    ) external override onlyCRE {
+        require(contentHash != bytes32(0), "Invalid hint");
+        require(bytes(ipfsPointer).length > 0, "Invalid hint");
+
+        departureHints[missionId].push(
+            DepartureHint({
+                contentHash: contentHash,
+                ipfsPointer: ipfsPointer,
+                timestamp: block.timestamp
+            })
+        );
+
+        emit DepartureHintRecorded(missionId, contentHash, ipfsPointer);
+    }
+
     // ============================================================
     //                   VIEW FUNCTIONS
     // ============================================================
@@ -80,6 +107,13 @@ contract CityNode is ICityNode {
      */
     function getCarmenStatus(uint256 missionId) external view override returns (bool) {
         return carmenPresence[missionId];
+    }
+
+    /**
+     * @notice Returns all recorded departure hints for a mission in this city.
+     */
+    function getDepartureHints(uint256 missionId) external view override returns (DepartureHint[] memory) {
+        return departureHints[missionId];
     }
 
     // ============================================================
