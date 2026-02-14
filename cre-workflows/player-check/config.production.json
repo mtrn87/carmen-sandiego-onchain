@@ -1,0 +1,6 @@
+{
+  "chainId": 11155111,
+  "rpcUrl": "https://eth-sepolia.g.alchemy.com/v2/cZgx1scPSDR68tWHfflr7",
+  "playerRegistryAddress": "0xD004e782DbEeAe2EDE648Bb86a64e4Da89320f0b",
+  "gasLimit": 500000
+}

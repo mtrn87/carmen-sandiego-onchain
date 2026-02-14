@@ -7,10 +7,13 @@ import App from './App'
 import './styles/global.css'
 
 const privyConfig = {
-  loginMethods: ['google', 'wallet'],
+  loginMethods: ['google'],
   appearance: {
     theme: 'dark',
     accentColor: '#00ffff',
+  },
+  embeddedWallets: {
+    createOnLogin: 'users-can-choose',
   },
 }
 
