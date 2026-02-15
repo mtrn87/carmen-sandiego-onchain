@@ -59,7 +59,7 @@ describe("Carmen Sandiego - Full Game E2E (Commit-Reveal)", function () {
   async function deliverClue(missionId: number | bigint, clueType: number = 0) {
     const hash = ethers.keccak256(ethers.toUtf8Bytes(`clue-${missionId}-${Date.now()}-${Math.random()}`));
     const ipfs = clueType >= 1 ? "QmEncryptedContent" : "";
-    await gameMaster.connect(creOracle).receiveClue(missionId, clueType, hash, ipfs);
+    await gameMaster.connect(creOracle).receiveClue(missionId, clueType, hash, ipfs, 50);
   }
 
   beforeEach(async function () {
