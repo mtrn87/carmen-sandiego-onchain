@@ -13,6 +13,12 @@ import {
   onCarmenCaptured,
   onCarmenMoved,
   onMissionFailed,
+  onWalletFragmentReceived,
+  onWalletCaseBuilt,
+  onEvidenceCollected,
+  getMissionWalletFragments,
+  getMissionFragmentCount,
+  getMissionEvidenceCount,
   ensureSepoliaNetwork,
   getSigner,
   CITY_MAP,
@@ -32,6 +38,8 @@ import {
 } from '../services/contractService'
 import { getPublicKeyHex, decryptClue } from '../utils/ecies'
 import scenariosData from '../data/scenarios.json'
+import { CITY_POOL_MAP, pickStartingCity, pickRevealedCities } from '../data/cityRegistry'
+import { getCarmenWallet, getCarmenLocationIdx } from '../data/walletPool'
 
 const MISSION_PLOT_STORAGE_KEY = 'carmen_current_mission_plot'
 const PROGRESS_STORAGE_KEY = 'carmen_investigation_progress'
@@ -46,6 +54,18 @@ function saveProgress(state) {
       inspected: loc.inspected || false,
       scanned: loc.scanned || false,
     })),
+    // discovery state
+    discoveredCityIds: state.discoveredCityIds,
+    visitedCityIds: state.visitedCityIds,
+    cityTrail: state.cityTrail,
+    discoveryScanCount: state.discoveryScanCount,
+    // evidence state (persisted for continue mission)
+    evidence: state.evidence,
+    cityEvidence: state.cityEvidence,
+    walletFragments: state.walletFragments,
+    walletFragmentCount: state.walletFragmentCount,
+    walletCaptureAvailable: state.walletCaptureAvailable,
+    evidenceCount: state.evidenceCount,
   }
   localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(data))
 }
@@ -159,12 +179,12 @@ const CITY_LOCATIONS = [
   },
   {
     id: 51,
-    name: 'London',
+    name: 'Sydney',
     chain: 'XDC Apothem',
     chainColor: '#ff6b00',
     type: 'bridge',
-    description: 'A cross-chain bridge on XDC. One high-value transfer stands out among recent activity.',
-    coords: { x: 55, y: 35 },
+    description: 'A cross-chain hub on XDC. Suspect high-frequency swap patterns detected among recent activity.',
+    coords: { x: 87, y: 78 },
     investigated: false,
     connections: [421614],
   },
@@ -232,14 +252,32 @@ export const useGameStore = create((set, get) => ({
   citySuspectWallets: [],
   cityEvidence: [],
   currentLocationIdx: null,
+  startLocationIdx: null, // random starting location — first clue here is always strong
   captureMode: false,
   captureState: 'ready', // 'ready' | 'pending' | 'success' | 'fail'
   captureResult: null,
+  captureSelectedTx: null, // tx selected by clicking in explorer during capture mode
   showDossierModal: false,
   dossierData: null,
   cityViewTab: 'overview', // 'overview' | 'contracts' | 'evidence'
   gameplayLoading: false,
   _cityNodeUnsub: null,
+
+  // ── city discovery state ──
+  discoveredCityIds: [],      // IDs of revealed + available cities
+  visitedCityIds: [],         // IDs of already-visited cities
+  cityTrail: [],              // ordered trail [id1, id2, ...]
+  discoveryScanCount: 0,      // how many times the player scanned (deterministic seed)
+
+  // carmen wallet (per-mission, deterministic from missionId)
+  carmenWalletAddress: null,    // address of Carmen's wallet for this mission
+  carmenLocationIdx: null,      // which locationIdx receives the Carmen tx
+
+  // wallet evidence
+  walletFragments: [],           // { startIndex, length, chars, fragmentIndex }
+  walletFragmentCount: 0,
+  walletCaptureAvailable: false, // true when >= 3
+  evidenceCount: 0,              // on-chain evidence count (clues with strength > 65)
 
   // event unsubscribers
   _unsubscribers: [],
@@ -375,11 +413,30 @@ export const useGameStore = create((set, get) => ({
         console.warn('Failed to load mission events:', err)
       }
 
+      // Load wallet fragments from on-chain
+      let walletFragmentCount = 0
+      try {
+        walletFragmentCount = await getMissionFragmentCount(missionId)
+      } catch (err) {
+        console.warn('Failed to load wallet fragment count:', err)
+      }
+
+      // Load evidence count from on-chain
+      let evidenceCount = 0
+      try {
+        evidenceCount = await getMissionEvidenceCount(missionId)
+      } catch (err) {
+        console.warn('Failed to load evidence count:', err)
+      }
+
       set({
         missionId,
         missionData: mission,
         missionEvents: events,
         lastKnownLocation: getLastKnownLocationFromEvents(events),
+        walletFragmentCount,
+        walletCaptureAvailable: walletFragmentCount >= 3,
+        evidenceCount,
         currentMission: {
           id: `mission-${missionId}`,
           title: `Mission #${missionId}`,
@@ -553,6 +610,90 @@ export const useGameStore = create((set, get) => ({
         }))
       })
       newUnsubs.push(unsubMoved)
+
+      // Listen for wallet fragments
+      const unsubFragment = await onWalletFragmentReceived(missionId, async (event) => {
+        set((s) => ({
+          terminalLines: [
+            ...s.terminalLines,
+            { text: '> WALLET FRAGMENT RECEIVED from CRE workflow.', color: 'cyan', type: 'system' },
+            { text: '> Decrypting fragment with local private key...', color: 'muted', type: 'system' },
+          ],
+        }))
+
+        try {
+          const decryptedJson = await decryptClue(event.ipfsPointer)
+          const fragment = JSON.parse(decryptedJson)
+
+          set((s) => {
+            const newFragments = [...s.walletFragments, {
+              startIndex: fragment.startIndex,
+              length: fragment.length,
+              chars: fragment.chars,
+              fragmentIndex: fragment.fragmentIndex,
+            }]
+            const newCount = newFragments.length
+            return {
+              walletFragments: newFragments,
+              walletFragmentCount: newCount,
+              walletCaptureAvailable: newCount >= 3,
+              terminalLines: [
+                ...s.terminalLines,
+                { text: `> WALLET FRAGMENT #${fragment.fragmentIndex} DECRYPTED.`, color: 'yellow', type: 'alert' },
+                { text: `> Position: ${fragment.startIndex}-${fragment.startIndex + fragment.length - 1} | Chars: ${fragment.chars}`, color: 'green', type: 'system' },
+                ...(newCount >= 3
+                  ? [{ text: '> 3+ FRAGMENTS COLLECTED — WALLET CAPTURE AVAILABLE!', color: 'green', type: 'alert' }]
+                  : [{ text: `> ${newCount}/3 fragments collected.`, color: 'muted', type: 'system' }]),
+              ],
+            }
+          })
+        } catch (err) {
+          console.error('Fragment decryption failed:', err)
+          set((s) => ({
+            terminalLines: [
+              ...s.terminalLines,
+              { text: '> !! FRAGMENT DECRYPTION FAILED.', color: 'red', type: 'alert' },
+            ],
+          }))
+        }
+      })
+      newUnsubs.push(unsubFragment)
+
+      // Listen for evidence collected
+      const unsubEvidence = await onEvidenceCollected(missionId, (event) => {
+        set((s) => ({
+          evidenceCount: event.evidenceCount,
+          terminalLines: [
+            ...s.terminalLines,
+            { text: `> EVIDENCE COLLECTED! Strength ${event.strength} > 65 threshold.`, color: 'green', type: 'alert' },
+            { text: `> On-chain evidence count: ${event.evidenceCount}`, color: 'cyan', type: 'system' },
+          ],
+        }))
+      })
+      newUnsubs.push(unsubEvidence)
+
+      // Listen for wallet case results
+      const unsubWalletCase = await onWalletCaseBuilt(missionId, (event) => {
+        if (event.valid) {
+          set((s) => ({
+            terminalLines: [
+              ...s.terminalLines,
+              { text: '> ████████████████████████████████████████', color: 'green', type: 'system' },
+              { text: '> WALLET CASE VALIDATED — CARMEN CAPTURED!', color: 'green', type: 'alert' },
+              { text: '> ████████████████████████████████████████', color: 'green', type: 'system' },
+            ],
+          }))
+        } else {
+          set((s) => ({
+            terminalLines: [
+              ...s.terminalLines,
+              { text: '> !! WALLET CASE REJECTED — wrong wallet address.', color: 'red', type: 'alert' },
+              { text: '> Review your fragments and try again.', color: 'yellow', type: 'system' },
+            ],
+          }))
+        }
+      })
+      newUnsubs.push(unsubWalletCase)
 
       // Listen for mission failure
       const unsubFail = await onMissionFailed(missionId, () => {
@@ -753,9 +894,30 @@ export const useGameStore = create((set, get) => ({
         }
       }
 
-      // Load first CityNode city + first location
-      await get().selectCity(421614)
-      get().selectLocation(0)
+      // Initialize city discovery and load starting city
+      await get().initDiscovery(mId)
+
+      // Restore saved evidence from localStorage
+      const savedEvidence = loadProgress()
+      if (savedEvidence) {
+        const restored = {}
+        if (savedEvidence.evidence?.length > 0) restored.evidence = savedEvidence.evidence
+        if (savedEvidence.cityEvidence?.length > 0) restored.cityEvidence = savedEvidence.cityEvidence
+        if (savedEvidence.walletFragments?.length > 0) {
+          restored.walletFragments = savedEvidence.walletFragments
+          restored.walletFragmentCount = savedEvidence.walletFragmentCount || savedEvidence.walletFragments.length
+          restored.walletCaptureAvailable = (restored.walletFragmentCount || 0) >= 3
+        }
+        if (savedEvidence.evidenceCount > 0) restored.evidenceCount = savedEvidence.evidenceCount
+        if (Object.keys(restored).length > 0) set(restored)
+      }
+
+      const startingCityId = get().discoveredCityIds[0] || 421614
+      await get().selectCity(startingCityId)
+      const locCount = get().cityLocations.length || 3
+      const startIdx = Math.floor(Math.random() * locCount)
+      set({ startLocationIdx: startIdx })
+      get().selectLocation(startIdx)
 
       if (mId) {
         const state = get()
@@ -769,12 +931,12 @@ export const useGameStore = create((set, get) => ({
 
         await state._setupEventListeners(mId)
 
-        const firstLoc = get().cityLocations[0]
+        const startLoc = get().cityLocations[startIdx]
         set((s) => ({
           terminalLines: [
             ...s.terminalLines,
             { text: `> MISSION #${mId} ACTIVE. Carmen's location committed.`, color: 'yellow', type: 'alert' },
-            { text: `> LOCATION: ${firstLoc?.name || 'Location 0'} — first clue available here.`, color: 'green', type: 'help' },
+            { text: `> LOCATION: ${startLoc?.name || `Location ${startIdx}`} — first clue available here.`, color: 'green', type: 'help' },
             { text: '> Type /MISSION in terminal to read your current assignment.', color: 'cyan', type: 'help' },
           ],
         }))
@@ -786,12 +948,12 @@ export const useGameStore = create((set, get) => ({
           tourStep: 0,
         })
 
-        const firstLoc = get().cityLocations[0]
+        const startLoc = get().cityLocations[startIdx]
         set((s) => ({
           terminalLines: [
             ...s.terminalLines,
             { text: '> MISSION INITIALIZED. Carmen is on the move.', color: 'yellow', type: 'alert' },
-            { text: `> LOCATION: ${firstLoc?.name || 'Location 0'} — first clue available here.`, color: 'green', type: 'help' },
+            { text: `> LOCATION: ${startLoc?.name || `Location ${startIdx}`} — first clue available here.`, color: 'green', type: 'help' },
             { text: '> Type /MISSION in terminal to read your current assignment.', color: 'cyan', type: 'help' },
           ],
         }))
@@ -915,6 +1077,19 @@ export const useGameStore = create((set, get) => ({
       carmenMovedAlert: false,
       _blockPollInterval: null,
       _unsubscribers: [],
+      // reset carmen wallet
+      carmenWalletAddress: null,
+      carmenLocationIdx: null,
+      // reset wallet evidence
+      walletFragments: [],
+      walletFragmentCount: 0,
+      walletCaptureAvailable: false,
+      evidenceCount: 0,
+      // reset discovery state
+      discoveredCityIds: [],
+      visitedCityIds: [],
+      cityTrail: [],
+      discoveryScanCount: 0,
       // reset gameplay loop state
       currentCityId: null,
       currentCityInfo: null,
@@ -923,9 +1098,11 @@ export const useGameStore = create((set, get) => ({
       citySuspectWallets: [],
       cityEvidence: [],
       currentLocationIdx: null,
+      startLocationIdx: null,
       captureMode: false,
       captureState: 'ready',
       captureResult: null,
+      captureSelectedTx: null,
       showDossierModal: false,
       dossierData: null,
       cityViewTab: 'overview',
@@ -937,6 +1114,7 @@ export const useGameStore = create((set, get) => ({
     })
 
     clearSavedMissionPlot()
+    clearProgress()
   },
 
   hydrateMissionPlot: (missionIdParam = null) => {
@@ -1051,8 +1229,11 @@ export const useGameStore = create((set, get) => ({
       }
 
       // build per-location transactions (normal txs + anomaly flags when Carmen present)
+      const { carmenWalletAddress: cwAddr, carmenLocationIdx: cLocIdx } = get()
+      // build a lightweight Carmen wallet object for tx generation
+      const cwObj = cwAddr ? { address: cwAddr, _missionId: get().missionId || 1 } : null
       locations.forEach((loc, i) => {
-        loc.transactions = buildLocationTransactions(chainId, i, anomalyTxRefs, locations.length)
+        loc.transactions = buildLocationTransactions(chainId, i, anomalyTxRefs, locations.length, cwObj, cLocIdx)
       })
 
       set({
@@ -1095,6 +1276,113 @@ export const useGameStore = create((set, get) => ({
       console.error('selectCity error:', error)
       set({ gameplayLoading: false })
     }
+  },
+
+  /**
+   * Initialize city discovery for a mission.
+   * Picks a deterministic starting city based on missionId.
+   */
+  initDiscovery: async (missionId) => {
+    // try restoring from localStorage first
+    const saved = loadProgress()
+    if (saved?.discoveredCityIds?.length > 0) {
+      set({
+        discoveredCityIds: saved.discoveredCityIds,
+        visitedCityIds: saved.visitedCityIds || [],
+        cityTrail: saved.cityTrail || [],
+        discoveryScanCount: saved.discoveryScanCount || 0,
+      })
+      return
+    }
+
+    // initialize Carmen wallet for this mission (deterministic from missionId)
+    const mId = missionId || 1
+    const carmenW = getCarmenWallet(mId)
+    const carmenLocIdx = getCarmenLocationIdx(mId, 3) // 3 locations per city
+    set({ carmenWalletAddress: carmenW.address, carmenLocationIdx: carmenLocIdx })
+
+    const startingCityId = pickStartingCity(mId)
+    const cityData = CITY_POOL_MAP[startingCityId]
+
+    set((s) => ({
+      discoveredCityIds: [startingCityId],
+      visitedCityIds: [],
+      cityTrail: [startingCityId],
+      discoveryScanCount: 0,
+      terminalLines: [...s.terminalLines,
+        { text: `> INTEL: Initial network detected in ${cityData?.name || 'Unknown'} (${cityData?.chain || 'Unknown Chain'})`, color: 'cyan', type: 'system' },
+      ],
+    }))
+  },
+
+  /**
+   * Reveal 2 new cities after a successful scan.
+   * Uses deterministic algorithm based on missionId + scanCount.
+   */
+  revealCities: () => {
+    const { missionId, discoveryScanCount, discoveredCityIds, visitedCityIds } = get()
+    const excludeIds = [...new Set([...discoveredCityIds, ...visitedCityIds])]
+    const newCities = pickRevealedCities(missionId || 1, discoveryScanCount, excludeIds)
+
+    if (newCities.length === 0) return
+
+    const newIds = newCities.map((c) => c.id)
+    const newLines = newCities.map((c) => ({
+      text: `> INTEL RECEIVED: New network detected in ${c.name} (${c.chain})`,
+      color: 'green',
+      type: 'alert',
+    }))
+
+    set((s) => ({
+      discoveredCityIds: [...s.discoveredCityIds, ...newIds],
+      discoveryScanCount: s.discoveryScanCount + 1,
+      terminalLines: [...s.terminalLines, ...newLines],
+    }))
+  },
+
+  /**
+   * Travel to a discovered city.
+   * Current city becomes visited, old visited cities are removed from discovered.
+   */
+  travelToCity: async (cityId) => {
+    const { currentCityId, discoveredCityIds, visitedCityIds, cityTrail } = get()
+    if (!discoveredCityIds.includes(cityId)) return
+
+    const newVisited = currentCityId ? [...visitedCityIds, currentCityId] : visitedCityIds
+    const newTrail = [...cityTrail, cityId]
+
+    // keep: current target + the last visited city visible
+    // remove cities visited before the last one from discoveredCityIds
+    const lastVisited = newVisited.length > 0 ? newVisited[newVisited.length - 1] : null
+    const keepIds = new Set(discoveredCityIds.filter((id) => {
+      if (id === cityId) return true // target city
+      if (id === lastVisited) return true // last visited
+      if (!newVisited.includes(id)) return true // not visited = still available
+      return false
+    }))
+
+    set({
+      discoveredCityIds: [...keepIds],
+      visitedCityIds: newVisited,
+      cityTrail: newTrail,
+    })
+
+    // load the new city data
+    await get().selectCity(cityId)
+    const locCount = get().cityLocations.length || 3
+    const startIdx = Math.floor(Math.random() * locCount)
+    get().selectLocation(startIdx)
+
+    const cityData = CITY_POOL_MAP[cityId]
+    set((s) => ({
+      terminalLines: [...s.terminalLines,
+        { text: '', color: 'muted', type: 'system' },
+        { text: `> TRAVELING TO: ${cityData?.name || 'Unknown'} [${cityData?.chain || 'Unknown'}]`, color: 'cyan', type: 'action' },
+        { text: '> Network connection established.', color: 'green', type: 'system' },
+      ],
+    }))
+
+    saveProgress(get())
   },
 
   backToMap: () => {
@@ -1191,6 +1479,10 @@ export const useGameStore = create((set, get) => ({
         getCityNodeSuspectWallets(currentCityId),
       ])
       set({ cityAnomalyTxRefs: anomalyTxRefs, citySuspectWallets: suspectWallets })
+
+      // reveal 2 new cities after successful scan
+      get().revealCities()
+
       saveProgress(get())
     } catch (error) {
       set((s) => ({
@@ -1203,7 +1495,7 @@ export const useGameStore = create((set, get) => ({
   },
 
   gameplayRequestClue: async (locationIdx, clueIndex) => {
-    const { currentCityId } = get()
+    const { currentCityId, startLocationIdx } = get()
     if (!currentCityId) return
 
     set((s) => ({
@@ -1216,7 +1508,9 @@ export const useGameStore = create((set, get) => ({
     }))
 
     try {
-      const result = await cityNodeRequestClue(currentCityId, locationIdx, clueIndex)
+      // first clue at the starting location is always strong (guaranteed lead)
+      const isStartingClue = locationIdx === startLocationIdx && clueIndex === 0
+      const result = await cityNodeRequestClue(currentCityId, locationIdx, clueIndex, isStartingClue)
 
       const isDeadEnd = result.clueType === 'DEAD_END'
       const newClue = {
@@ -1232,6 +1526,21 @@ export const useGameStore = create((set, get) => ({
         timestamp: Date.now(),
       }
 
+      // Build evidence item when strength exceeds threshold
+      const EVIDENCE_THRESHOLD = 65
+      const isEvidence = !isDeadEnd && result.strength > EVIDENCE_THRESHOLD
+      const evidenceItem = isEvidence ? {
+        id: `evidence-${Date.now()}`,
+        icon: result.clueType === 'FUNDING_TRAIL' ? 'receipt'
+          : result.clueType === 'IDENTITY_COMMIT' ? 'hot'
+          : result.clueType === 'RELATIONSHIP' ? 'key'
+          : result.clueType === 'TECHNICAL_SIGNATURE' ? 'key'
+          : 'receipt',
+        name: `${result.clueType} [STR ${result.strength}]`,
+        rarity: result.strength >= 86 ? 'legendary' : result.strength >= 76 ? 'epic' : 'rare',
+        description: result.clueData,
+      } : null
+
       set((s) => ({
         showCityClueModal: true,
         activeCityClue: newClue,
@@ -1241,6 +1550,7 @@ export const useGameStore = create((set, get) => ({
             : loc
         ),
         cityEvidence: [...s.cityEvidence, newClue],
+        evidence: evidenceItem ? [...s.evidence, evidenceItem] : s.evidence,
         terminalLines: [...s.terminalLines,
           isDeadEnd
             ? { text: `> DEAD END at clue #${clueIndex + 1}. No actionable intel.`, color: 'red', type: 'alert' }
@@ -1249,6 +1559,9 @@ export const useGameStore = create((set, get) => ({
             ? { text: `> Consolation hint available.`, color: 'muted', type: 'system' }
             : { text: `> HIT: ${result.clueData}`, color: 'yellow', type: 'alert' },
           { text: `> Strength: ${result.strength}/100 | Anomaly: ref#${result.anomalyRefId?.slice(2, 6) || '????'}`, color: 'muted', type: 'system' },
+          ...(isEvidence
+            ? [{ text: `> EVIDENCE COLLECTED! Strength ${result.strength} > ${EVIDENCE_THRESHOLD} threshold.`, color: 'green', type: 'alert' }]
+            : []),
         ],
       }))
       saveProgress(get())
@@ -1334,8 +1647,11 @@ export const useGameStore = create((set, get) => ({
       captureMode: !s.captureMode,
       captureState: 'ready',
       captureResult: null,
+      captureSelectedTx: null,
     }))
   },
+
+  setCaptureSelectedTx: (tx) => set({ captureSelectedTx: tx }),
 
   gameplayRequestCapture: async (suspectWallet) => {
     const { currentCityId } = get()
@@ -1386,6 +1702,44 @@ export const useGameStore = create((set, get) => ({
         blocksElapsed: Math.max(0, s.blocksElapsed - 3),
         terminalLines: [...s.terminalLines,
           { text: `> !! CAPTURE TX FAILED: ${error.message}`, color: 'red', type: 'alert' },
+        ],
+      }))
+    }
+  },
+
+  submitWalletCapture: async (walletAddress) => {
+    const { missionId } = get()
+    if (!missionId || !walletAddress) return
+
+    set((s) => ({
+      captureState: 'pending',
+      terminalLines: [
+        ...s.terminalLines,
+        { text: '', color: 'muted', type: 'system' },
+        { text: '> ████████████████████████████████████████', color: 'cyan', type: 'system' },
+        { text: `> WALLET CAPTURE: ${walletAddress}`, color: 'cyan', type: 'action' },
+        { text: '> Submitting reconstructed wallet to GameMaster...', color: 'muted', type: 'system' },
+      ],
+    }))
+
+    try {
+      await ensureSepoliaNetwork()
+      // Submit investigation on the city where Carmen is — CRE will handle the wallet capture resolution
+      // For now, this is stored locally. The CRE workflow or a separate tx would call resolveWalletCapture.
+      set((s) => ({
+        terminalLines: [
+          ...s.terminalLines,
+          { text: '> Wallet evidence submitted. Awaiting CRE validation...', color: 'cyan', type: 'system' },
+        ],
+      }))
+    } catch (error) {
+      console.error('Wallet capture failed:', error)
+      set((s) => ({
+        captureState: 'fail',
+        captureResult: { success: false, reasonCode: 'TX_FAILED', gmNote: error.message },
+        terminalLines: [
+          ...s.terminalLines,
+          { text: `> !! WALLET CAPTURE FAILED: ${error.message}`, color: 'red', type: 'alert' },
         ],
       }))
     }

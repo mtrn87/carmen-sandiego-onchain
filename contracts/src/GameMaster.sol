@@ -30,6 +30,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
     // --- Game Config ---
     uint256 public constant MAX_BLOCKS = 50;           // Max blocks before mission fails
     uint256 public constant MAX_INVESTIGATIONS = 10;   // Max investigation attempts
+    uint8 public constant EVIDENCE_THRESHOLD = 65;     // Clue strength > this = evidence
     uint256[] public validChainIds;                     // Chain IDs representing cities
 
     // --- Game State ---
@@ -39,6 +40,11 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
     mapping(address => uint256) public activePlayerMission;             // player => active missionId
     mapping(uint256 => uint256) private vrfRequestToMission;            // VRF requestId => missionId
     mapping(uint256 => bytes32) public missionSalts;                    // missionId => salt (for CRE to read)
+
+    // --- Wallet Evidence ---
+    mapping(uint256 => WalletFragment[]) public missionWalletFragments; // missionId => fragments
+    mapping(uint256 => uint8) public missionFragmentCount;              // missionId => fragment count
+    mapping(uint256 => uint8) public missionEvidenceCount;              // missionId => evidence count
 
     // --- Player Registry ---
     mapping(address => bytes) public playerPublicKeys;                  // player => ECIES public key
@@ -196,21 +202,29 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         uint256 missionId,
         ClueType clueType,
         bytes32 contentHash,
-        string calldata ipfsPointer
+        string calldata ipfsPointer,
+        uint8 strength
     ) external onlyCRE {
         require(missions[missionId].status == MissionStatus.Active, "Mission not active");
+        require(strength <= 100, "Invalid strength");
 
         Clue memory clue = Clue({
             clueType: clueType,
             contentHash: contentHash,
             ipfsPointer: ipfsPointer,
-            timestamp: block.timestamp
+            timestamp: block.timestamp,
+            strength: strength
         });
 
         missionClues[missionId].push(clue);
         missions[missionId].cluesReceived++;
 
-        emit ClueReceived(missionId, clueType, contentHash, ipfsPointer);
+        if (strength > EVIDENCE_THRESHOLD) {
+            missionEvidenceCount[missionId]++;
+            emit EvidenceCollected(missionId, missionEvidenceCount[missionId], strength);
+        }
+
+        emit ClueReceived(missionId, clueType, contentHash, ipfsPointer, strength);
     }
 
     /**
@@ -378,6 +392,85 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
     }
 
     // ============================================================
+    //               WALLET EVIDENCE (CRE CALLBACKS)
+    // ============================================================
+
+    /**
+     * @notice Called by CRE to deliver a wallet fragment for a correct investigation.
+     * @param missionId The mission this fragment belongs to.
+     * @param startIndex Position in the 40-char hex address where fragment starts.
+     * @param length Number of hex chars revealed (typically 5).
+     * @param contentHash Hash of the fragment content for verification.
+     * @param ipfsPointer IPFS CID for the encrypted fragment.
+     */
+    function receiveWalletFragment(
+        uint256 missionId,
+        uint8 startIndex,
+        uint8 length,
+        bytes32 contentHash,
+        string calldata ipfsPointer
+    ) external onlyCRE {
+        require(missions[missionId].status == MissionStatus.Active, "Mission not active");
+        require(startIndex + length <= 40, "Fragment out of bounds");
+
+        WalletFragment memory fragment = WalletFragment({
+            startIndex: startIndex,
+            length: length,
+            contentHash: contentHash,
+            ipfsPointer: ipfsPointer,
+            timestamp: block.timestamp
+        });
+
+        missionWalletFragments[missionId].push(fragment);
+        uint8 fragmentIndex = missionFragmentCount[missionId];
+        missionFragmentCount[missionId] = fragmentIndex + 1;
+
+        emit WalletFragmentReceived(missionId, fragmentIndex, startIndex, length, contentHash, ipfsPointer);
+    }
+
+    /**
+     * @notice Called by CRE to resolve a wallet-based capture attempt.
+     *         Derives Carmen's wallet from salt and verifies the player's submission.
+     * @param missionId The mission to resolve.
+     * @param submittedWallet The wallet address the player reconstructed.
+     * @param revealedChainId The actual chain where Carmen was hiding.
+     * @param salt The salt used in the commit hash.
+     */
+    function resolveWalletCapture(
+        uint256 missionId,
+        address submittedWallet,
+        uint256 revealedChainId,
+        bytes32 salt
+    ) external onlyCRE {
+        Mission storage mission = missions[missionId];
+        require(mission.status == MissionStatus.Active, "Mission not active");
+        require(missionFragmentCount[missionId] >= 3, "Need 3+ fragments");
+
+        // Verify chain reveal matches commit
+        bytes32 expectedHash = keccak256(abi.encodePacked(revealedChainId, salt));
+        require(expectedHash == mission.targetHash, "Invalid reveal");
+
+        // Derive Carmen's wallet and check match
+        address carmenWallet = deriveCarmenWallet(salt);
+        bool valid = submittedWallet == carmenWallet;
+
+        emit WalletCaseBuilt(missionId, mission.player, submittedWallet, valid);
+
+        if (valid) {
+            _captureCarmen(missionId, revealedChainId);
+        }
+    }
+
+    /**
+     * @notice Derive Carmen's wallet address deterministically from a mission salt.
+     * @param salt The VRF-derived salt for the mission.
+     * @return The deterministic Carmen wallet address.
+     */
+    function deriveCarmenWallet(bytes32 salt) public pure returns (address) {
+        return address(uint160(uint256(keccak256(abi.encodePacked(salt, "carmen-wallet")))));
+    }
+
+    // ============================================================
     //                   VIEW FUNCTIONS
     // ============================================================
 
@@ -409,6 +502,18 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
 
     function getMissionSalt(uint256 missionId) external view returns (bytes32) {
         return missionSalts[missionId];
+    }
+
+    function getMissionWalletFragments(uint256 missionId) external view returns (WalletFragment[] memory) {
+        return missionWalletFragments[missionId];
+    }
+
+    function getMissionFragmentCount(uint256 missionId) external view returns (uint8) {
+        return missionFragmentCount[missionId];
+    }
+
+    function getMissionEvidenceCount(uint256 missionId) external view returns (uint8) {
+        return missionEvidenceCount[missionId];
     }
 
     /**

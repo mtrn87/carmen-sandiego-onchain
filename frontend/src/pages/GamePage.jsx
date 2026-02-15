@@ -8,7 +8,7 @@ import MissionBriefing from '../components/MissionBriefing'
 import MissionOutcome from '../components/MissionOutcome'
 import MissionPlotModal from '../components/MissionPlotModal'
 import ClueModal from '../components/ClueModal'
-import DevMenu from '../components/DevMenu'
+
 import { useGameStore } from '../store/gameStore'
 import styles from './GamePage.module.css'
 
@@ -84,7 +84,7 @@ export default function GamePage() {
   }
 
   return (
-    <div className={styles.layout}>
+    <div className={`${styles.layout} ${captureMode ? styles.layoutCapture : ''}`}>
       {/* CRT scanlines + rolling bar over entire page */}
       <div className={styles.crtScanlines} />
       <div className={styles.crtRollingBar} />
@@ -102,22 +102,19 @@ export default function GamePage() {
       {/* city clue modal — shown after requesting a clue */}
       {showCityClueModal && <ClueModal />}
 
-      {/* capture mode overlay — full screen dark overlay */}
-      {captureMode && <CaptureMode />}
-
-      {/* left sidebar — terminal (empty until briefing done) */}
-      <aside className={styles.sidebar}>
+      {/* left sidebar — terminal (dimmed in capture mode) */}
+      <aside className={`${styles.sidebar} ${captureMode ? styles.sidebarDimmed : ''}`}>
         <TerminalSidebar />
       </aside>
 
-      {/* right area — explorer/map */}
+      {/* right area — explorer/map + capture bar */}
       <main className={styles.main}>
         <div className={styles.mapArea}>
           {renderMainContent()}
         </div>
+        {captureMode && <CaptureMode />}
       </main>
 
-      {!import.meta.env.PROD && <DevMenu />}
     </div>
   )
 }

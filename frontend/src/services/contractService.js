@@ -6,6 +6,8 @@
  */
 
 import { ethers } from "ethers"
+import { CITY_POOL_MAP, getMockLocations, getMockClueData, getCountryCode } from '../data/cityRegistry'
+import { WALLET_POOL, pickTxWallets, getCarmenWalletIndex } from '../data/walletPool'
 import GameMasterArtifact from "../abi/GameMaster.json"
 import CityNodeArtifact from "../abi/CityNode.json"
 
@@ -27,11 +29,9 @@ const DEFAULT_CITY_NODE_RPCS = {
   51: "https://erpc.apothem.network",
 }
 
-const CITY_NODE_META = {
-  421614: { name: "Tokyo", chain: "Arbitrum Sepolia" },
-  84532: { name: "Paris", chain: "Base Sepolia" },
-  51: { name: "London", chain: "XDC Apothem" },
-}
+const CITY_NODE_META = Object.fromEntries(
+  Object.entries(CITY_POOL_MAP).map(([id, city]) => [Number(id), { name: city.name, chain: city.chain }])
+)
 
 const CITY_NODE_ADDRESSES = {
   421614: import.meta.env.VITE_CITYNODE_TOKYO_ADDRESS,
@@ -45,11 +45,12 @@ const CITY_NODE_RPC_URLS = {
   51: import.meta.env.VITE_XDC_APOTHEM_RPC_URL || DEFAULT_CITY_NODE_RPCS[51],
 }
 
-export const CITY_MAP = {
-  421614: { name: "Tokyo", chain: "Arbitrum Sepolia", color: "#28a0f0", emoji: "\u{1F5FE}" },
-  84532:  { name: "Paris", chain: "Base Sepolia",     color: "#0052ff", emoji: "\u{1F5FC}" },
-  51:     { name: "London", chain: "XDC Apothem",     color: "#ff6b00", emoji: "\u{1F3A1}" },
-}
+export const CITY_MAP = Object.fromEntries(
+  Object.entries(CITY_POOL_MAP).map(([id, city]) => [
+    Number(id),
+    { name: city.name, chain: city.chain, color: city.chainColor, emoji: city.flag },
+  ])
+)
 
 // Compiled ABIs from contract artifacts — source of truth
 const GAME_MASTER_ABI = GameMasterArtifact.abi
@@ -422,6 +423,118 @@ export async function getCurrentCarmenLocation(missionId) {
   return null
 }
 
+/** Get wallet fragments for a mission. */
+export async function getMissionWalletFragments(missionId) {
+  const contract = await getReadContract()
+  const fragments = await contract.getMissionWalletFragments(missionId)
+  return fragments.map((f) => ({
+    startIndex: Number(f.startIndex),
+    length: Number(f.length),
+    contentHash: f.contentHash,
+    ipfsPointer: f.ipfsPointer,
+    timestamp: Number(f.timestamp),
+  }))
+}
+
+/** Get wallet fragment count for a mission. */
+export async function getMissionFragmentCount(missionId) {
+  try {
+    const contract = await getReadContract()
+    if (typeof contract.getMissionFragmentCount !== 'function') return 0
+    return Number(await contract.getMissionFragmentCount(missionId))
+  } catch {
+    return 0
+  }
+}
+
+/** Get on-chain evidence count for a mission (clues with strength > 65). */
+export async function getMissionEvidenceCount(missionId) {
+  try {
+    const contract = await getReadContract()
+    if (typeof contract.getMissionEvidenceCount !== 'function') return 0
+    return Number(await contract.getMissionEvidenceCount(missionId))
+  } catch {
+    return 0
+  }
+}
+
+/** Derive Carmen wallet from salt (for verification). */
+export async function deriveCarmenWallet(salt) {
+  const contract = await getReadContract()
+  return contract.deriveCarmenWallet(salt)
+}
+
+/**
+ * Listen for WalletFragmentReceived events for a specific mission.
+ * @param {number|bigint} missionId
+ * @param {Function} callback - ({ missionId, fragmentIndex, startIndex, length, contentHash, ipfsPointer }) => void
+ * @returns {Function} unsubscribe function
+ */
+export async function onWalletFragmentReceived(missionId, callback) {
+  try {
+    const contract = await getReadContract()
+    if (!contract.filters?.WalletFragmentReceived) return () => {}
+    const filter = contract.filters.WalletFragmentReceived(missionId)
+    const handler = (mId, fragmentIndex, startIndex, length, contentHash, ipfsPointer) => {
+      callback({
+        missionId: Number(mId),
+        fragmentIndex: Number(fragmentIndex),
+        startIndex: Number(startIndex),
+        length: Number(length),
+        contentHash,
+        ipfsPointer,
+      })
+    }
+    contract.on(filter, handler)
+    return () => contract.off(filter, handler)
+  } catch {
+    return () => {}
+  }
+}
+
+/**
+ * Listen for EvidenceCollected events for a specific mission.
+ * @param {number|bigint} missionId
+ * @param {Function} callback - ({ missionId, evidenceCount, strength }) => void
+ * @returns {Function} unsubscribe function
+ */
+export async function onEvidenceCollected(missionId, callback) {
+  try {
+    const contract = await getReadContract()
+    if (!contract.filters?.EvidenceCollected) return () => {}
+    const filter = contract.filters.EvidenceCollected(missionId)
+    const handler = (mId, evidenceCount, strength) => {
+      callback({
+        missionId: Number(mId),
+        evidenceCount: Number(evidenceCount),
+        strength: Number(strength),
+      })
+    }
+    contract.on(filter, handler)
+    return () => contract.off(filter, handler)
+  } catch {
+    return () => {}
+  }
+}
+
+/**
+ * Listen for WalletCaseBuilt events for a specific mission.
+ */
+export async function onWalletCaseBuilt(missionId, callback) {
+  const contract = await getReadContract()
+  const filter = contract.filters.WalletCaseBuilt(missionId)
+  const handler = (mId, player, submittedWallet, valid) => {
+    callback({
+      missionId: Number(mId),
+      player,
+      submittedWallet,
+      valid,
+    })
+  }
+  contract.on(filter, handler)
+  return () => contract.off(filter, handler)
+}
+
 /** Get blocks used in a mission. */
 export async function getBlocksUsed(missionId) {
   const contract = await getReadContract()
@@ -731,65 +844,53 @@ function isCityNodeConfigured(chainId) {
 
 // ── Mock data generators (used when contracts are not deployed) ──
 
-const MOCK_CLUE_DATA = {
-  421614: {
-    0: [
-      "Cross-chain bridge packets routed through Senso-ji relay carry encoded wallet fragments. Pattern matches Carmen's known obfuscation — she was here within the last 12 blocks.",
-      "Temple node logs reveal a secondary handshake protocol — someone tested a custody transfer that was later aborted. The abort signature matches Carmen's operational style.",
-      "Dead end — incense smoke and encrypted noise. No actionable intel at this relay point.",
-    ],
-    1: [
-      "Tokyo Tower beacon intercepted a burst transmission containing partial coordinates. The destination chain resolves to Base Sepolia — Carmen may be heading to Paris.",
-      "Signal analysis reveals a repeating pattern: every 7 blocks, a micro-transaction pings this beacon. The sender wallet has ties to a known Carmen associate.",
-      "Beacon logs show routine traffic only. The signal router appears clean — this may be a decoy.",
-    ],
-    2: [
-      "Chochin Market swap logs expose a layering scheme: thousands of micro-swaps converging into a single wallet. The final destination is obscured but the volume matches a major asset extraction.",
-      "A swap pair was created and burned within 3 blocks — classic Carmen counter-forensics. The residual token dust points toward XDC Apothem.",
-      "Market noise. The swap volume here is organic — no signs of manipulation.",
-    ],
-  },
-  84532: {
-    0: [
-      "Eiffel relay captured bridge ingress from three separate L2 chains in a 5-block window. Cross-referencing reveals two flagged addresses — Carmen's network is active in Paris.",
-      "Monitoring data shows a custody pre-staging event. Someone moved a significant payload through this beacon — the gas pattern is identical to the Tokyo extraction.",
-      "Beacon monitoring returned nominal results. Traffic appears clean at this time.",
-    ],
-    1: [
-      "Louvre custody router processed a high-value vault operation: multi-sig approval with 3/5 threshold. One of the signers maps to a wallet seen at Senso-ji Temple Node.",
-      "Vault staging detected — assets are being consolidated here from multiple chains. The aggregation pattern suggests an imminent large transfer. Carmen is preparing something.",
-      "Custody logs reveal routine operations. The vault has not been accessed by flagged addresses recently.",
-    ],
-    2: [
-      "Notre-Dame gate funneled Base traffic from at least 4 distinct origin chains. The convergence timing aligns with Carmen's known movement windows — she uses the noise as cover.",
-      "Bridge relay detected an unusual gas spike: someone overpaid by 300% to embed metadata in the transaction. Decoded fragments contain encrypted coordinates.",
-      "Gate traffic is heavy but organic. No anomalous patterns detected in this scan window.",
-    ],
-  },
-  51: {
-    0: [
-      "Tower Bridge node processed fresh cross-chain transfers with deliberately overpaid gas. Decoded tx metadata contains what appears to be coordinate-based messaging — Carmen's signature technique.",
-      "Bridge signatures show a wallet hopping between XDC and Arbitrum every 4 blocks. The timing is too precise for a human — this is an automated extraction bot linked to Carmen.",
-      "Bridge node traffic appears routine. The suspect route signatures may have been a false positive.",
-    ],
-    1: [
-      "Buckingham Vault is accumulating tokens from 5 different chains through obfuscated intermediaries. The pattern is consistent with pre-extraction staging — Carmen is building a war chest.",
-      "Vault multi-sig triggered with an unusual signer rotation. One new signer wallet was created 2 blocks before approval — freshly minted for this operation.",
-      "Vault custody operations are within normal parameters. No unusual accumulation detected.",
-    ],
-    2: [
-      "London Eye router relayed encrypted packets in periodic bursts matching Carmen's known operational cadence. The destination resolves to an uncharted relay on Polygon Amoy.",
-      "Packet analysis reveals a steganographic layer: underneath routine XDC traffic, a hidden data stream carries wallet seed fragments. The technique is Carmen's trademark.",
-      "Router traffic is clean. Periodic bursts appear to be standard network heartbeat signals.",
-    ],
-  },
-}
+const MOCK_CLUE_DATA = Object.fromEntries(
+  Object.keys(CITY_POOL_MAP).map((id) => [Number(id), getMockClueData(Number(id))])
+)
 
-function _mockClueResult(chainId, locationIdx, clueIndex, txHash, blockNumber) {
+function _mockClueResult(chainId, locationIdx, clueIndex, txHash, blockNumber, isStartingClue = false) {
   const clueTypes = ["BEHAVIOR_FINGERPRINT", "RELATIONSHIP", "IDENTITY_COMMIT", "FUNDING_TRAIL", "TECHNICAL_SIGNATURE", "DEAD_END"]
-  const clueTexts = MOCK_CLUE_DATA[chainId]?.[locationIdx]
-  const isDeadEnd = clueTexts ? clueTexts[clueIndex]?.includes("Dead end") || clueTexts[clueIndex]?.includes("routine") || clueTexts[clueIndex]?.includes("clean") || clueTexts[clueIndex]?.includes("false positive") : Math.random() < 0.15
-  const clueData = clueTexts?.[clueIndex] || `Clue #${clueIndex + 1}: Suspect pattern detected at ${CITY_NODE_META[chainId]?.name || "unknown"} location ${locationIdx}.`
+  const locationData = MOCK_CLUE_DATA[chainId]?.[locationIdx]
+
+  // starting clue is always strong (guaranteed lead for the player)
+  // regular clues: ~15% dead end chance, otherwise random 20-95
+  const isDeadEnd = isStartingClue ? false : Math.random() < 0.15
+  const strength = isStartingClue
+    ? 70 + Math.floor(Math.random() * 26)  // 70-95
+    : isDeadEnd ? 5 + Math.floor(Math.random() * 16) : 20 + Math.floor(Math.random() * 76) // 20-95
+
+  // determine tier from strength
+  let tier
+  if (strength <= 40) tier = "weak"
+  else if (strength <= 65) tier = "medium"
+  else tier = "strong"
+
+  // pick clue text from the matching tier
+  const cityName = CITY_NODE_META[chainId]?.name || "unknown"
+  let clueData
+  if (locationData && locationData[tier]) {
+    const tierTexts = locationData[tier]
+    const idx = clueIndex % tierTexts.length
+    clueData = tierTexts[idx]
+  } else {
+    // generic tiered clue text for cities without custom data
+    const genericClues = {
+      weak: [
+        `Faint residual signals at ${cityName} location ${locationIdx} — trace too degraded to analyze. Could be anyone.`,
+        `Network scan at ${cityName} returned nominal results. No actionable intel at this time.`,
+      ],
+      medium: [
+        `Suspicious activity pattern detected at ${cityName} location ${locationIdx}. The transaction timing matches known obfuscation techniques but the trail fragments after two hops.`,
+        `Cross-chain traffic at ${cityName} shows anomalous routing. Someone is moving assets through this node — the gas pattern is consistent with Carmen's operational style.`,
+      ],
+      strong: [
+        `Full analysis of ${cityName} location ${locationIdx} confirms Carmen's network is active here. Transaction pattern decoded — extraction route mapped. [WALLET INTEL: suspect wallet interacted with contracts on this chain in the last 24 hours]`,
+        `${cityName} node fully compromised: Carmen's relay signature confirmed. Asset staging detected with multi-chain convergence. [WALLET INTEL: suspect wallet holds tokens bridged from at least 2 chains]`,
+      ],
+    }
+    const texts = genericClues[tier]
+    clueData = texts[clueIndex % texts.length]
+  }
 
   return {
     hash: txHash || `0x${Math.random().toString(16).slice(2, 14)}...mock`,
@@ -799,7 +900,7 @@ function _mockClueResult(chainId, locationIdx, clueIndex, txHash, blockNumber) {
     clueType: isDeadEnd ? "DEAD_END" : clueTypes[Math.floor(Math.random() * 5)],
     clueData,
     anomalyRefId: `0x${Math.random().toString(16).slice(2, 14)}`,
-    strength: isDeadEnd ? 10 : 40 + Math.floor(Math.random() * 50),
+    strength,
   }
 }
 
@@ -807,7 +908,7 @@ function _mockCityInfo(chainId) {
   const meta = CITY_NODE_META[chainId]
   return {
     city: meta?.name || `City ${chainId}`,
-    countryCode: chainId === 421614 ? "JP" : chainId === 84532 ? "FR" : "GB",
+    countryCode: getCountryCode(chainId),
     chainId,
     cityId: chainId,
     suspicionLevel: Math.floor(Math.random() * 40) + 30,
@@ -815,23 +916,9 @@ function _mockCityInfo(chainId) {
   }
 }
 
-const MOCK_LOCATIONS = {
-  421614: [
-    { name: "Senso-ji Temple Node", category: 0, fakeLevel: 2, riskLevel: 3, description: "Ancient relay pulsing with cross-chain traffic." },
-    { name: "Tokyo Tower Beacon", category: 1, fakeLevel: 1, riskLevel: 4, description: "High-altitude signal bouncing encrypted bursts." },
-    { name: "Chochin Market", category: 2, fakeLevel: 3, riskLevel: 2, description: "Token swaps masking asset movements." },
-  ],
-  84532: [
-    { name: "Eiffel Tower Relay", category: 3, fakeLevel: 2, riskLevel: 3, description: "Monitoring beacon with bridge ingress traces." },
-    { name: "Louvre Custody Router", category: 4, fakeLevel: 1, riskLevel: 5, description: "High-value custody operations detected." },
-    { name: "Notre-Dame Gate", category: 0, fakeLevel: 3, riskLevel: 2, description: "Base traffic converges at this relay." },
-  ],
-  51: [
-    { name: "Tower Bridge Node", category: 5, fakeLevel: 1, riskLevel: 4, description: "Fresh suspect route signatures found." },
-    { name: "Buckingham Vault", category: 4, fakeLevel: 2, riskLevel: 3, description: "High-value asset staging area." },
-    { name: "London Eye Router", category: 1, fakeLevel: 3, riskLevel: 2, description: "XDC packets hopping across regions." },
-  ],
-}
+const MOCK_LOCATIONS = Object.fromEntries(
+  Object.keys(CITY_POOL_MAP).map((id) => [Number(id), getMockLocations(Number(id))])
+)
 
 // ── Read functions ──
 
@@ -986,9 +1073,10 @@ function _hexFromSeed(val, length) {
   return hex.slice(0, length)
 }
 
-function _generateLocationTxs(chainId, locationIdx) {
+function _generateLocationTxs(chainId, locationIdx, carmenWallet, carmenLocationIdx) {
   const seed = _seedFromParams(chainId, locationIdx)
   const rng = _seededRng(seed)
+  const carmenIdx = carmenWallet ? getCarmenWalletIndex(carmenWallet._missionId || 0) : -1
 
   const count = 3 + Math.floor(rng() * 3) // 3-5 txs
   const normalMethods = [
@@ -1006,10 +1094,13 @@ function _generateLocationTxs(chainId, locationIdx) {
     const blockOffset = Math.floor(rng() * 200)
     const val = rng() * 5
 
+    // pick from/to from wallet pool, excluding Carmen's wallet
+    const [fromW, toW] = pickTxWallets(seed * 31 + i * 97, carmenIdx)
+
     txs.push({
       txHashLike: `0x${_hexFromSeed(seed * 31 + i * 97, 64)}`,
-      from: `0x${_hexFromSeed(seed * 17 + i * 53 + 1, 40)}`,
-      to: `0x${_hexFromSeed(seed * 23 + i * 71 + 2, 40)}`,
+      from: fromW.address,
+      to: toW.address,
       methodSigLike: normalMethods[mIdx].sig,
       methodLabel: normalMethods[mIdx].label,
       blockLike: 52884200 + blockOffset,
@@ -1021,6 +1112,29 @@ function _generateLocationTxs(chainId, locationIdx) {
     })
   }
 
+  // inject exactly 1 Carmen tx if this is the Carmen location
+  if (carmenWallet && locationIdx === carmenLocationIdx) {
+    const [normalW] = pickTxWallets(seed * 59 + 777, carmenIdx)
+    const cMIdx = Math.floor(rng() * normalMethods.length)
+    const cVal = rng() * 3
+    const carmenTx = {
+      txHashLike: `0x${_hexFromSeed(seed * 41 + 9999, 64)}`,
+      from: carmenWallet.address,
+      to: normalW.address,
+      methodSigLike: normalMethods[cMIdx].sig,
+      methodLabel: normalMethods[cMIdx].label,
+      blockLike: 52884200 + Math.floor(rng() * 200),
+      valueLike: BigInt(Math.floor(cVal * 1e18)),
+      valueDisplay: cVal.toFixed(4),
+      anomalyType: null,
+      anomalyLabel: null,
+      isAnomaly: false,
+    }
+    // insert in the middle
+    const insertPos = Math.floor(txs.length / 2)
+    txs.splice(insertPos, 0, carmenTx)
+  }
+
   return txs
 }
 
@@ -1028,8 +1142,8 @@ function _generateLocationTxs(chainId, locationIdx) {
  * Build transaction list for a location, merging anomaly data from city-wide anomalyTxRefs.
  * Normal txs are always generated. Anomaly flags are set when refs exist (Carmen present).
  */
-export function buildLocationTransactions(chainId, locationIdx, anomalyTxRefs, numLocations = 3) {
-  const txs = _generateLocationTxs(chainId, locationIdx)
+export function buildLocationTransactions(chainId, locationIdx, anomalyTxRefs, numLocations = 3, carmenWallet = null, carmenLocationIdx = null) {
+  const txs = _generateLocationTxs(chainId, locationIdx, carmenWallet, carmenLocationIdx)
 
   if (!anomalyTxRefs || anomalyTxRefs.length === 0) return txs
 
@@ -1048,21 +1162,14 @@ export function buildLocationTransactions(chainId, locationIdx, anomalyTxRefs, n
 }
 
 function _mockAnomalyTxRefs(chainId) {
-  const addrs = [
-    "0x1111111111111111111111111111111111111111",
-    "0x2222222222222222222222222222222222222222",
-    "0x3333333333333333333333333333333333333333",
-    "0x4444444444444444444444444444444444444444",
-    "0x5555555555555555555555555555555555555555",
-  ]
   const sigs = ["0xa9059cbb", "0x095ea7b3", "0x38ed1739", "0x3ce33bff", "0xd0e30db0"]
   const labels = ["transfer", "approve", "swap", "bridge", "deposit"]
 
   return Array.from({ length: 5 }, (_, i) => ({
     refId: i + 1,
     txHashLike: ethers.id(`mock-tx-${chainId}-${i}`),
-    from: addrs[i],
-    to: addrs[(i + 2) % 5],
+    from: WALLET_POOL[i % 25].address,
+    to: WALLET_POOL[(i + 5) % 25].address,
     methodSigLike: sigs[i],
     methodLabel: labels[i],
     blockLike: 52884300 + i * 10,
@@ -1097,29 +1204,19 @@ export async function getCityNodeSuspectWallets(chainId) {
 }
 
 function _mockSuspectWallets() {
-  return [
-    {
-      wallet: "0xCa12e45a67B9c3D8E0F1234567890AbCdEf7f2a",
-      suspicionLevel: 87,
-      txRefIds: [1n, 2n, 3n, 4n],
-      tagsBitmap: 3n,
-      tags: decodeTags(3n),
-    },
-    {
-      wallet: "0x5a4d0wFaD9876543210FeDcBa9876543210e3e91",
-      suspicionLevel: 62,
-      txRefIds: [2n, 5n],
-      tagsBitmap: 12n,
-      tags: decodeTags(12n),
-    },
-    {
-      wallet: "0xF335a1b0B3c4D5e6F7a8B9c0D1e2F3a4B5c6d444",
-      suspicionLevel: 45,
-      txRefIds: [3n],
-      tagsBitmap: 16n,
-      tags: decodeTags(16n),
-    },
-  ]
+  // pick 3 wallets from pool (indices 2, 7, 15)
+  const picks = [2, 7, 15]
+  const levels = [87, 62, 45]
+  const bitmaps = [3n, 12n, 16n]
+  const refs = [[1n, 2n, 3n, 4n], [2n, 5n], [3n]]
+
+  return picks.map((idx, i) => ({
+    wallet: WALLET_POOL[idx].address,
+    suspicionLevel: levels[i],
+    txRefIds: refs[i],
+    tagsBitmap: bitmaps[i],
+    tags: decodeTags(bitmaps[i]),
+  }))
 }
 
 /**
@@ -1264,11 +1361,11 @@ export async function cityNodeScanAnomalies(chainId, locationIdx) {
  * Request a clue at a location.
  * Async tx — sends request, then waits for GM resolve event (ClueUnlocked or DeadEnd).
  */
-export async function cityNodeRequestClue(chainId, locationIdx, clueIndex) {
+export async function cityNodeRequestClue(chainId, locationIdx, clueIndex, isStartingClue = false) {
   if (!isCityNodeConfigured(chainId)) {
-    console.log(`[cityNode] requestClue(${locationIdx}, ${clueIndex}) on chain ${chainId} — MOCK`)
+    console.log(`[cityNode] requestClue(${locationIdx}, ${clueIndex}) on chain ${chainId} — MOCK${isStartingClue ? ' [STARTING CLUE]' : ''}`)
     await new Promise((r) => setTimeout(r, 2500))
-    return _mockClueResult(chainId, locationIdx, clueIndex)
+    return _mockClueResult(chainId, locationIdx, clueIndex, null, null, isStartingClue)
   }
 
   // Try real contract call; fall back to mock if GM is unreachable

@@ -943,3 +943,36 @@
   color: var(--text-muted);
   letter-spacing: 1px;
 }
+
+/* ── visited city marker ── */
+.entityMarkerVisited {
+  opacity: 0.3;
+  filter: grayscale(0.8);
+  pointer-events: none;
+}
+
+.entityMarkerVisited .entityPulse {
+  display: none;
+}
+
+/* ── newly revealed city marker ── */
+.entityMarkerNew .entityIcon {
+  animation: newCityPulse 2s ease-in-out infinite;
+}
+
+.entityMarkerNew .entityPulse {
+  animation: entityPulse 1.5s ease-out infinite;
+}
+
+@keyframes newCityPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 10px color-mix(in srgb, var(--chain-color, #00f0ff) 40%, transparent),
+      0 0 20px color-mix(in srgb, var(--chain-color, #00f0ff) 15%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 20px color-mix(in srgb, var(--chain-color, #00f0ff) 70%, transparent),
+      0 0 40px color-mix(in srgb, var(--chain-color, #00f0ff) 30%, transparent);
+  }
+}

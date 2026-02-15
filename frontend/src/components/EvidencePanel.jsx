@@ -1,4 +1,7 @@
+import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useGameStore } from '../store/gameStore'
+import WalletEvidence from './WalletEvidence'
 import styles from './EvidencePanel.module.css'
 
 const CLUE_TYPE_ICONS = {
@@ -21,7 +24,10 @@ export default function EvidencePanel() {
     closeDossierModal,
     gameplayLoading,
     cityLocations,
+    evidenceCount,
   } = useGameStore()
+
+  const [selectedClue, setSelectedClue] = useState(null)
 
   const clues = cityEvidence.filter((e) => !e.isDeadEnd)
   const deadEnds = cityEvidence.filter((e) => e.isDeadEnd)
@@ -45,6 +51,10 @@ export default function EvidencePanel() {
           <span className={styles.statNum}>{cityAnomalyTxRefs.length}</span>
           <span className={styles.statLabel}>TX REFS</span>
         </div>
+        <div className={styles.stat}>
+          <span className={`${styles.statNum} ${evidenceCount > 0 ? styles.confHigh : ''}`}>{evidenceCount}</span>
+          <span className={styles.statLabel}>EVIDENCE</span>
+        </div>
         <div className={`${styles.stat} ${styles.confidenceStat}`}>
           <span className={`${styles.statNum} ${confidence >= 70 ? styles.confHigh : confidence >= 40 ? styles.confMed : styles.confLow}`}>
             {confidence}%
@@ -62,7 +72,7 @@ export default function EvidencePanel() {
           ) : (
             <div className={styles.clueList}>
               {clues.map((clue) => (
-                <div key={clue.id} className={styles.clueCard}>
+                <div key={clue.id} className={styles.clueCard} onClick={() => setSelectedClue(clue)} role="button" tabIndex={0}>
                   <span className={styles.clueIcon}>{CLUE_TYPE_ICONS[clue.clueType] || '\u{1F50D}'}</span>
                   <div className={styles.clueInfo}>
                     <div className={styles.clueTop}>
@@ -130,6 +140,11 @@ export default function EvidencePanel() {
           )}
         </div>
 
+        {/* wallet evidence */}
+        <div className={styles.section}>
+          <WalletEvidence />
+        </div>
+
         {/* confidence meter */}
         <div className={styles.confidenceMeter}>
           <span className={styles.meterLabel}>EVIDENCE CONFIDENCE</span>
@@ -152,8 +167,50 @@ export default function EvidencePanel() {
         </button>
       </div>
 
-      {/* dossier modal */}
-      {showDossierModal && dossierData && (
+      {/* clue detail modal — portaled to body to escape overflow containers */}
+      {selectedClue && createPortal(
+        <div className={styles.modalOverlay} onClick={() => setSelectedClue(null)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <span className={styles.modalTitle}>
+                {CLUE_TYPE_ICONS[selectedClue.clueType] || '\u{1F50D}'} {selectedClue.clueType}
+              </span>
+              <span className={`${styles.modalConf} ${selectedClue.strength >= 70 ? styles.strHigh : selectedClue.strength >= 40 ? styles.strMed : styles.strLow}`}>
+                STR {selectedClue.strength}
+              </span>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.modalSection}>
+                <span className={styles.modalSectionTitle}>INTEL</span>
+                <p className={styles.modalText}>{selectedClue.data}</p>
+              </div>
+              <div className={styles.modalSection}>
+                <span className={styles.modalSectionTitle}>METADATA</span>
+                <p className={styles.modalTextCyan}>
+                  Location: {selectedClue.locationIdx !== undefined ? `Slot ${selectedClue.locationIdx}` : 'Unknown'}
+                  {' | '}Clue #{(selectedClue.clueIndex ?? 0) + 1}
+                  {selectedClue.anomalyRefId && (<>{' | '}Ref: {selectedClue.anomalyRefId.slice(0, 10)}...</>)}
+                </p>
+                <p className={styles.modalTextCyan}>
+                  {selectedClue.timestamp ? new Date(selectedClue.timestamp).toLocaleString() : ''}
+                </p>
+              </div>
+              {selectedClue.strength > 65 && (
+                <div className={styles.modalSection}>
+                  <span className={styles.evidenceBadge}>EVIDENCE COLLECTED</span>
+                </div>
+              )}
+            </div>
+            <button className={styles.modalClose} onClick={() => setSelectedClue(null)}>
+              CLOSE
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* dossier modal — portaled to body */}
+      {showDossierModal && dossierData && createPortal(
         <div className={styles.modalOverlay} onClick={closeDossierModal}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
@@ -186,7 +243,8 @@ export default function EvidencePanel() {
               ACKNOWLEDGE
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

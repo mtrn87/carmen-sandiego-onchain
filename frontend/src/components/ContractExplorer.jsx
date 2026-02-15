@@ -11,77 +11,12 @@ import {
   getCityNodeSuspectWallets,
   getCityNodeEvidenceSummary,
 } from '../services/contractService'
+import { getLocationNarratives as getRegistryNarratives, getLocationImages as getRegistryImages } from '../data/cityRegistry'
 import styles from './ContractExplorer.module.css'
 
-// Detective-style narrative translations for location data
-const LOCATION_NARRATIVES = {
-  // Tokyo (Arbitrum Sepolia)
-  421614: {
-    0: {
-      title: 'Senso-ji Temple Node',
-      analysis: 'Ancient relay pulsing with cross-chain traffic. This bridge relay has been used by blockchain wallets to funnel assets across networks under the cover of legitimate temple donation micro-transactions. High volumes of token wrapping detected — someone is laundering trail signatures through prayer bell intervals.',
-      status: 'ACTIVE RELAY — MEDIUM THREAT',
-      statusColor: 'yellow',
-    },
-    1: {
-      title: 'Tokyo Tower Beacon',
-      analysis: 'High-altitude signal router bouncing encrypted bursts across the Pacific corridor. Packet analysis reveals fragmented wallet signatures hidden inside routine beacon pings. This tower is being used as a signal repeater to coordinate cross-chain movements — the timing patterns match Carmen\'s known operational cadence.',
-      status: 'SIGNAL INTERCEPT — HIGH THREAT',
-      statusColor: 'red',
-    },
-    2: {
-      title: 'Chochin Market',
-      analysis: 'Underground swap protocol operating beneath the lantern market stalls. Token swaps are masking asset movements through rapid-fire micro-trades — thousands of transactions per block, each one carefully sized to stay below anomaly detection thresholds. Classic layering technique.',
-      status: 'SWAP MASKING — LOW THREAT',
-      statusColor: 'green',
-    },
-  },
-  // Paris (Base Sepolia)
-  84532: {
-    0: {
-      title: 'Eiffel Tower Relay',
-      analysis: 'Monitoring beacon with bridge ingress traces converging from multiple L2 chains. The relay is intercepting Base network traffic and logging wallet fingerprints. Cross-referencing with known Carmen associates reveals at least three flagged addresses routing through this node in the last 48 blocks.',
-      status: 'MONITORING ACTIVE — MEDIUM THREAT',
-      statusColor: 'yellow',
-    },
-    1: {
-      title: 'Louvre Custody Router',
-      analysis: 'High-value custody operations detected behind museum-grade encryption. This protocol is staging significant digital asset transfers — the vault signatures match patterns from previous Carmen heists. Someone is preparing to move a large payload off-chain. Extreme caution advised.',
-      status: 'CUSTODY BREACH RISK — CRITICAL',
-      statusColor: 'red',
-    },
-    2: {
-      title: 'Notre-Dame Gate',
-      analysis: 'Base traffic converges at this bridge relay like pilgrims to a cathedral. The gate is acting as a funnel point for cross-chain asset flows, blending legitimate DeFi activity with obfuscated transfers. The noise-to-signal ratio is deliberately high — someone wants this node to look busy.',
-      status: 'BRIDGE CONVERGENCE — LOW THREAT',
-      statusColor: 'green',
-    },
-  },
-  // London (XDC Apothem)
-  51: {
-    0: {
-      title: 'Tower Bridge Node',
-      analysis: 'Fresh suspect route signatures found crossing the XDC bridge. This node is handling cross-chain transfers with unusual gas patterns — the bridge fees are being deliberately overpaid to embed hidden data in transaction metadata. Decoded fragments suggest coordinate-based messaging.',
-      status: 'ROUTE SIGNATURES — HIGH THREAT',
-      statusColor: 'red',
-    },
-    1: {
-      title: 'Buckingham Vault',
-      analysis: 'High-value asset staging area fortified with multi-sig custody. The vault is accumulating tokens from at least five different chains, all routed through obfuscated intermediaries. The accumulation pattern is consistent with pre-extraction staging — someone is building a war chest.',
-      status: 'ASSET STAGING — MEDIUM THREAT',
-      statusColor: 'yellow',
-    },
-    2: {
-      title: 'London Eye Router',
-      analysis: 'XDC packets hopping across regions through this rotating signal router. The Eye provides 360-degree network coverage, relaying encrypted messages between continental nodes. Traffic analysis shows periodic bursts that correlate with Carmen\'s known movement windows.',
-      status: 'PACKET ROUTING — LOW THREAT',
-      statusColor: 'green',
-    },
-  },
-}
-
 function getLocationNarrative(chainId, locationIdx) {
-  return LOCATION_NARRATIVES[chainId]?.[locationIdx] || null
+  const narratives = getRegistryNarratives(chainId)
+  return narratives?.[locationIdx] || null
 }
 
 // Build detective-style narrative from anomaly txRefs data
@@ -160,6 +95,9 @@ export default function ContractExplorer({ onOpenMap }) {
     gameplayScanAnomalies,
     gameplayRequestClue,
     walletAddress,
+    captureMode,
+    captureSelectedTx,
+    setCaptureSelectedTx,
   } = useGameStore()
 
   const [selectedTx, setSelectedTx] = useState(null)
@@ -172,8 +110,8 @@ export default function ContractExplorer({ onOpenMap }) {
   const [readLoading, setReadLoading] = useState({})
   const [readViewMode, setReadViewMode] = useState({}) // 'analysis' (default) | 'raw'
 
-  // CityNode mode: when currentCityId is set
-  const isCityNodeMode = Boolean(currentCityId && CITY_MAP[currentCityId])
+  // CityNode mode: active whenever a city is selected (legacy mode is disabled)
+  const isCityNodeMode = Boolean(currentCityId)
 
   // reset state when case or city changes
   useEffect(() => {
@@ -190,17 +128,15 @@ export default function ContractExplorer({ onOpenMap }) {
   const events = !isCityNodeMode ? (caseData?.events || []) : []
 
   // ── CityNode mode data ──
-  const cityMeta = isCityNodeMode ? CITY_MAP[currentCityId] : null
+  const cityMeta = isCityNodeMode
+    ? (CITY_MAP[currentCityId] || { name: `City ${currentCityId}`, chain: 'Unknown', color: '#00ffff', emoji: '' })
+    : null
   const currentLocation = isCityNodeMode && currentLocationIdx !== null ? cityLocations[currentLocationIdx] : null
 
-  // Location images by chainId → locationIdx
-  const LOCATION_IMAGES = {
-    421614: ['/tokyo_1.png', '/tokyo_2.png', '/tokyo_3.png'],
-    84532:  ['/dubai_1.png', '/dubai_2.png', '/dubai_3.png'],
-    51:     ['/shanghai_1.png', '/nyc_1.png'],
-  }
+  // Location images from city registry (supports all 16 cities)
+  const locationImages = isCityNodeMode ? getRegistryImages(currentCityId) : []
   const locationImage = isCityNodeMode && currentLocationIdx !== null
-    ? LOCATION_IMAGES[currentCityId]?.[currentLocationIdx] || null
+    ? locationImages[currentLocationIdx] || null
     : null
 
   // ── Legacy handlers ──
@@ -559,9 +495,9 @@ export default function ContractExplorer({ onOpenMap }) {
           </div>
         )}
 
-        {/* CityNode transactions: per-location txs with conditional anomaly column */}
+        {/* CityNode transactions: per-location txs with anomaly column */}
         {activeSection === 'transactions' && isCityNodeMode && (
-          <div className={styles.txTable}>
+          <div className={`${styles.txTable} ${captureMode ? styles.txTableCapture : ''}`}>
             {(() => {
               const locationScanned = currentLocation
                 ? currentLocation.scanned
@@ -581,7 +517,7 @@ export default function ContractExplorer({ onOpenMap }) {
                     <span className={styles.thArrow} />
                     <span className={styles.thTo}>To</span>
                     <span className={styles.thValue}>Value</span>
-                    {locationScanned && <span className={styles.thMethod}>Anomaly</span>}
+                    <span className={styles.thMethod}>Anomaly</span>
                   </div>
                   {displayTxs.length === 0 ? (
                     <div className={styles.placeholderSection}>
@@ -593,8 +529,13 @@ export default function ContractExplorer({ onOpenMap }) {
                       const hashStr = typeof tx.txHashLike === 'string' ? tx.txHashLike : String(tx.txHashLike)
                       const fromStr = typeof tx.from === 'string' ? tx.from : String(tx.from)
                       const toStr = typeof tx.to === 'string' ? tx.to : String(tx.to)
+                      const isCaptureSelected = captureMode && captureSelectedTx?.txHashLike === tx.txHashLike
                       return (
-                        <div key={i} className={styles.txTableRow}>
+                        <div
+                          key={i}
+                          className={`${styles.txTableRow} ${captureMode ? styles.txRowCapture : ''} ${isCaptureSelected ? styles.txCaptureSelected : ''}`}
+                          onClick={captureMode ? () => setCaptureSelectedTx(tx) : undefined}
+                        >
                           <span className={styles.tdStatus}>
                             <span className={`${styles.statusDot} ${styles.statusSuccess}`} />
                           </span>
@@ -605,27 +546,29 @@ export default function ContractExplorer({ onOpenMap }) {
                             <span className={styles.methodBadge}>{tx.methodLabel || 'unknown'}</span>
                           </span>
                           <span className={styles.tdBlock}>{Number(tx.blockLike)}</span>
-                          <span className={styles.tdFrom}>
+                          <span className={`${styles.tdFrom} ${captureMode ? styles.walletHighlight : ''}`}>
                             {fromStr.length > 12 ? `${fromStr.slice(0, 8)}...${fromStr.slice(-4)}` : fromStr}
                           </span>
                           <span className={styles.tdArrow}>
                             <span className={styles.arrowIcon}>&#10132;</span>
                           </span>
-                          <span className={styles.tdTo}>
+                          <span className={`${styles.tdTo} ${captureMode ? styles.walletHighlight : ''}`}>
                             {toStr.length > 12 ? `${toStr.slice(0, 8)}...${toStr.slice(-4)}` : toStr}
                           </span>
                           <span className={styles.tdValue}>{tx.valueDisplay || '—'}</span>
-                          {locationScanned && (
-                            <span className={styles.tdMethod}>
-                              {tx.isAnomaly ? (
+                          <span className={styles.tdMethod}>
+                            {locationScanned ? (
+                              tx.isAnomaly ? (
                                 <span className={styles.methodBadge} style={{ backgroundColor: 'rgba(255, 60, 60, 0.15)', color: 'var(--red, #f44)' }}>
                                   {tx.anomalyLabel || ANOMALY_TYPE_MAP[tx.anomalyType] || 'ANOMALY'}
                                 </span>
                               ) : (
                                 <span style={{ color: 'var(--text-muted, #666)' }}>—</span>
-                              )}
-                            </span>
-                          )}
+                              )
+                            ) : (
+                              <span className={styles.anomalyUnknown}>?</span>
+                            )}
+                          </span>
                         </div>
                       )
                     })

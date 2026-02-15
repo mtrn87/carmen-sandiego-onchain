@@ -5,8 +5,7 @@
     <link rel="icon" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Security Headers -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';" />
-    <meta http-equiv="X-Frame-Options" content="DENY" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://*.privy.io; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.privy.io; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.privy.io; connect-src 'self' http://localhost:8545 https://sepolia-rollup.arbitrum.io https://sepolia.base.org https://erpc.apothem.network https://*.privy.io https://*.ethereum.org https://*.infura.io https://*.alchemy.com wss://*.privy.io; frame-src https://*.privy.io; object-src 'none'; base-uri 'self'; form-action 'self';" />
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
     <meta http-equiv="Strict-Transport-Security" content="max-age=63072000; includeSubDomains; preload" />
     <title>Where in the Web3 World is Carmen Sandiego?</title>

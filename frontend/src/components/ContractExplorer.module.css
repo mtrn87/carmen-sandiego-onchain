@@ -579,6 +579,50 @@
   font-size: 0.62rem;
 }
 
+/* ── capture mode effects ── */
+.txTableCapture {
+  border-color: rgba(255, 42, 109, 0.2);
+  box-shadow: 0 0 20px rgba(255, 42, 109, 0.08);
+}
+
+.txRowCapture {
+  animation: capturePulse 2s ease-in-out infinite;
+  border-bottom: 1px solid rgba(255, 42, 109, 0.12) !important;
+}
+
+.txRowCapture:nth-child(odd) {
+  animation-delay: 0.3s;
+}
+
+@keyframes capturePulse {
+  0%, 100% { border-color: rgba(255, 42, 109, 0.08); background: transparent; }
+  50% { border-color: rgba(255, 42, 109, 0.25); background: rgba(255, 42, 109, 0.03); }
+}
+
+.walletHighlight {
+  color: var(--red) !important;
+  text-shadow: 0 0 6px rgba(255, 42, 109, 0.4);
+  animation: walletBlink 1.5s ease-in-out infinite;
+}
+
+@keyframes walletBlink {
+  0%, 100% { opacity: 1; text-shadow: 0 0 6px rgba(255, 42, 109, 0.4); }
+  50% { opacity: 0.6; text-shadow: 0 0 12px rgba(255, 42, 109, 0.7); }
+}
+
+.txCaptureSelected {
+  background: rgba(255, 42, 109, 0.1) !important;
+  border-left: 3px solid var(--red) !important;
+  box-shadow: 0 0 12px rgba(255, 42, 109, 0.15);
+}
+
+.anomalyUnknown {
+  color: var(--text-muted);
+  opacity: 0.35;
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
 /* ── placeholder sections ── */
 .placeholderSection {
   display: flex;

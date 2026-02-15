@@ -97,8 +97,10 @@ const GameMasterABI = parseAbi([
   "function getMission(uint256) view returns (address,uint256,bytes32,uint8,uint8,uint8)",
   "function getMissionSalt(uint256) view returns (bytes32)",
   "function getValidCities() view returns (uint256[])",
-  "function getMissionClues(uint256) view returns ((uint8,bytes32,string,uint256)[])",
+  "function getMissionClues(uint256) view returns ((uint8,bytes32,string,uint256,uint8)[])",
   "function getPlayerPublicKey(address) view returns (bytes)",
+  "function getMissionFragmentCount(uint256) view returns (uint8)",
+  "function deriveCarmenWallet(bytes32) view returns (address)",
   "event InvestigationSubmitted(uint256 indexed missionId, address indexed player, uint256 chainId)",
 ])
 
@@ -128,6 +130,7 @@ function getScenario(missionId: bigint): Scenario {
 // Action codes — must match GameMasterProxy.sol constants
 const ACTION_RECEIVE_CLUE = 1
 const ACTION_RESOLVE_CAPTURE = 2
+const ACTION_RECEIVE_WALLET_FRAGMENT = 4
 
 const ZERO_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -167,6 +170,24 @@ function parsePubKey(pubKeyHex: string, log: (msg: string) => void): Uint8Array 
     bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16)
   }
   return bytes
+}
+
+// ============================================================
+//  Helper: deterministic strength calculation
+// ============================================================
+function calculateStrength(salt: `0x${string}`, clueIndex: number, isCorrectCity: boolean): number {
+  const hash = keccak256(
+    encodeAbiParameters(parseAbiParameters("bytes32, uint256, string"), [salt, BigInt(clueIndex), "strength"])
+  )
+  const raw = Number(BigInt(hash) % BigInt(256))
+
+  if (isCorrectCity) {
+    // correct city: range 40-95 (can exceed 65 → generates evidence)
+    return 40 + (raw % 56)
+  } else {
+    // wrong city: range 20-55 (never exceeds 65)
+    return 20 + (raw % 36)
+  }
 }
 
 // ============================================================
@@ -375,6 +396,10 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
   const clueText = selectedClue.text
   const clueType = selectedClue.type
 
+  // ── Step 6b: Calculate deterministic strength ──
+  const strength = calculateStrength(salt, Number(cluesReceived), isCorrectCity)
+  runtime.log(`Clue strength: ${strength} (threshold=65, correct=${isCorrectCity})`)
+
   // ── Step 7: Encrypt clue with ECIES ──
   const contentHash = keccak256(toBytes(clueText))
 
@@ -386,8 +411,8 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
 
   // ── Step 8: Send clue report ──
   const clueData = encodeAbiParameters(
-    parseAbiParameters("uint256, uint8, bytes32, string"),
-    [missionId, clueType, contentHash as `0x${string}`, encryptedClue]
+    parseAbiParameters("uint256, uint8, bytes32, string, uint8"),
+    [missionId, clueType, contentHash as `0x${string}`, encryptedClue, strength]
   )
   const clueReport = encodeAbiParameters(
     parseAbiParameters("uint8, bytes"),
@@ -413,6 +438,92 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
     .result()
 
   runtime.log("Clue delivered successfully!")
+
+  // ── Step 8b: Wallet fragment (only for strong clues — evidence threshold) ──
+  const EVIDENCE_THRESHOLD = 65
+  if (strength > EVIDENCE_THRESHOLD) {
+    runtime.log(`Strong clue (${strength} > ${EVIDENCE_THRESHOLD})! Generating wallet fragment...`)
+
+    // Read current fragment count
+    const fragCountData = readContract(evmClient, runtime, gm, encodeFunctionData({
+      abi: GameMasterABI,
+      functionName: "getMissionFragmentCount",
+      args: [missionId],
+    }))
+    const fragmentCount = Number(decodeFunctionResult({
+      abi: GameMasterABI,
+      functionName: "getMissionFragmentCount",
+      data: bytesToHex(fragCountData),
+    }))
+    runtime.log(`Current fragment count: ${fragmentCount}`)
+
+    // Derive Carmen's wallet from salt
+    const carmenWalletData = readContract(evmClient, runtime, gm, encodeFunctionData({
+      abi: GameMasterABI,
+      functionName: "deriveCarmenWallet",
+      args: [salt],
+    }))
+    const carmenWallet = decodeFunctionResult({
+      abi: GameMasterABI,
+      functionName: "deriveCarmenWallet",
+      data: bytesToHex(carmenWalletData),
+    }) as `0x${string}`
+
+    // Extract wallet hex (40 chars, no 0x prefix)
+    const walletHex = carmenWallet.slice(2).toLowerCase()
+    runtime.log(`Carmen wallet: 0x${walletHex.slice(0, 8)}...`)
+
+    // Calculate fragment position deterministically from salt + fragmentCount
+    const FRAGMENT_LENGTH = 5
+    const positionHash = keccak256(
+      encodeAbiParameters(parseAbiParameters("bytes32, uint256"), [salt, BigInt(fragmentCount)])
+    )
+    const startIndex = Number(BigInt(positionHash) % BigInt(40 - FRAGMENT_LENGTH + 1))
+
+    // Extract the fragment chars
+    const fragmentChars = walletHex.slice(startIndex, startIndex + FRAGMENT_LENGTH)
+    runtime.log(`Fragment #${fragmentCount}: pos=${startIndex}, chars="${fragmentChars}"`)
+
+    // Encrypt fragment with player's ECIES key
+    const fragmentPayload = JSON.stringify({
+      fragmentIndex: fragmentCount,
+      startIndex,
+      length: FRAGMENT_LENGTH,
+      chars: fragmentChars,
+    })
+    const fragmentContentHash = keccak256(toBytes(fragmentPayload))
+    const encryptedFragment = eciesEncrypt(pubKeyBytes, fragmentPayload)
+
+    // Send wallet fragment report
+    const fragData = encodeAbiParameters(
+      parseAbiParameters("uint256, uint8, uint8, bytes32, string"),
+      [missionId, startIndex, FRAGMENT_LENGTH, fragmentContentHash as `0x${string}`, encryptedFragment]
+    )
+    const fragReport = encodeAbiParameters(
+      parseAbiParameters("uint8, bytes"),
+      [ACTION_RECEIVE_WALLET_FRAGMENT, fragData as `0x${string}`]
+    )
+
+    runtime.log("Sending wallet fragment report to proxy...")
+    const fragReportResponse = runtime
+      .report({
+        encodedPayload: hexToBase64(fragReport),
+        encoderName: "evm",
+        signingAlgo: "ecdsa",
+        hashingAlgo: "keccak256",
+      })
+      .result()
+
+    evmClient
+      .writeReport(runtime, {
+        receiver: config.proxyAddress,
+        report: fragReportResponse,
+        gasConfig: { gasLimit: config.gasLimit },
+      })
+      .result()
+
+    runtime.log(`Wallet fragment #${fragmentCount} delivered!`)
+  }
 
   // ── Step 9: Check capture conditions ──
   const totalClues = cluesReceived + 1

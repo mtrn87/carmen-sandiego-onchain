@@ -41,6 +41,8 @@ describe('gameStore', () => {
       rank: 0,
       rankTitle: 'Detective Rookie',
       currentMission: null,
+      carmenWalletAddress: null,
+      carmenLocationIdx: null,
     })
 
     localStorage.clear()
@@ -148,7 +150,7 @@ describe('gameStore', () => {
       expect(useGameStore.getState().briefingDone).toBe(true)
     })
 
-    it('registers player and starts mission when not registered', async () => {
+    it('fetches active mission and sets briefingDone when not registered', async () => {
       contractMocks.getPlayerActiveMission.mockResolvedValueOnce(1n)
       contractMocks.getMission.mockResolvedValueOnce({
         player: '0x1234567890abcdef1234567890abcdef12345678', startBlock: 100n, targetHash: '0xhash',
@@ -158,13 +160,13 @@ describe('gameStore', () => {
       const { completeBriefing } = useGameStore.getState()
       await completeBriefing()
 
-      expect(contractMocks.registerPlayer).toHaveBeenCalled()
-      expect(contractMocks.startMission).toHaveBeenCalled()
-      expect(useGameStore.getState().isRegistered).toBe(true)
+      // completeBriefing no longer registers or starts missions (moved to LoginPage)
+      expect(contractMocks.registerPlayer).not.toHaveBeenCalled()
+      expect(contractMocks.startMission).not.toHaveBeenCalled()
       expect(useGameStore.getState().briefingDone).toBe(true)
     })
 
-    it('skips registration when already registered', async () => {
+    it('enters briefing with existing mission when already registered', async () => {
       useGameStore.setState({ isRegistered: true })
       contractMocks.getPlayerActiveMission.mockResolvedValueOnce(1n)
       contractMocks.getMission.mockResolvedValueOnce({
@@ -176,7 +178,8 @@ describe('gameStore', () => {
       await completeBriefing()
 
       expect(contractMocks.registerPlayer).not.toHaveBeenCalled()
-      expect(contractMocks.startMission).toHaveBeenCalled()
+      expect(contractMocks.startMission).not.toHaveBeenCalled()
+      expect(useGameStore.getState().briefingDone).toBe(true)
     })
 
     it('adds error terminal line on failure', async () => {

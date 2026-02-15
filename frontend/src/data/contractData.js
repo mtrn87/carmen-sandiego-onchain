@@ -1,10 +1,11 @@
 // ─── contract exploration data per case ───
+import { CITY_POOL_MAP } from './cityRegistry'
 
 export const CHAIN_CONFIG = {
   'Ethereum Sepolia': { color: '#627EEA', logo: 'ETH', name: 'Ethereum Sepolia', symbol: 'ETH', location: 'New York', flag: '\u{1F5FD}' },
   'Arbitrum Sepolia': { color: '#28a0f0', logo: 'ARB', name: 'Arbitrum Sepolia', symbol: 'ETH', location: 'Tokyo', flag: '\u{1F1EF}\u{1F1F5}' },
   'Base Sepolia': { color: '#0052ff', logo: 'BASE', name: 'Base Sepolia', symbol: 'ETH', location: 'Paris', flag: '\u{1F1EB}\u{1F1F7}' },
-  'XDC Apothem': { color: '#ff6b00', logo: 'XDC', name: 'XDC Apothem', symbol: 'XDC', location: 'London', flag: '\u{1F1EC}\u{1F1E7}' },
+  'XDC Apothem': { color: '#ff6b00', logo: 'XDC', name: 'XDC Apothem', symbol: 'XDC', location: 'New York', flag: '\u{1F1FA}\u{1F1F8}' },
   'Multi-Chain': { color: '#00f0ff', logo: 'CCIP', name: 'Multi-Chain', symbol: 'ETH', location: '', flag: '' },
 }
 
@@ -534,11 +535,11 @@ const PARIS_MARKET_CASE = {
   events: MALL_EVENTS,
 }
 
-const LONDON_BRIDGE_CASE = {
+const NYC_WALL_STREET_CASE = {
   chain: 'XDC Apothem',
   headerType: 'contract',
-  locationImage: '/shanghai_1.png',
-  contract: { ...AIRPORT_CONTRACT, name: 'TowerBridgeNode.sol', caseId: 'CASE-XDC-001', type: 'Cross-Chain Bridge' },
+  locationImage: '/nyc_1.png',
+  contract: { ...AIRPORT_CONTRACT, name: 'WallStreetExchange.sol', caseId: 'CASE-XDC-001', type: 'Cross-Chain Bridge' },
   transactions: AIRPORT_CITYNODE_TXS,
   events: AIRPORT_EVENTS,
 }
@@ -593,16 +594,16 @@ export const CASE_DATA = {
   'paris-eiffel': PARIS_EIFFEL_CASE,
   'paris-louvre': PARIS_LOUVRE_CASE,
   'paris-market': PARIS_MARKET_CASE,
-  // London — XDC Apothem (chainId 51)
-  'london-bridge': LONDON_BRIDGE_CASE,
+  // New York — XDC Apothem (chainId 51)
+  'nyc-wall-street': NYC_WALL_STREET_CASE,
 }
 
-export const CONTRACT_CITY_REGISTRY = {
-  11155111: { name: 'New York', emoji: '\u{1F5FD}', chain: 'Ethereum Sepolia', investigable: false },
-  421614: { name: 'Tokyo', emoji: '\u{1F5FE}', chain: 'Arbitrum Sepolia', investigable: true },
-  84532: { name: 'Paris', emoji: '\u{1F5FC}', chain: 'Base Sepolia', investigable: true },
-  51: { name: 'London', emoji: '\u{1F3A1}', chain: 'XDC Apothem', investigable: true },
-}
+export const CONTRACT_CITY_REGISTRY = Object.fromEntries(
+  Object.entries(CITY_POOL_MAP).map(([id, city]) => [
+    Number(id),
+    { name: city.name, emoji: city.flag, chain: city.chain, investigable: Number(id) !== 11155111 },
+  ])
+)
 
 export const PLATFORM_CITY_OPTIONS = [
   {
@@ -710,40 +711,40 @@ export const PLATFORM_CITY_OPTIONS = [
   },
   {
     id: 51,
-    name: 'London',
-    flag: '\u{1F3A1}',
+    name: 'Sydney',
+    flag: '\u{1F3A7}',
     chain: 'XDC Apothem',
     chainColor: '#00AEEF',
     chainIcon: '/blockchain_icon/xdc.png',
-    image: '/london.png',
-    coords: { left: '47%', top: '24%' },
+    image: '/sydney.png',
+    coords: { left: '87%', top: '78%' },
     investigable: true,
     cases: [
       {
-        id: 'london-bridge',
-        name: 'Tower Bridge Node',
-        type: 'Cross-Chain Bridge',
-        status: 'active',
-        description: 'Fresh suspect route signatures found.',
-        image: '/london_1.png',
-        chainId: 51,
-      },
-      {
-        id: 'london-buckingham',
-        name: 'Buckingham Vault',
-        type: 'Custody Protocol',
-        status: 'active',
-        description: 'High-value asset staging area.',
-        image: '/london_2.png',
-        chainId: 51,
-      },
-      {
-        id: 'london-eye',
-        name: 'London Eye Router',
+        id: 'sydney-opera',
+        name: 'Opera House Node',
         type: 'Signal Router',
         status: 'active',
-        description: 'XDC packets hopping across regions.',
-        image: '/london_3.png',
+        description: 'XDC transmissions intensify after dusk at the Opera House.',
+        image: '/sydney_1.png',
+        chainId: 51,
+      },
+      {
+        id: 'sydney-bridge',
+        name: 'Harbour Bridge Relay',
+        type: 'Bridge Relay',
+        status: 'active',
+        description: 'Cross-chain drips forming a trail across the Harbour Bridge.',
+        image: '/sydney_2.png',
+        chainId: 51,
+      },
+      {
+        id: 'sydney-bondi',
+        name: 'Bondi Beach Market',
+        type: 'Market Router',
+        status: 'active',
+        description: 'Unusual swaps mask the stolen assets near Bondi.',
+        image: '/sydney_3.png',
         chainId: 51,
       },
     ],
