@@ -273,7 +273,6 @@ export default function ContractExplorer({ onOpenMap }) {
             data-tour="map-btn"
             onClick={() => {
               if (tourActive && tourStep === 4) endTour()
-              if (isCityNodeMode) backToMap()
               onOpenMap()
             }}
           >

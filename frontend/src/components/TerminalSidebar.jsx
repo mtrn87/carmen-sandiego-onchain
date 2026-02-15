@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useGameStore } from '../store/gameStore'
 import styles from './TerminalSidebar.module.css'
 
@@ -32,6 +33,7 @@ export default function TerminalSidebar() {
   const [activeTab, setActiveTab] = useState('terminal')
   const [chatInput, setChatInput] = useState('')
   const [playingAudio, setPlayingAudio] = useState(null)
+  const [selectedEvidence, setSelectedEvidence] = useState(null)
 
   const {
     terminalLines,
@@ -154,6 +156,11 @@ export default function TerminalSidebar() {
     const command = msg.toLowerCase()
     if (command === '/mission') {
       openMissionPlotModal()
+      return
+    }
+    if (command === '/reset') {
+      addTerminalLine('> RESETTING MISSION — failing current assignment on-chain...', 'red', 'alert')
+      startNewMission()
       return
     }
 
@@ -328,9 +335,11 @@ export default function TerminalSidebar() {
               evidence.map((item) => (
                 <div
                   key={item.id}
-                  className={`${styles.evidenceCard} ${item.audioSrc ? styles.evidenceCardAudio : ''}`}
+                  className={`${styles.evidenceCard} ${styles.evidenceCardClickable} ${item.audioSrc ? styles.evidenceCardAudio : ''}`}
                   style={{ '--rarity': RARITY_COLORS[item.rarity] || RARITY_COLORS.common }}
-                  onClick={() => item.audioSrc && handlePlayAudio(item.id, item.audioSrc)}
+                  onClick={() => setSelectedEvidence(item)}
+                  role="button"
+                  tabIndex={0}
                 >
                   <div className={styles.evidenceIcon}>
                     {ICON_MAP[item.icon] || '\u{1F4CE}'}
@@ -369,6 +378,56 @@ export default function TerminalSidebar() {
         </div>
       )}
       <audio ref={audioRef} preload="none" />
+
+      {/* evidence detail modal — portaled to body */}
+      {selectedEvidence && createPortal(
+        <div className={styles.evidenceModalOverlay} onClick={() => setSelectedEvidence(null)}>
+          <div className={styles.evidenceModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.evidenceModalHeader}>
+              <span className={styles.evidenceModalIcon}>
+                {ICON_MAP[selectedEvidence.icon] || '\u{1F4CE}'}
+              </span>
+              <span className={styles.evidenceModalTitle}>{selectedEvidence.name}</span>
+              <span
+                className={styles.evidenceModalRarity}
+                style={{ color: RARITY_COLORS[selectedEvidence.rarity] }}
+              >
+                {selectedEvidence.rarity.toUpperCase()}
+              </span>
+            </div>
+            <div className={styles.evidenceModalBody}>
+              <div className={styles.evidenceModalSection}>
+                <span className={styles.evidenceModalLabel}>FULL INTEL</span>
+                <p className={styles.evidenceModalText}>{selectedEvidence.description}</p>
+              </div>
+              {selectedEvidence.fromLocation && (
+                <div className={styles.evidenceModalSection}>
+                  <span className={styles.evidenceModalLabel}>SOURCE</span>
+                  <p className={styles.evidenceModalMeta}>{selectedEvidence.fromLocation}</p>
+                </div>
+              )}
+              {selectedEvidence.audioSrc && (
+                <div className={styles.evidenceModalSection}>
+                  <button
+                    className={`${styles.audioPlayBtn} ${playingAudio === selectedEvidence.id ? styles.audioPlaying : ''}`}
+                    onClick={() => handlePlayAudio(selectedEvidence.id, selectedEvidence.audioSrc)}
+                  >
+                    {playingAudio === selectedEvidence.id ? (
+                      <><span className={styles.audioWaveAnim} /> PLAYING... CLICK TO STOP</>
+                    ) : (
+                      <><span className={styles.audioPlayIcon}>&#9654;</span> PLAY INTERCEPTED AUDIO</>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+            <button className={styles.evidenceModalClose} onClick={() => setSelectedEvidence(null)}>
+              CLOSE
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

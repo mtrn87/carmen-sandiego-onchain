@@ -245,7 +245,8 @@ export const useGameStore = create((set, get) => ({
   _blockPollInterval: null,
 
   // ── gameplay loop state ──
-  currentCityId: null,
+  currentCityId: null,      // unique city id (e.g. 512 for Rio) — used for display/CITY_MAP lookups
+  currentChainId: null,     // real blockchain chainId (e.g. 51 for XDC) — used for contract calls
   currentCityInfo: null,
   cityLocations: [],
   cityAnomalyTxRefs: [],
@@ -912,12 +913,16 @@ export const useGameStore = create((set, get) => ({
         if (Object.keys(restored).length > 0) set(restored)
       }
 
-      const startingCityId = get().discoveredCityIds[0] || 421614
+      const HOME_CITY_ID = 80002
+      const startingCityId = get().discoveredCityIds[0] || HOME_CITY_ID
       await get().selectCity(startingCityId)
       const locCount = get().cityLocations.length || 3
       const startIdx = Math.floor(Math.random() * locCount)
       set({ startLocationIdx: startIdx })
       get().selectLocation(startIdx)
+
+      // persist initial state (home city scanned + discovered cities) to localStorage
+      saveProgress(get())
 
       if (mId) {
         const state = get()
@@ -1046,11 +1051,23 @@ export const useGameStore = create((set, get) => ({
    * Start a new mission after completion or failure.
    * Resets game state and goes back to briefing flow.
    */
+  /**
+   * Reset current mission and start fresh.
+   * Calls startMission on-chain (auto-fails active mission) then resets local state.
+   */
   startNewMission: async () => {
     const { _unsubscribers, _blockPollInterval, _cityNodeUnsub } = get()
     _unsubscribers.forEach((unsub) => unsub())
     if (_blockPollInterval) clearInterval(_blockPollInterval)
     if (_cityNodeUnsub) _cityNodeUnsub()
+
+    // call startMission on-chain — this auto-fails any active mission
+    try {
+      await ensureSepoliaNetwork()
+      await startMissionOnChain()
+    } catch (err) {
+      console.warn('[startNewMission] on-chain startMission failed:', err.message)
+    }
 
     set({
       missionId: null,
@@ -1092,6 +1109,7 @@ export const useGameStore = create((set, get) => ({
       discoveryScanCount: 0,
       // reset gameplay loop state
       currentCityId: null,
+      currentChainId: null,
       currentCityInfo: null,
       cityLocations: [],
       cityAnomalyTxRefs: [],
@@ -1173,15 +1191,15 @@ export const useGameStore = create((set, get) => ({
    * Combined action: load CityNode data + call inspectLocation on-chain.
    * Used by InteractiveMap's "SCAN NETWORK" button.
    */
-  scanAndInspect: async (chainId) => {
+  scanAndInspect: async (cityId) => {
     const state = get()
-    if (state.isScanning || state.scannedLocations.includes(chainId)) return
+    if (state.isScanning || state.scannedLocations.includes(cityId)) return
 
     set({ isScanning: true })
 
     try {
       // 1. Load all CityNode data (locations, anomalies, suspects, energy)
-      await state.selectCity(chainId)
+      await state.selectCity(cityId)
 
       // 2. Call inspectLocation(0) on-chain (costs 1 energy)
       await state.gameplayInspectLocation(0)
@@ -1189,7 +1207,7 @@ export const useGameStore = create((set, get) => ({
       // 3. Mark city as scanned in the UI so case cards appear
       set((s) => ({
         isScanning: false,
-        scannedLocations: [...s.scannedLocations, chainId],
+        scannedLocations: [...s.scannedLocations, cityId],
       }))
       saveProgress(get())
     } catch (error) {
@@ -1203,22 +1221,26 @@ export const useGameStore = create((set, get) => ({
     }
   },
 
-  selectCity: async (chainId) => {
-    set({ currentCityId: chainId, gameplayLoading: true, currentLocationIdx: null, cityViewTab: 'overview' })
+  selectCity: async (cityId) => {
+    // Resolve the real blockchain chainId from the unique city id
+    const cityPoolEntry = CITY_POOL_MAP[cityId]
+    const chainId = cityPoolEntry?.chainId || cityId
+
+    set({ currentCityId: cityId, currentChainId: chainId, gameplayLoading: true, currentLocationIdx: null, cityViewTab: 'overview' })
 
     const { walletAddress } = get()
 
     try {
       const [cityInfo, locations, anomalyTxRefs, suspectWallets] = await Promise.all([
-        getCityNodeInfo(chainId),
-        getCityNodeLocations(chainId),
-        getCityNodeAnomalyTxRefs(chainId),
-        getCityNodeSuspectWallets(chainId),
+        getCityNodeInfo(cityId),
+        getCityNodeLocations(cityId),
+        getCityNodeAnomalyTxRefs(cityId),
+        getCityNodeSuspectWallets(cityId),
       ])
 
       // Restore saved location states (inspected/scanned) from localStorage
       const saved = loadProgress()
-      if (saved?.cityLocationStates && saved.currentCityId === chainId) {
+      if (saved?.cityLocationStates && saved.currentCityId === cityId) {
         locations.forEach((loc, i) => {
           const savedLoc = saved.cityLocationStates[i]
           if (savedLoc) {
@@ -1233,7 +1255,7 @@ export const useGameStore = create((set, get) => ({
       // build a lightweight Carmen wallet object for tx generation
       const cwObj = cwAddr ? { address: cwAddr, _missionId: get().missionId || 1 } : null
       locations.forEach((loc, i) => {
-        loc.transactions = buildLocationTransactions(chainId, i, anomalyTxRefs, locations.length, cwObj, cLocIdx)
+        loc.transactions = buildLocationTransactions(cityId, i, anomalyTxRefs, locations.length, cwObj, cLocIdx)
       })
 
       set({
@@ -1242,11 +1264,11 @@ export const useGameStore = create((set, get) => ({
         cityAnomalyTxRefs: anomalyTxRefs,
         citySuspectWallets: suspectWallets,
         gameplayLoading: false,
-        ...(saved?.scannedLocations ? { scannedLocations: saved.scannedLocations } : {}),
+        ...(saved?.scannedLocations ? { scannedLocations: [...new Set([...get().scannedLocations, ...saved.scannedLocations])] } : {}),
         ...(saved?.blocksElapsed ? { blocksElapsed: saved.blocksElapsed } : {}),
       })
 
-      const city = CITY_MAP[chainId]
+      const city = CITY_MAP[cityId]
       set((s) => ({
         terminalLines: [...s.terminalLines,
           { text: '', color: 'muted', type: 'system' },
@@ -1260,7 +1282,7 @@ export const useGameStore = create((set, get) => ({
       const { _cityNodeUnsub, walletAddress: playerAddr } = get()
       if (_cityNodeUnsub) _cityNodeUnsub()
       if (playerAddr) {
-        const unsub = await onCityNodeEvents(chainId, playerAddr, {
+        const unsub = await onCityNodeEvents(cityId, playerAddr, {
           onClueUnlocked: ({ idx, clueIndex, clueType, clueDataHash, anomalyRefId }) => {
             const CLUE_NAMES = ["BEHAVIOR_FINGERPRINT", "RELATIONSHIP", "IDENTITY_COMMIT", "FUNDING_TRAIL", "TECHNICAL_SIGNATURE", "DEAD_END"]
             set((s) => ({
@@ -1280,17 +1302,29 @@ export const useGameStore = create((set, get) => ({
 
   /**
    * Initialize city discovery for a mission.
-   * Picks a deterministic starting city based on missionId.
+   * Home city (Santiago) is always fully enabled.
+   * Two additional plausible cities are revealed immediately.
    */
   initDiscovery: async (missionId) => {
+    const HOME_CITY_ID = 80002
+
     // try restoring from localStorage first
     const saved = loadProgress()
     if (saved?.discoveredCityIds?.length > 0) {
+      // ensure home city is always discovered + scanned even in restored sessions
+      const restoredDiscovered = saved.discoveredCityIds.includes(HOME_CITY_ID)
+        ? saved.discoveredCityIds
+        : [HOME_CITY_ID, ...saved.discoveredCityIds]
+      const restoredScanned = saved.scannedLocations?.includes(HOME_CITY_ID)
+        ? saved.scannedLocations
+        : [...(saved.scannedLocations || []), HOME_CITY_ID]
+
       set({
-        discoveredCityIds: saved.discoveredCityIds,
+        discoveredCityIds: restoredDiscovered,
         visitedCityIds: saved.visitedCityIds || [],
         cityTrail: saved.cityTrail || [],
         discoveryScanCount: saved.discoveryScanCount || 0,
+        scannedLocations: restoredScanned,
       })
       return
     }
@@ -1301,16 +1335,30 @@ export const useGameStore = create((set, get) => ({
     const carmenLocIdx = getCarmenLocationIdx(mId, 3) // 3 locations per city
     set({ carmenWalletAddress: carmenW.address, carmenLocationIdx: carmenLocIdx })
 
-    const startingCityId = pickStartingCity(mId)
-    const cityData = CITY_POOL_MAP[startingCityId]
+    // home city — Santiago is always the starting point (player's origin)
+    const homeCity = CITY_POOL_MAP[HOME_CITY_ID]
+
+    // reveal 2 plausible cities immediately (no scan required to discover them)
+    const initialRevealed = pickRevealedCities(mId, 0, [HOME_CITY_ID])
+    const revealedIds = initialRevealed.map((c) => c.id)
+
+    const revealLines = initialRevealed.map((c) => ({
+      text: `> INTEL: Suspicious activity detected in ${c.name} (${c.chain})`,
+      color: 'green',
+      type: 'alert',
+    }))
 
     set((s) => ({
-      discoveredCityIds: [startingCityId],
+      discoveredCityIds: [HOME_CITY_ID, ...revealedIds],
       visitedCityIds: [],
-      cityTrail: [startingCityId],
-      discoveryScanCount: 0,
+      cityTrail: [HOME_CITY_ID],
+      discoveryScanCount: 1, // count the initial reveal
+      // Santiago is fully scanned — home city is known territory
+      scannedLocations: [...s.scannedLocations, HOME_CITY_ID],
       terminalLines: [...s.terminalLines,
-        { text: `> INTEL: Initial network detected in ${cityData?.name || 'Unknown'} (${cityData?.chain || 'Unknown Chain'})`, color: 'cyan', type: 'system' },
+        { text: `> HOME BASE: ${homeCity?.name || 'Santiago'} (${homeCity?.chain || 'Polygon Amoy'}) — network fully mapped.`, color: 'cyan', type: 'system' },
+        { text: '> Local contacts provide 100% network coverage here.', color: 'green', type: 'system' },
+        ...revealLines,
       ],
     }))
   },
@@ -1390,6 +1438,7 @@ export const useGameStore = create((set, get) => ({
     if (_cityNodeUnsub) _cityNodeUnsub()
     set({
       currentCityId: null,
+      currentChainId: null,
       currentCityInfo: null,
       cityLocations: [],
       cityAnomalyTxRefs: [],
@@ -1521,7 +1570,7 @@ export const useGameStore = create((set, get) => ({
         data: result.clueData,
         strength: result.strength,
         anomalyRefId: result.anomalyRefId,
-        cityId: currentCityId,
+        cityId: get().currentCityId,
         isDeadEnd,
         timestamp: Date.now(),
       }

@@ -6,7 +6,7 @@
  */
 
 import { ethers } from "ethers"
-import { CITY_POOL_MAP, getMockLocations, getMockClueData, getCountryCode } from '../data/cityRegistry'
+import { CITY_POOL, CITY_POOL_MAP, getMockLocations, getMockClueData, getCountryCode } from '../data/cityRegistry'
 import { WALLET_POOL, pickTxWallets, getCarmenWalletIndex } from '../data/walletPool'
 import GameMasterArtifact from "../abi/GameMaster.json"
 import CityNodeArtifact from "../abi/CityNode.json"
@@ -43,6 +43,14 @@ const CITY_NODE_RPC_URLS = {
   421614: import.meta.env.VITE_ARBITRUM_SEPOLIA_RPC_URL || DEFAULT_CITY_NODE_RPCS[421614],
   84532: import.meta.env.VITE_BASE_SEPOLIA_RPC_URL || DEFAULT_CITY_NODE_RPCS[84532],
   51: import.meta.env.VITE_XDC_APOTHEM_RPC_URL || DEFAULT_CITY_NODE_RPCS[51],
+}
+
+/**
+ * Resolve a cityId (unique, e.g. 512 for Rio) to the real blockchain chainId (e.g. 51 for XDC).
+ * If the id is already a real chainId (e.g. 51), returns it as-is.
+ */
+function resolveChainId(cityId) {
+  return CITY_POOL_MAP[cityId]?.chainId || cityId
 }
 
 export const CITY_MAP = Object.fromEntries(
@@ -848,9 +856,20 @@ const MOCK_CLUE_DATA = Object.fromEntries(
   Object.keys(CITY_POOL_MAP).map((id) => [Number(id), getMockClueData(Number(id))])
 )
 
-function _mockClueResult(chainId, locationIdx, clueIndex, txHash, blockNumber, isStartingClue = false) {
+/**
+ * Pick a city on a DIFFERENT chain to serve as the [NEXT LEAD] destination.
+ * Deterministic based on seed so the same clue always points to the same city.
+ */
+function _pickNextLeadCity(currentChainId, seed) {
+  const candidates = CITY_POOL.filter((c) => c.chainId !== currentChainId)
+  if (candidates.length === 0) return CITY_POOL[0]
+  const idx = Math.abs(seed) % candidates.length
+  return candidates[idx]
+}
+
+function _mockClueResult(cityId, locationIdx, clueIndex, txHash, blockNumber, isStartingClue = false) {
   const clueTypes = ["BEHAVIOR_FINGERPRINT", "RELATIONSHIP", "IDENTITY_COMMIT", "FUNDING_TRAIL", "TECHNICAL_SIGNATURE", "DEAD_END"]
-  const locationData = MOCK_CLUE_DATA[chainId]?.[locationIdx]
+  const locationData = MOCK_CLUE_DATA[cityId]?.[locationIdx]
 
   // starting clue is always strong (guaranteed lead for the player)
   // regular clues: ~15% dead end chance, otherwise random 20-95
@@ -866,7 +885,7 @@ function _mockClueResult(chainId, locationIdx, clueIndex, txHash, blockNumber, i
   else tier = "strong"
 
   // pick clue text from the matching tier
-  const cityName = CITY_NODE_META[chainId]?.name || "unknown"
+  const cityName = CITY_NODE_META[cityId]?.name || "unknown"
   let clueData
   if (locationData && locationData[tier]) {
     const tierTexts = locationData[tier]
@@ -892,6 +911,14 @@ function _mockClueResult(chainId, locationIdx, clueIndex, txHash, blockNumber, i
     clueData = texts[clueIndex % texts.length]
   }
 
+  // Strong clues ALWAYS include a [NEXT LEAD] pointing to a city on a different chain
+  if (tier === "strong") {
+    const leadSeed = (cityId * 31 + locationIdx * 7 + clueIndex * 3) | 0
+    const nextCity = _pickNextLeadCity(resolveChainId(cityId), leadSeed)
+    const chainDef = nextCity.chain || 'unknown chain'
+    clueData += ` [NEXT LEAD: Cross-chain signals trace to ${nextCity.name} (${chainDef}) — investigate that network next.]`
+  }
+
   return {
     hash: txHash || `0x${Math.random().toString(16).slice(2, 14)}...mock`,
     blockNumber: blockNumber || 52884300 + Math.floor(Math.random() * 100),
@@ -904,13 +931,13 @@ function _mockClueResult(chainId, locationIdx, clueIndex, txHash, blockNumber, i
   }
 }
 
-function _mockCityInfo(chainId) {
-  const meta = CITY_NODE_META[chainId]
+function _mockCityInfo(cityId) {
+  const meta = CITY_NODE_META[cityId]
   return {
-    city: meta?.name || `City ${chainId}`,
-    countryCode: getCountryCode(chainId),
-    chainId,
-    cityId: chainId,
+    city: meta?.name || `City ${cityId}`,
+    countryCode: getCountryCode(cityId),
+    chainId: resolveChainId(cityId),
+    cityId,
     suspicionLevel: Math.floor(Math.random() * 40) + 30,
     suspicionReasonHash: ethers.ZeroHash,
   }
@@ -926,9 +953,10 @@ const MOCK_LOCATIONS = Object.fromEntries(
  * Get city info from a CityNode.
  * Calls cityInfo() + getSuspicionIndex(); falls back to mock.
  */
-export async function getCityNodeInfo(chainId) {
+export async function getCityNodeInfo(cityId) {
+  const chainId = resolveChainId(cityId)
   const contract = getCityNodeGameplayContract(chainId)
-  if (!contract) return _mockCityInfo(chainId)
+  if (!contract) return _mockCityInfo(cityId)
 
   try {
     const [info, suspicion] = await Promise.all([
@@ -953,10 +981,11 @@ export async function getCityNodeInfo(chainId) {
  * Get locations for a CityNode (3 per city).
  * Calls getLocations(); enriches with display fields. Falls back to mock.
  */
-export async function getCityNodeLocations(chainId) {
+export async function getCityNodeLocations(cityId) {
+  const chainId = resolveChainId(cityId)
   const contract = getCityNodeGameplayContract(chainId)
   if (!contract) {
-    return (MOCK_LOCATIONS[chainId] || []).map((loc, i) => ({
+    return (MOCK_LOCATIONS[cityId] || []).map((loc, i) => ({
       ...loc,
       categoryLabel: CATEGORY_MAP[loc.category] || `Category ${loc.category}`,
       descriptionHash: ethers.ZeroHash,
@@ -984,7 +1013,7 @@ export async function getCityNodeLocations(chainId) {
     }))
   } catch (err) {
     console.warn(`[cityNode] getLocations real call failed for chain ${chainId}, using mock:`, err.message)
-    return (MOCK_LOCATIONS[chainId] || []).map((loc, i) => ({
+    return (MOCK_LOCATIONS[cityId] || []).map((loc, i) => ({
       ...loc,
       categoryLabel: CATEGORY_MAP[loc.category] || `Category ${loc.category}`,
       descriptionHash: ethers.ZeroHash,
@@ -1000,9 +1029,10 @@ export async function getCityNodeLocations(chainId) {
  * Get anomaly tx refs from a CityNode.
  * Calls getAnomalyTxRefs(0, 50); enriches with display helpers. Falls back to mock.
  */
-export async function getCityNodeAnomalyTxRefs(chainId) {
+export async function getCityNodeAnomalyTxRefs(cityId) {
+  const chainId = resolveChainId(cityId)
   const contract = getCityNodeGameplayContract(chainId)
-  if (!contract) return _mockAnomalyTxRefs(chainId)
+  if (!contract) return _mockAnomalyTxRefs(cityId)
 
   try {
     const rawRefs = await contract.getAnomalyTxRefs(0, 50)
@@ -1025,7 +1055,7 @@ export async function getCityNodeAnomalyTxRefs(chainId) {
     })
   } catch (err) {
     console.warn(`[cityNode] getAnomalyTxRefs real call failed for chain ${chainId}, using mock:`, err.message)
-    return _mockAnomalyTxRefs(chainId)
+    return _mockAnomalyTxRefs(cityId)
   }
 }
 
@@ -1046,9 +1076,9 @@ function _methodSigToLabel(sigHex) {
 
 // ── Location transaction generators ──
 
-function _seedFromParams(chainId, locationIdx) {
+function _seedFromParams(cityId, locationIdx) {
   let h = 5381
-  const s = `${chainId}-${locationIdx}-txgen`
+  const s = `${cityId}-${locationIdx}-txgen`
   for (let i = 0; i < s.length; i++) {
     h = ((h << 5) + h + s.charCodeAt(i)) & 0x7fffffff
   }
@@ -1073,8 +1103,8 @@ function _hexFromSeed(val, length) {
   return hex.slice(0, length)
 }
 
-function _generateLocationTxs(chainId, locationIdx, carmenWallet, carmenLocationIdx) {
-  const seed = _seedFromParams(chainId, locationIdx)
+function _generateLocationTxs(cityId, locationIdx, carmenWallet, carmenLocationIdx) {
+  const seed = _seedFromParams(cityId, locationIdx)
   const rng = _seededRng(seed)
   const carmenIdx = carmenWallet ? getCarmenWalletIndex(carmenWallet._missionId || 0) : -1
 
@@ -1142,8 +1172,8 @@ function _generateLocationTxs(chainId, locationIdx, carmenWallet, carmenLocation
  * Build transaction list for a location, merging anomaly data from city-wide anomalyTxRefs.
  * Normal txs are always generated. Anomaly flags are set when refs exist (Carmen present).
  */
-export function buildLocationTransactions(chainId, locationIdx, anomalyTxRefs, numLocations = 3, carmenWallet = null, carmenLocationIdx = null) {
-  const txs = _generateLocationTxs(chainId, locationIdx, carmenWallet, carmenLocationIdx)
+export function buildLocationTransactions(cityId, locationIdx, anomalyTxRefs, numLocations = 3, carmenWallet = null, carmenLocationIdx = null) {
+  const txs = _generateLocationTxs(cityId, locationIdx, carmenWallet, carmenLocationIdx)
 
   if (!anomalyTxRefs || anomalyTxRefs.length === 0) return txs
 
@@ -1161,13 +1191,13 @@ export function buildLocationTransactions(chainId, locationIdx, anomalyTxRefs, n
   return txs
 }
 
-function _mockAnomalyTxRefs(chainId) {
+function _mockAnomalyTxRefs(cityId) {
   const sigs = ["0xa9059cbb", "0x095ea7b3", "0x38ed1739", "0x3ce33bff", "0xd0e30db0"]
   const labels = ["transfer", "approve", "swap", "bridge", "deposit"]
 
   return Array.from({ length: 5 }, (_, i) => ({
     refId: i + 1,
-    txHashLike: ethers.id(`mock-tx-${chainId}-${i}`),
+    txHashLike: ethers.id(`mock-tx-${cityId}-${i}`),
     from: WALLET_POOL[i % 25].address,
     to: WALLET_POOL[(i + 5) % 25].address,
     methodSigLike: sigs[i],
@@ -1184,7 +1214,8 @@ function _mockAnomalyTxRefs(chainId) {
  * Get suspect wallets from a CityNode.
  * Calls getSuspectWallets(0, 50); derives tags array. Falls back to mock.
  */
-export async function getCityNodeSuspectWallets(chainId) {
+export async function getCityNodeSuspectWallets(cityId) {
+  const chainId = resolveChainId(cityId)
   const contract = getCityNodeGameplayContract(chainId)
   if (!contract) return _mockSuspectWallets()
 
@@ -1223,7 +1254,8 @@ function _mockSuspectWallets() {
  * Get player energy from a CityNode.
  * Calls getEnergy(player); returns single uint32. Falls back to MAX_ENERGY.
  */
-export async function getCityNodeEnergy(chainId, player) {
+export async function getCityNodeEnergy(cityId, player) {
+  const chainId = resolveChainId(cityId)
   const contract = getCityNodeGameplayContract(chainId)
   if (!contract || !player) return MAX_ENERGY
 
@@ -1240,7 +1272,8 @@ export async function getCityNodeEnergy(chainId, player) {
  * Get player progress on a CityNode.
  * Calls getPlayerProgress(player). Falls back to zeros.
  */
-export async function getCityNodePlayerProgress(chainId, player) {
+export async function getCityNodePlayerProgress(cityId, player) {
+  const chainId = resolveChainId(cityId)
   const contract = getCityNodeGameplayContract(chainId)
   if (!contract || !player) return { inspectedBitmap: 0, cluesFound: 0, scansCompleted: 0 }
 
@@ -1261,7 +1294,8 @@ export async function getCityNodePlayerProgress(chainId, player) {
  * Get evidence summary for a player.
  * Calls getEvidenceSummary(player). Falls back to zeros.
  */
-export async function getCityNodeEvidenceSummary(chainId, player) {
+export async function getCityNodeEvidenceSummary(cityId, player) {
+  const chainId = resolveChainId(cityId)
   const contract = getCityNodeGameplayContract(chainId)
   if (!contract || !player) return { totalClues: 0, bundleHashLike: ethers.ZeroHash, confidence: 0 }
 
@@ -1284,7 +1318,8 @@ export async function getCityNodeEvidenceSummary(chainId, player) {
  * Inspect a location on a CityNode.
  * Direct tx — completes in one transaction (no oracle callback).
  */
-export async function cityNodeInspectLocation(chainId, locationIdx) {
+export async function cityNodeInspectLocation(cityId, locationIdx) {
+  const chainId = resolveChainId(cityId)
   if (!isCityNodeConfigured(chainId)) {
     console.log(`[cityNode] inspectLocation(${locationIdx}) on chain ${chainId} — MOCK`)
     await new Promise((r) => setTimeout(r, 1500))
@@ -1322,7 +1357,8 @@ export async function cityNodeInspectLocation(chainId, locationIdx) {
  * Scan anomalies at a location.
  * Direct tx — completes in one transaction.
  */
-export async function cityNodeScanAnomalies(chainId, locationIdx) {
+export async function cityNodeScanAnomalies(cityId, locationIdx) {
+  const chainId = resolveChainId(cityId)
   if (!isCityNodeConfigured(chainId)) {
     console.log(`[cityNode] scanAnomalies(${locationIdx}) on chain ${chainId} — MOCK`)
     await new Promise((r) => setTimeout(r, 2000))
@@ -1361,11 +1397,12 @@ export async function cityNodeScanAnomalies(chainId, locationIdx) {
  * Request a clue at a location.
  * Async tx — sends request, then waits for GM resolve event (ClueUnlocked or DeadEnd).
  */
-export async function cityNodeRequestClue(chainId, locationIdx, clueIndex, isStartingClue = false) {
+export async function cityNodeRequestClue(cityId, locationIdx, clueIndex, isStartingClue = false) {
+  const chainId = resolveChainId(cityId)
   if (!isCityNodeConfigured(chainId)) {
     console.log(`[cityNode] requestClue(${locationIdx}, ${clueIndex}) on chain ${chainId} — MOCK${isStartingClue ? ' [STARTING CLUE]' : ''}`)
     await new Promise((r) => setTimeout(r, 2500))
-    return _mockClueResult(chainId, locationIdx, clueIndex, null, null, isStartingClue)
+    return _mockClueResult(cityId, locationIdx, clueIndex, null, null, isStartingClue)
   }
 
   // Try real contract call; fall back to mock if GM is unreachable
@@ -1394,7 +1431,7 @@ export async function cityNodeRequestClue(chainId, locationIdx, clueIndex, isSta
       const timeout = setTimeout(() => {
         cleanup()
         console.warn(`[cityNode] GM resolve timeout — using mock clue for location ${locationIdx}, clue ${clueIndex}`)
-        resolve(_mockClueResult(chainId, locationIdx, clueIndex, receipt.hash, receipt.blockNumber))
+        resolve(_mockClueResult(cityId, locationIdx, clueIndex, receipt.hash, receipt.blockNumber))
       }, 15_000)
 
       let clueUnsub, deadEndUnsub
@@ -1440,7 +1477,7 @@ export async function cityNodeRequestClue(chainId, locationIdx, clueIndex, isSta
   } catch (err) {
     console.warn(`[cityNode] requestClue real call failed for chain ${chainId}, using mock:`, err.message)
     await new Promise((r) => setTimeout(r, 2000))
-    return _mockClueResult(chainId, locationIdx, clueIndex)
+    return _mockClueResult(cityId, locationIdx, clueIndex)
   }
 }
 
@@ -1448,7 +1485,8 @@ export async function cityNodeRequestClue(chainId, locationIdx, clueIndex, isSta
  * Flag a transaction reference.
  * Direct tx. Contract takes bytes32 refId.
  */
-export async function cityNodeFlagTx(chainId, refId) {
+export async function cityNodeFlagTx(cityId, refId) {
+  const chainId = resolveChainId(cityId)
   if (!isCityNodeConfigured(chainId)) {
     console.log(`[cityNode] flagTx(${refId}) on chain ${chainId} — MOCK`)
     await new Promise((r) => setTimeout(r, 1000))
@@ -1471,7 +1509,8 @@ export async function cityNodeFlagTx(chainId, refId) {
  * Request a dossier (evidence summary analysis).
  * Async tx — sends request, then waits for DossierResolved event.
  */
-export async function cityNodeRequestDossier(chainId) {
+export async function cityNodeRequestDossier(cityId) {
+  const chainId = resolveChainId(cityId)
   if (!isCityNodeConfigured(chainId)) {
     console.log(`[cityNode] requestDossier() on chain ${chainId} — MOCK`)
     await new Promise((r) => setTimeout(r, 3000))
@@ -1544,7 +1583,8 @@ export async function cityNodeRequestDossier(chainId) {
  * Request capture of a suspect wallet.
  * Async tx — sends request, then waits for CaptureResolved event.
  */
-export async function cityNodeRequestCapture(chainId, suspectWallet, evidenceBundleHash) {
+export async function cityNodeRequestCapture(cityId, suspectWallet, evidenceBundleHash) {
+  const chainId = resolveChainId(cityId)
   if (!isCityNodeConfigured(chainId)) {
     console.log(`[cityNode] requestCapture(${suspectWallet}) on chain ${chainId} — MOCK`)
     await new Promise((r) => setTimeout(r, 3500))
@@ -1620,7 +1660,8 @@ export async function cityNodeRequestCapture(chainId, suspectWallet, evidenceBun
  * Listen for CityNode gameplay events for a specific player.
  * Returns an unsubscribe function.
  */
-export async function onCityNodeEvents(chainId, playerAddress, callbacks) {
+export async function onCityNodeEvents(cityId, playerAddress, callbacks) {
+  const chainId = resolveChainId(cityId)
   const contract = getCityNodeGameplayContract(chainId)
   if (!contract) return () => {}
 

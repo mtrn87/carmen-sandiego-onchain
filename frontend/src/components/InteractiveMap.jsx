@@ -219,7 +219,7 @@ export default function InteractiveMap({ onSelectCase }) {
                       onClick={(e) => {
                         e.stopPropagation()
                         setSelectedMarker(null)
-                        onSelectCase?.({ ...c, locationIdx: caseIdx })
+                        onSelectCase?.({ ...c, cityId: loc.id, locationIdx: caseIdx })
                       }}
                     >
                       <div className={styles.caseImageWrap}>

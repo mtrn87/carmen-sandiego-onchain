@@ -10,6 +10,7 @@ import MissionPlotModal from '../components/MissionPlotModal'
 import ClueModal from '../components/ClueModal'
 
 import { useGameStore } from '../store/gameStore'
+import { CITY_POOL_MAP } from '../data/cityRegistry'
 import styles from './GamePage.module.css'
 
 export default function GamePage() {
@@ -47,12 +48,12 @@ export default function GamePage() {
 
   const handleSelectCase = (c) => {
     // CityNode cities: load city data and set location index
-    const cityNodeChains = [421614, 84532, 51]
-    if (c?.chainId && cityNodeChains.includes(c.chainId)) {
-      // find location index within the city's cases
+    // Use unique cityId (from InteractiveMap) to identify the city
+    const cityId = c?.cityId
+    if (cityId && CITY_POOL_MAP[cityId]) {
       const locIdx = c.locationIdx ?? 0
-      if (!currentCityId || currentCityId !== c.chainId) {
-        selectCity(c.chainId).then(() => selectLocation(locIdx))
+      if (!currentCityId || currentCityId !== cityId) {
+        selectCity(cityId).then(() => selectLocation(locIdx))
       } else {
         selectLocation(locIdx)
       }
