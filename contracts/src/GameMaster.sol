@@ -6,6 +6,7 @@ import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/V
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {IGameMaster} from "./interfaces/IGameMaster.sol";
 import {IMissionNFT} from "./interfaces/IMissionNFT.sol";
+import {ICityNode} from "./interfaces/ICityNode.sol";
 
 /**
  * @title GameMaster
@@ -29,6 +30,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
     // --- Game Config ---
     uint256 public constant MAX_BLOCKS = 50;           // Max blocks before mission fails
     uint256 public constant MAX_INVESTIGATIONS = 10;   // Max investigation attempts
+    uint8 public constant EVIDENCE_THRESHOLD = 65;     // Clue strength > this = evidence
     uint256[] public validChainIds;                     // Chain IDs representing cities
 
     // --- Game State ---
@@ -39,6 +41,11 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
     mapping(uint256 => uint256) private vrfRequestToMission;            // VRF requestId => missionId
     mapping(uint256 => bytes32) public missionSalts;                    // missionId => salt (for CRE to read)
 
+    // --- Wallet Evidence ---
+    mapping(uint256 => WalletFragment[]) public missionWalletFragments; // missionId => fragments
+    mapping(uint256 => uint8) public missionFragmentCount;              // missionId => fragment count
+    mapping(uint256 => uint8) public missionEvidenceCount;              // missionId => evidence count
+
     // --- Player Registry ---
     mapping(address => bytes) public playerPublicKeys;                  // player => ECIES public key
 
@@ -47,6 +54,12 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
 
     // --- NFT ---
     IMissionNFT public missionNFT;  // Trophy NFT contract (set after deployment)
+
+    // --- CityNode integration ---
+    mapping(address => mapping(bytes32 => uint8)) public playerCityClueCount;  // player => cityNodeId => clue count
+    mapping(address => bytes32[]) public playerIdentityCommits;                // player => identity commit hashes
+    mapping(uint256 => address) public captureRequestCity;                     // capture requestId => CityNode address
+    mapping(address => uint8) public playerCitiesVisited;                      // player => number of cities visited
 
     // ============================================================
     //                      MODIFIERS
@@ -189,21 +202,29 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         uint256 missionId,
         ClueType clueType,
         bytes32 contentHash,
-        string calldata ipfsPointer
+        string calldata ipfsPointer,
+        uint8 strength
     ) external onlyCRE {
         require(missions[missionId].status == MissionStatus.Active, "Mission not active");
+        require(strength <= 100, "Invalid strength");
 
         Clue memory clue = Clue({
             clueType: clueType,
             contentHash: contentHash,
             ipfsPointer: ipfsPointer,
-            timestamp: block.timestamp
+            timestamp: block.timestamp,
+            strength: strength
         });
 
         missionClues[missionId].push(clue);
         missions[missionId].cluesReceived++;
 
-        emit ClueReceived(missionId, clueType, contentHash, ipfsPointer);
+        if (strength > EVIDENCE_THRESHOLD) {
+            missionEvidenceCount[missionId]++;
+            emit EvidenceCollected(missionId, missionEvidenceCount[missionId], strength);
+        }
+
+        emit ClueReceived(missionId, clueType, contentHash, ipfsPointer, strength);
     }
 
     /**
@@ -242,6 +263,104 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
     }
 
     // ============================================================
+    //               CITYNODE INTEGRATION
+    // ============================================================
+
+    /**
+     * @notice Resolve a clue request on a CityNode. Called by CRE/operator.
+     *         GameMaster acts as the trusted intermediary between CRE and CityNodes.
+     * @param cityNode Address of the CityNode contract.
+     * @param requestId The clue request ID on the CityNode.
+     * @param clueType The type of clue (ICityNode.ClueType enum value).
+     * @param clueDataHash Hash of the clue data.
+     * @param anomalyRefId Related anomaly reference ID.
+     */
+    function resolveClueOnCity(
+        address cityNode,
+        uint256 requestId,
+        uint8 clueType,
+        bytes32 clueDataHash,
+        bytes32 anomalyRefId
+    ) external onlyCRE {
+        require(cityNode != address(0), "Invalid city node");
+
+        ICityNode(cityNode).resolveClue(requestId, clueType, clueDataHash, anomalyRefId);
+
+        emit ClueResolvedOnCity(cityNode, requestId, clueType, clueDataHash);
+    }
+
+    /**
+     * @notice Resolve a dossier request on a CityNode.
+     * @param cityNode Address of the CityNode contract.
+     * @param requestId The dossier request ID.
+     * @param dossierHash Hash of the dossier content.
+     * @param confidence Confidence level (0-100).
+     * @param nextObjectiveHintHash Hash of the next objective hint.
+     */
+    function resolveDossierOnCity(
+        address cityNode,
+        uint256 requestId,
+        bytes32 dossierHash,
+        uint8 confidence,
+        bytes32 nextObjectiveHintHash
+    ) external onlyCRE {
+        require(cityNode != address(0), "Invalid city node");
+
+        ICityNode(cityNode).resolveDossier(requestId, dossierHash, confidence, nextObjectiveHintHash);
+
+        emit DossierResolvedOnCity(cityNode, requestId, dossierHash, confidence);
+    }
+
+    /**
+     * @notice Resolve a capture request on a CityNode.
+     * @param cityNode Address of the CityNode contract.
+     * @param requestId The capture request ID.
+     * @param success Whether the capture was successful.
+     * @param reasonCode Reason code for the result.
+     * @param gmNoteHash Hash of the GM's note.
+     */
+    function resolveCaptureOnCity(
+        address cityNode,
+        uint256 requestId,
+        bool success,
+        uint8 reasonCode,
+        bytes32 gmNoteHash
+    ) external onlyCRE {
+        require(cityNode != address(0), "Invalid city node");
+
+        ICityNode(cityNode).resolveCapture(requestId, success, reasonCode, gmNoteHash);
+
+        captureRequestCity[requestId] = cityNode;
+
+        emit CaptureResolvedOnCity(cityNode, requestId, success, reasonCode);
+    }
+
+    /**
+     * @notice Track a player's clue progress for a specific city.
+     *         Called by CRE after resolving a clue to update global state.
+     * @param player The player address.
+     * @param cityNodeId Identifier for the city (bytes32 hash of cityNode address).
+     * @param identityCommitHash If the clue is an identity commit, store it.
+     */
+    function trackPlayerClue(
+        address player,
+        bytes32 cityNodeId,
+        bytes32 identityCommitHash
+    ) external onlyCRE {
+        playerCityClueCount[player][cityNodeId]++;
+
+        // if first clue on this city, increment cities visited
+        if (playerCityClueCount[player][cityNodeId] == 1) {
+            playerCitiesVisited[player]++;
+        }
+
+        // store identity commit if provided
+        if (identityCommitHash != bytes32(0)) {
+            playerIdentityCommits[player].push(identityCommitHash);
+        }
+    }
+
+    // ============================================================
     //                   VRF CALLBACK
     // ============================================================
 
@@ -270,6 +389,85 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         missions[missionId].targetHash = keccak256(abi.encodePacked(targetChainId, salt));
 
         emit CarmenLocationCommitted(missionId, missions[missionId].targetHash);
+    }
+
+    // ============================================================
+    //               WALLET EVIDENCE (CRE CALLBACKS)
+    // ============================================================
+
+    /**
+     * @notice Called by CRE to deliver a wallet fragment for a correct investigation.
+     * @param missionId The mission this fragment belongs to.
+     * @param startIndex Position in the 40-char hex address where fragment starts.
+     * @param length Number of hex chars revealed (typically 5).
+     * @param contentHash Hash of the fragment content for verification.
+     * @param ipfsPointer IPFS CID for the encrypted fragment.
+     */
+    function receiveWalletFragment(
+        uint256 missionId,
+        uint8 startIndex,
+        uint8 length,
+        bytes32 contentHash,
+        string calldata ipfsPointer
+    ) external onlyCRE {
+        require(missions[missionId].status == MissionStatus.Active, "Mission not active");
+        require(startIndex + length <= 40, "Fragment out of bounds");
+
+        WalletFragment memory fragment = WalletFragment({
+            startIndex: startIndex,
+            length: length,
+            contentHash: contentHash,
+            ipfsPointer: ipfsPointer,
+            timestamp: block.timestamp
+        });
+
+        missionWalletFragments[missionId].push(fragment);
+        uint8 fragmentIndex = missionFragmentCount[missionId];
+        missionFragmentCount[missionId] = fragmentIndex + 1;
+
+        emit WalletFragmentReceived(missionId, fragmentIndex, startIndex, length, contentHash, ipfsPointer);
+    }
+
+    /**
+     * @notice Called by CRE to resolve a wallet-based capture attempt.
+     *         Derives Carmen's wallet from salt and verifies the player's submission.
+     * @param missionId The mission to resolve.
+     * @param submittedWallet The wallet address the player reconstructed.
+     * @param revealedChainId The actual chain where Carmen was hiding.
+     * @param salt The salt used in the commit hash.
+     */
+    function resolveWalletCapture(
+        uint256 missionId,
+        address submittedWallet,
+        uint256 revealedChainId,
+        bytes32 salt
+    ) external onlyCRE {
+        Mission storage mission = missions[missionId];
+        require(mission.status == MissionStatus.Active, "Mission not active");
+        require(missionFragmentCount[missionId] >= 3, "Need 3+ fragments");
+
+        // Verify chain reveal matches commit
+        bytes32 expectedHash = keccak256(abi.encodePacked(revealedChainId, salt));
+        require(expectedHash == mission.targetHash, "Invalid reveal");
+
+        // Derive Carmen's wallet and check match
+        address carmenWallet = deriveCarmenWallet(salt);
+        bool valid = submittedWallet == carmenWallet;
+
+        emit WalletCaseBuilt(missionId, mission.player, submittedWallet, valid);
+
+        if (valid) {
+            _captureCarmen(missionId, revealedChainId);
+        }
+    }
+
+    /**
+     * @notice Derive Carmen's wallet address deterministically from a mission salt.
+     * @param salt The VRF-derived salt for the mission.
+     * @return The deterministic Carmen wallet address.
+     */
+    function deriveCarmenWallet(bytes32 salt) public pure returns (address) {
+        return address(uint160(uint256(keccak256(abi.encodePacked(salt, "carmen-wallet")))));
     }
 
     // ============================================================
@@ -304,6 +502,56 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
 
     function getMissionSalt(uint256 missionId) external view returns (bytes32) {
         return missionSalts[missionId];
+    }
+
+    function getMissionWalletFragments(uint256 missionId) external view returns (WalletFragment[] memory) {
+        return missionWalletFragments[missionId];
+    }
+
+    function getMissionFragmentCount(uint256 missionId) external view returns (uint8) {
+        return missionFragmentCount[missionId];
+    }
+
+    function getMissionEvidenceCount(uint256 missionId) external view returns (uint8) {
+        return missionEvidenceCount[missionId];
+    }
+
+    /**
+     * @notice Get a player's global progress across all cities.
+     * @param player The player address.
+     * @return citiesVisited Number of unique cities visited.
+     * @return totalClues Total clue count (sum of all cities' identity commits).
+     * @return identityCommitsCount Number of identity commits collected.
+     */
+    function getPlayerGlobalProgress(address player)
+        external
+        view
+        returns (uint8 citiesVisited, uint256 totalClues, uint256 identityCommitsCount)
+    {
+        return (
+            playerCitiesVisited[player],
+            playerIdentityCommits[player].length,
+            playerIdentityCommits[player].length
+        );
+    }
+
+    /**
+     * @notice Get a player's identity commits.
+     * @param player The player address.
+     * @return commits Array of identity commit hashes.
+     */
+    function getPlayerIdentityCommits(address player) external view returns (bytes32[] memory) {
+        return playerIdentityCommits[player];
+    }
+
+    /**
+     * @notice Get a player's clue count for a specific city.
+     * @param player The player address.
+     * @param cityNodeId City identifier hash.
+     * @return count Number of clues found in this city.
+     */
+    function getPlayerCityClueCount(address player, bytes32 cityNodeId) external view returns (uint8) {
+        return playerCityClueCount[player][cityNodeId];
     }
 
     // ============================================================

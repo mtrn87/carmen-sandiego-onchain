@@ -3,11 +3,14 @@
  * All functions return sensible defaults. Override per-test with mockResolvedValueOnce.
  */
 
-export const CITY_MAP = {
-  421614: { name: 'Tokyo', chain: 'Arbitrum Sepolia', color: '#28a0f0', emoji: '\u{1F5FE}' },
-  84532:  { name: 'Paris', chain: 'Base Sepolia',     color: '#0052ff', emoji: '\u{1F5FC}' },
-  51:     { name: 'London', chain: 'XDC Apothem',     color: '#ff6b00', emoji: '\u{1F3A1}' },
-}
+import { CITY_POOL_MAP } from '../../data/cityRegistry'
+
+export const CITY_MAP = Object.fromEntries(
+  Object.entries(CITY_POOL_MAP).map(([id, city]) => [
+    Number(id),
+    { name: city.name, chain: city.chain, color: city.chainColor, emoji: city.flag },
+  ])
+)
 
 export const GAME_MASTER_ADDRESS = '0xB6E2A9DEd3352E1a1B4a501c6F110813883F4cEB'
 export const SEPOLIA_CHAIN_ID = 11155111
@@ -41,3 +44,24 @@ export const getSigner = vi.fn(async () => ({
 }))
 export const getContract = vi.fn()
 export const getReadContract = vi.fn()
+
+// CityNode gameplay mocks
+export const getCityNodeInfo = vi.fn(async () => ({ city: 'Mock', countryCode: 'XX', chainId: 421614, cityId: 421614, suspicionLevel: 50, suspicionReasonHash: '0x0' }))
+export const getCityNodeLocations = vi.fn(async () => [])
+export const getCityNodeAnomalyTxRefs = vi.fn(async () => [])
+export const getCityNodeSuspectWallets = vi.fn(async () => [])
+export const getCityNodeEvidenceSummary = vi.fn(async () => ({ totalClues: 0, bundleHashLike: '0x0', confidence: 0 }))
+export const cityNodeInspectLocation = vi.fn(async () => ({ hash: '0xmock', blockNumber: 1, noteHash: '0x0' }))
+export const cityNodeScanAnomalies = vi.fn(async () => ({ hash: '0xmock', blockNumber: 1, anomaliesFound: 2, suspectsFound: 1 }))
+export const cityNodeRequestClue = vi.fn(async () => ({ hash: '0xmock', clueType: 'BEHAVIOR_FINGERPRINT', clueData: 'mock', strength: 50, anomalyRefId: '0x0' }))
+export const cityNodeFlagTx = vi.fn(async () => ({ hash: '0xmock' }))
+export const cityNodeRequestDossier = vi.fn(async () => ({ hash: '0xmock', summary: 'mock', hypotheses: [], gaps: [], nextObjective: '', confidence: 50 }))
+export const cityNodeRequestCapture = vi.fn(async () => ({ hash: '0xmock', success: true, reasonCode: 'OK', gmNote: 'Captured!' }))
+export const onCityNodeEvents = vi.fn(async () => vi.fn())
+export const buildLocationTransactions = vi.fn((chainId, locationIdx, anomalyTxRefs, numLocations, carmenWallet, carmenLocationIdx) => [])
+export const onWalletFragmentReceived = vi.fn(async () => vi.fn())
+export const onWalletCaseBuilt = vi.fn(async () => vi.fn())
+export const onEvidenceCollected = vi.fn(async () => vi.fn())
+export const getMissionWalletFragments = vi.fn(async () => [])
+export const getMissionFragmentCount = vi.fn(async () => 0)
+export const getMissionEvidenceCount = vi.fn(async () => 0)

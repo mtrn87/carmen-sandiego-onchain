@@ -59,7 +59,7 @@ describe("Carmen Sandiego - Full Game E2E (Commit-Reveal)", function () {
   async function deliverClue(missionId: number | bigint, clueType: number = 0) {
     const hash = ethers.keccak256(ethers.toUtf8Bytes(`clue-${missionId}-${Date.now()}-${Math.random()}`));
     const ipfs = clueType >= 1 ? "QmEncryptedContent" : "";
-    await gameMaster.connect(creOracle).receiveClue(missionId, clueType, hash, ipfs);
+    await gameMaster.connect(creOracle).receiveClue(missionId, clueType, hash, ipfs, 50);
   }
 
   beforeEach(async function () {
@@ -105,9 +105,9 @@ describe("Carmen Sandiego - Full Game E2E (Commit-Reveal)", function () {
 
     // 7. Deploy CityNode contracts
     const CityNodeFactory = await ethers.getContractFactory("CityNode");
-    cityTokyo = await CityNodeFactory.deploy("Tokyo", ARBITRUM_SEPOLIA, creOracle.address) as CityNode;
-    cityParis = await CityNodeFactory.deploy("Paris", BASE_SEPOLIA, creOracle.address) as CityNode;
-    cityLondon = await CityNodeFactory.deploy("London", XDC_APOTHEM, creOracle.address) as CityNode;
+    cityTokyo = await CityNodeFactory.deploy("Tokyo", "JP", ARBITRUM_SEPOLIA, 1, creOracle.address) as CityNode;
+    cityParis = await CityNodeFactory.deploy("Paris", "FR", BASE_SEPOLIA, 2, creOracle.address) as CityNode;
+    cityLondon = await CityNodeFactory.deploy("London", "GB", XDC_APOTHEM, 3, creOracle.address) as CityNode;
   });
 
   // ============================================================

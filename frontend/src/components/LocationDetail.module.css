@@ -1,0 +1,244 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.backBtn {
+  background: rgba(0, 240, 255, 0.06);
+  border: 1px solid rgba(0, 240, 255, 0.15);
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.backBtn:hover {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: rgba(0, 240, 255, 0.3);
+}
+
+.headerInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.category {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.name {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.risk {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.riskLabel {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+}
+
+.riskValue {
+  font-size: 0.8rem;
+  font-weight: bold;
+  font-family: var(--font-mono);
+}
+
+.riskLow { color: var(--green); }
+.riskMed { color: var(--yellow); }
+.riskHigh { color: var(--red); }
+
+.description {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  border-left: 2px solid rgba(0, 240, 255, 0.15);
+  padding-left: 10px;
+}
+
+/* progress indicator */
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 8px 0;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+.stepDone { color: var(--green); }
+
+.stepDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--text-muted);
+  flex-shrink: 0;
+}
+
+.stepDone .stepDot {
+  background: var(--green);
+  border-color: var(--green);
+  box-shadow: 0 0 6px rgba(5, 255, 161, 0.4);
+}
+
+.stepLine {
+  flex: 1;
+  height: 1px;
+  background: rgba(0, 240, 255, 0.1);
+  margin: 0 6px;
+}
+
+/* clue slots */
+.clueSlots {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.slotsLabel {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+}
+
+.slots {
+  display: flex;
+  gap: 8px;
+}
+
+.slot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border: 1px dashed rgba(0, 240, 255, 0.15);
+  background: rgba(0, 240, 255, 0.02);
+  min-height: 60px;
+  justify-content: center;
+}
+
+.slotFilled {
+  border-style: solid;
+  border-color: var(--cyan);
+  background: rgba(0, 240, 255, 0.06);
+}
+
+.slotDeadEnd {
+  border-color: var(--red);
+  background: rgba(255, 42, 109, 0.04);
+}
+
+.slotIcon { font-size: 1.1rem; }
+
+.slotType {
+  font-size: 0.55rem;
+  color: var(--cyan);
+  letter-spacing: 1px;
+  text-align: center;
+}
+
+.slotDeadEnd .slotType { color: var(--red); }
+
+.slotStrength {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+}
+
+.slotEmpty {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  opacity: 0.3;
+}
+
+.slotEmptyLabel {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  opacity: 0.3;
+  letter-spacing: 2px;
+}
+
+/* action buttons */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.actionBtn {
+  flex: 1 1 calc(50% - 3px);
+  min-width: 120px;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 1px;
+  color: var(--cyan);
+  background: rgba(0, 240, 255, 0.04);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.actionBtn:hover:not(:disabled) {
+  background: rgba(0, 240, 255, 0.1);
+  border-color: rgba(0, 240, 255, 0.4);
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+}
+
+.actionBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.actionDone {
+  color: var(--green);
+  border-color: rgba(5, 255, 161, 0.2);
+  background: rgba(5, 255, 161, 0.04);
+}
+
+.clueBtn {
+  flex: 1 1 calc(33% - 4px);
+  min-width: 100px;
+}

@@ -579,6 +579,50 @@
   font-size: 0.62rem;
 }
 
+/* ── capture mode effects ── */
+.txTableCapture {
+  border-color: rgba(255, 42, 109, 0.2);
+  box-shadow: 0 0 20px rgba(255, 42, 109, 0.08);
+}
+
+.txRowCapture {
+  animation: capturePulse 2s ease-in-out infinite;
+  border-bottom: 1px solid rgba(255, 42, 109, 0.12) !important;
+}
+
+.txRowCapture:nth-child(odd) {
+  animation-delay: 0.3s;
+}
+
+@keyframes capturePulse {
+  0%, 100% { border-color: rgba(255, 42, 109, 0.08); background: transparent; }
+  50% { border-color: rgba(255, 42, 109, 0.25); background: rgba(255, 42, 109, 0.03); }
+}
+
+.walletHighlight {
+  color: var(--red) !important;
+  text-shadow: 0 0 6px rgba(255, 42, 109, 0.4);
+  animation: walletBlink 1.5s ease-in-out infinite;
+}
+
+@keyframes walletBlink {
+  0%, 100% { opacity: 1; text-shadow: 0 0 6px rgba(255, 42, 109, 0.4); }
+  50% { opacity: 0.6; text-shadow: 0 0 12px rgba(255, 42, 109, 0.7); }
+}
+
+.txCaptureSelected {
+  background: rgba(255, 42, 109, 0.1) !important;
+  border-left: 3px solid var(--red) !important;
+  box-shadow: 0 0 12px rgba(255, 42, 109, 0.15);
+}
+
+.anomalyUnknown {
+  color: var(--text-muted);
+  opacity: 0.35;
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
 /* ── placeholder sections ── */
 .placeholderSection {
   display: flex;
@@ -1066,6 +1110,264 @@
 
 .strengthCold {
   color: var(--text-muted);
+}
+
+/* ── back button (CityNode top bar / location) ── */
+.backBtn {
+  background: none;
+  border: 1px solid rgba(0, 240, 255, 0.15);
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.backBtn:hover {
+  background: rgba(0, 240, 255, 0.08);
+  border-color: rgba(0, 240, 255, 0.3);
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+}
+
+/* ── FLAG tx button in anomaly rows ── */
+.flagTxBtn {
+  padding: 3px 8px;
+  background: rgba(255, 42, 109, 0.08);
+  border: 1px solid rgba(255, 42, 109, 0.25);
+  color: var(--red);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.flagTxBtn:hover:not(:disabled) {
+  background: rgba(255, 42, 109, 0.18);
+  border-color: rgba(255, 42, 109, 0.5);
+  text-shadow: 0 0 6px rgba(255, 42, 109, 0.4);
+}
+
+.flagTxBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ── CityNode Contract Methods (Contract tab) ── */
+.contractMethodsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.methodGroupHeader {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  color: var(--cyan);
+  letter-spacing: 3px;
+  padding: 10px 0 4px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.08);
+  opacity: 0.7;
+}
+
+.methodCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid rgba(0, 240, 255, 0.06);
+  transition: border-color 0.2s ease;
+}
+
+.methodCard:hover {
+  border-color: rgba(0, 240, 255, 0.15);
+}
+
+.methodCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.methodSig {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--cyan);
+  letter-spacing: 0.3px;
+}
+
+.methodDesc {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.methodQueryBtn {
+  align-self: flex-start;
+  padding: 5px 14px;
+  background: rgba(0, 240, 255, 0.04);
+  border: 1px solid rgba(0, 240, 255, 0.15);
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.methodQueryBtn:hover:not(:disabled) {
+  background: rgba(0, 240, 255, 0.1);
+  border-color: rgba(0, 240, 255, 0.35);
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+}
+
+.methodQueryBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.methodExecBtn {
+  align-self: flex-start;
+  padding: 5px 14px;
+  background: rgba(255, 230, 0, 0.05);
+  border: 1px solid rgba(255, 230, 0, 0.2);
+  color: var(--yellow);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.methodExecBtn:hover:not(:disabled) {
+  background: rgba(255, 230, 0, 0.12);
+  border-color: rgba(255, 230, 0, 0.45);
+  text-shadow: 0 0 8px rgba(255, 230, 0, 0.4);
+}
+
+.methodExecBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.methodDone {
+  background: rgba(5, 255, 161, 0.05);
+  border-color: rgba(5, 255, 161, 0.2);
+  color: var(--green);
+}
+
+.methodDone:hover:not(:disabled) {
+  background: rgba(5, 255, 161, 0.05);
+  border-color: rgba(5, 255, 161, 0.2);
+  text-shadow: none;
+  cursor: default;
+}
+
+.methodResultWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.resultToggle {
+  display: flex;
+  align-self: flex-start;
+  border: 1px solid rgba(0, 240, 255, 0.1);
+  border-bottom: none;
+}
+
+.toggleBtn {
+  padding: 4px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.2);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggleBtn:hover {
+  color: var(--text-primary);
+  background: rgba(0, 240, 255, 0.04);
+}
+
+.toggleActive {
+  color: var(--cyan);
+  background: rgba(0, 240, 255, 0.08);
+}
+
+.analysisResult {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 240, 255, 0.06);
+  animation: fadeIn 0.3s ease;
+}
+
+.analysisHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.06);
+}
+
+.analysisTitle {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  color: var(--cyan);
+  letter-spacing: 1.5px;
+}
+
+.analysisStatus {
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 1.5px;
+  flex-shrink: 0;
+}
+
+.analysisText {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-primary);
+  line-height: 1.7;
+  opacity: 0.85;
+}
+
+.methodResult {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 240, 255, 0.06);
+  padding: 10px 12px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+.methodResult::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.methodResult::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.12);
+  border-radius: 2px;
 }
 
 /* ── tour highlight ── */
