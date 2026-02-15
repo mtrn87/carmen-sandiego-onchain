@@ -16,6 +16,7 @@ contract MissionNFT is ERC721, ERC721URIStorage, IMissionNFT {
     address public immutable gameMaster;
 
     mapping(uint256 => MissionRecord) private _missionRecords;
+    mapping(uint256 => uint256) public missionToTokenId; // missionId => tokenId
 
     modifier onlyGameMaster() {
         require(msg.sender == gameMaster, "Not GameMaster");
@@ -45,6 +46,7 @@ contract MissionNFT is ERC721, ERC721URIStorage, IMissionNFT {
             _setTokenURI(tokenId, uri);
         }
         _missionRecords[tokenId] = record;
+        missionToTokenId[record.missionId] = tokenId;
 
         emit MissionNFTMinted(tokenId, record.missionId, player, record.reward);
         return tokenId;

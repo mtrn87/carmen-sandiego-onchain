@@ -581,6 +581,20 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         validChainIds = _chainIds;
     }
 
+    /**
+     * @notice Called by CRE to set the token URI for a mission's trophy NFT.
+     *         Used by the generate-finale workflow to attach AI-generated metadata.
+     * @param missionId The mission whose NFT URI to set.
+     * @param uri The metadata URI (data URI or IPFS CID).
+     */
+    function setMissionTokenURI(uint256 missionId, string calldata uri) external onlyCRE {
+        require(address(missionNFT) != address(0), "MissionNFT not set");
+        uint256 tokenId = missionNFT.missionToTokenId(missionId);
+        require(tokenId != 0, "No NFT for mission");
+        missionNFT.setTokenURIByCRE(tokenId, uri);
+        emit TokenURISet(missionId, tokenId);
+    }
+
     // ============================================================
     //                   INTERNAL FUNCTIONS
     // ============================================================

@@ -509,6 +509,27 @@ describe("Carmen Sandiego - Full Game E2E (Commit-Reveal)", function () {
       expect(r1.capturedChainId).to.equal(ARBITRUM_SEPOLIA);
       expect(r2.capturedChainId).to.equal(BASE_SEPOLIA);
     });
+
+    it("should set token URI via setMissionTokenURI after capture", async function () {
+      const missionId = await setupMission(player, 3);
+      await deliverClue(missionId, 0);
+      await deliverClue(missionId, 1);
+      await deliverClue(missionId, 2);
+
+      const { salt } = computeTargetHash(ARBITRUM_SEPOLIA, 3, Number(missionId));
+      await gameMaster.connect(creOracle).resolveCapture(missionId, ARBITRUM_SEPOLIA, salt);
+
+      // Verify missionToTokenId mapping
+      const tokenId = await missionNFT.missionToTokenId(missionId);
+      expect(tokenId).to.equal(1);
+
+      // Set token URI (simulating generate-finale CRE workflow)
+      const metadataUri = "data:application/json;base64,eyJuYW1lIjoiQ2FybWVuIFNhbmRpZWdvIE1pc3Npb24gIzEiLCJkZXNjcmlwdGlvbiI6IkdPTEQgUkFOSyJ9";
+      await gameMaster.connect(creOracle).setMissionTokenURI(missionId, metadataUri);
+
+      // Verify URI was set on the NFT
+      expect(await missionNFT.tokenURI(tokenId)).to.equal(metadataUri);
+    });
   });
 
   // ============================================================

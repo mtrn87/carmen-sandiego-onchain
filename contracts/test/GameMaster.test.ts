@@ -949,4 +949,124 @@ describe("GameMaster", function () {
       expect(clues[0].strength).to.equal(77);
     });
   });
+
+  // ============================================================
+  //          SET MISSION TOKEN URI
+  // ============================================================
+
+  describe("setMissionTokenURI", function () {
+    it("should set token URI after capture", async function () {
+      // Deploy full setup: VRF, GameMaster, MissionNFT
+      const VRFMock = await ethers.getContractFactory("VRFCoordinatorV2PlusMock");
+      const vrfCoordinator = await VRFMock.deploy(0, 0, 0);
+      const createSubTx = await vrfCoordinator.createSubscription();
+      const createSubReceipt = await createSubTx.wait();
+      const subCreatedEvent = createSubReceipt?.logs.find((log: any) => {
+        try {
+          return vrfCoordinator.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "SubscriptionCreated";
+        } catch { return false; }
+      });
+      const subId = vrfCoordinator.interface.parseLog({
+        topics: [...subCreatedEvent!.topics], data: subCreatedEvent!.data
+      })!.args[0];
+      await vrfCoordinator.fundSubscription(subId, 1000000);
+
+      const GMFactory = await ethers.getContractFactory("GameMaster");
+      const gm = await GMFactory.deploy(
+        await vrfCoordinator.getAddress(), subId, VRF_KEY_HASH, validChainIds, creOracle.address
+      ) as GameMaster;
+      await gm.waitForDeployment();
+      await vrfCoordinator.addConsumer(subId, await gm.getAddress());
+
+      const NFTFactory = await ethers.getContractFactory("MissionNFT");
+      const nft = await NFTFactory.deploy(await gm.getAddress());
+      await nft.waitForDeployment();
+      await gm.connect(owner).setMissionNFT(await nft.getAddress());
+
+      // Start mission and capture
+      await gm.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm.connect(player).startMission();
+      const missionId = await gm.getPlayerActiveMission(player.address);
+      await vrfCoordinator.fulfillRandomWordsWithOverride(missionId, await gm.getAddress(), [42]);
+
+      const salt = await gm.getMissionSalt(missionId);
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("clue"));
+      await gm.connect(creOracle).receiveClue(missionId, 0, contentHash, "ipfs://1", 50);
+      await gm.connect(creOracle).receiveClue(missionId, 0, contentHash, "ipfs://2", 50);
+      await gm.connect(creOracle).receiveClue(missionId, 0, contentHash, "ipfs://3", 50);
+
+      // Capture (VRF word 42 % 2 = 0 → ARBITRUM_SEPOLIA)
+      await gm.connect(creOracle).resolveCapture(missionId, ARBITRUM_SEPOLIA, salt);
+
+      // Verify NFT minted
+      const tokenId = await nft.missionToTokenId(missionId);
+      expect(tokenId).to.be.gt(0);
+
+      // Set token URI
+      const uri = "data:application/json;base64,eyJuYW1lIjoiVGVzdCJ9";
+      await gm.connect(creOracle).setMissionTokenURI(missionId, uri);
+
+      // Verify URI was set
+      expect(await nft.tokenURI(tokenId)).to.equal(uri);
+    });
+
+    it("should emit TokenURISet event", async function () {
+      const VRFMock = await ethers.getContractFactory("VRFCoordinatorV2PlusMock");
+      const vrfCoordinator = await VRFMock.deploy(0, 0, 0);
+      const createSubTx = await vrfCoordinator.createSubscription();
+      const createSubReceipt = await createSubTx.wait();
+      const subCreatedEvent = createSubReceipt?.logs.find((log: any) => {
+        try {
+          return vrfCoordinator.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "SubscriptionCreated";
+        } catch { return false; }
+      });
+      const subId = vrfCoordinator.interface.parseLog({
+        topics: [...subCreatedEvent!.topics], data: subCreatedEvent!.data
+      })!.args[0];
+      await vrfCoordinator.fundSubscription(subId, 1000000);
+
+      const GMFactory = await ethers.getContractFactory("GameMaster");
+      const gm = await GMFactory.deploy(
+        await vrfCoordinator.getAddress(), subId, VRF_KEY_HASH, validChainIds, creOracle.address
+      ) as GameMaster;
+      await gm.waitForDeployment();
+      await vrfCoordinator.addConsumer(subId, await gm.getAddress());
+
+      const NFTFactory = await ethers.getContractFactory("MissionNFT");
+      const nft = await NFTFactory.deploy(await gm.getAddress());
+      await nft.waitForDeployment();
+      await gm.connect(owner).setMissionNFT(await nft.getAddress());
+
+      await gm.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm.connect(player).startMission();
+      const missionId = await gm.getPlayerActiveMission(player.address);
+      await vrfCoordinator.fulfillRandomWordsWithOverride(missionId, await gm.getAddress(), [42]);
+
+      const salt = await gm.getMissionSalt(missionId);
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("clue"));
+      await gm.connect(creOracle).receiveClue(missionId, 0, contentHash, "ipfs://1", 50);
+      await gm.connect(creOracle).receiveClue(missionId, 0, contentHash, "ipfs://2", 50);
+      await gm.connect(creOracle).receiveClue(missionId, 0, contentHash, "ipfs://3", 50);
+      await gm.connect(creOracle).resolveCapture(missionId, ARBITRUM_SEPOLIA, salt);
+
+      const tokenId = await nft.missionToTokenId(missionId);
+      const uri = "data:application/json;base64,dGVzdA==";
+
+      await expect(gm.connect(creOracle).setMissionTokenURI(missionId, uri))
+        .to.emit(gm, "TokenURISet")
+        .withArgs(missionId, tokenId);
+    });
+
+    it("should reject setMissionTokenURI from non-CRE", async function () {
+      await expect(
+        gameMaster.connect(player).setMissionTokenURI(1, "test-uri")
+      ).to.be.revertedWith("Not CRE oracle");
+    });
+
+    it("should reject setMissionTokenURI without MissionNFT set", async function () {
+      await expect(
+        gameMaster.connect(creOracle).setMissionTokenURI(1, "test-uri")
+      ).to.be.revertedWith("MissionNFT not set");
+    });
+  });
 });
