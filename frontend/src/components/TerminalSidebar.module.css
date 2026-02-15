@@ -517,6 +517,48 @@
   100% { transform: scaleY(1); }
 }
 
+/* ── capture button ── */
+.captureBar {
+  display: flex;
+  justify-content: center;
+  padding: 6px 10px;
+  border-top: 1px solid rgba(255, 42, 109, 0.1);
+  flex-shrink: 0;
+}
+
+.captureBtn {
+  background: rgba(255, 42, 109, 0.06);
+  border: 1px solid rgba(255, 42, 109, 0.3);
+  color: var(--red);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  padding: 8px 20px;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+
+.captureBtn:hover {
+  background: rgba(255, 42, 109, 0.12);
+  border-color: rgba(255, 42, 109, 0.5);
+  box-shadow: 0 0 12px rgba(255, 42, 109, 0.2);
+  text-shadow: 0 0 8px rgba(255, 42, 109, 0.5);
+}
+
+.captureBtnActive {
+  background: rgba(255, 42, 109, 0.15);
+  border-color: var(--red);
+  color: #fff;
+  animation: capturePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes capturePulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 42, 109, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(255, 42, 109, 0.4); }
+}
+
 /* ── tour highlight ── */
 .tourHighlight {
   animation: tourPulse 1.5s ease-in-out infinite;

@@ -283,6 +283,29 @@
   gap: 10px;
 }
 
+.cityViewBtn {
+  width: 100%;
+  padding: 10px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--cyan);
+  background: rgba(0, 240, 255, 0.06);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.cityViewBtn:hover {
+  background: rgba(0, 240, 255, 0.14);
+  border-color: rgba(0, 240, 255, 0.5);
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.12);
+}
+
 .investigateBtn {
   width: 100%;
   padding: 14px 16px;

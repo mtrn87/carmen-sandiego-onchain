@@ -51,27 +51,6 @@ function buildTypedLines(scenario) {
     }
   }
 
-  // Cities involved (limited to contractData city registry)
-  const scenarioCities = scenario?.cities || {}
-  const contractCityEntries = Object.entries(CONTRACT_CITY_REGISTRY)
-    .filter(([, baseCity]) => baseCity?.investigable)
-  if (contractCityEntries.length > 0) {
-    lines.push({ text: '', color: 'muted' })
-    lines.push({ text: 'SUSPECTED LOCATIONS:', color: 'red' })
-    for (const [cityId, baseCity] of contractCityEntries) {
-      const scenarioCity = scenarioCities[cityId] || {}
-      const city = {
-        name: scenarioCity.name || baseCity.name,
-        emoji: scenarioCity.emoji || baseCity.emoji,
-        chain: scenarioCity.chain || baseCity.chain,
-      }
-      lines.push({
-        text: `  ${city.emoji} ${city.name} [${city.chain}]`,
-        color: 'red',
-      })
-    }
-  }
-
   lines.push({ text: '', color: 'muted' })
   lines.push({ text: 'Good luck, detective. The entire agency is counting on you.', color: 'yellow' })
 

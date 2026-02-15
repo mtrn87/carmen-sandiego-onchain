@@ -16,11 +16,53 @@ import {
   ensureSepoliaNetwork,
   getSigner,
   CITY_MAP,
+  getCityNodeInfo,
+  getCityNodeLocations,
+  getCityNodeAnomalyTxRefs,
+  getCityNodeSuspectWallets,
+  getCityNodeEvidenceSummary,
+  cityNodeInspectLocation,
+  cityNodeScanAnomalies,
+  cityNodeRequestClue,
+  cityNodeFlagTx,
+  cityNodeRequestDossier,
+  cityNodeRequestCapture,
+  onCityNodeEvents,
+  buildLocationTransactions,
 } from '../services/contractService'
 import { getPublicKeyHex, decryptClue } from '../utils/ecies'
 import scenariosData from '../data/scenarios.json'
 
 const MISSION_PLOT_STORAGE_KEY = 'carmen_current_mission_plot'
+const PROGRESS_STORAGE_KEY = 'carmen_investigation_progress'
+
+function saveProgress(state) {
+  const data = {
+    scannedLocations: state.scannedLocations,
+    blocksElapsed: state.blocksElapsed,
+    currentCityId: state.currentCityId,
+    // per-city location states (inspected/scanned per locationIdx)
+    cityLocationStates: state.cityLocations.map((loc) => ({
+      inspected: loc.inspected || false,
+      scanned: loc.scanned || false,
+    })),
+  }
+  localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(data))
+}
+
+function loadProgress() {
+  try {
+    const raw = localStorage.getItem(PROGRESS_STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+function clearProgress() {
+  localStorage.removeItem(PROGRESS_STORAGE_KEY)
+}
 
 function getScenarioForMission(missionId) {
   const scenarios = scenariosData?.scenarios || []
@@ -167,6 +209,8 @@ export const useGameStore = create((set, get) => ({
   isInvestigating: false,
   showClueModal: false,
   activeClue: null,
+  showCityClueModal: false,
+  activeCityClue: null,
 
   // on-chain events for ContractExplorer
   missionEvents: [],
@@ -179,6 +223,23 @@ export const useGameStore = create((set, get) => ({
   blocksElapsed: 0,
   carmenMovedAlert: false,
   _blockPollInterval: null,
+
+  // ── gameplay loop state ──
+  currentCityId: null,
+  currentCityInfo: null,
+  cityLocations: [],
+  cityAnomalyTxRefs: [],
+  citySuspectWallets: [],
+  cityEvidence: [],
+  currentLocationIdx: null,
+  captureMode: false,
+  captureState: 'ready', // 'ready' | 'pending' | 'success' | 'fail'
+  captureResult: null,
+  showDossierModal: false,
+  dossierData: null,
+  cityViewTab: 'overview', // 'overview' | 'contracts' | 'evidence'
+  gameplayLoading: false,
+  _cityNodeUnsub: null,
 
   // event unsubscribers
   _unsubscribers: [],
@@ -656,33 +717,49 @@ export const useGameStore = create((set, get) => ({
   },
 
   /**
-   * Complete briefing: register player on-chain + start mission.
-   * If there's already an active mission (loaded by initGame), resumes it
-   * without sending a new startMission TX.
+   * Complete briefing: loads game state and enters the game.
+   * The on-chain startMission TX is now triggered from the LoginPage
+   * before navigating here, so this just sets up the gameplay.
    */
   completeBriefing: async () => {
-    const { walletAddress, isRegistered, missionId: existingMissionId } = get()
+    const { walletAddress, missionId: existingMissionId } = get()
 
-    console.log('[completeBriefing] START', { walletAddress, isRegistered, existingMissionId })
+    console.log('[completeBriefing] START', { walletAddress, existingMissionId })
 
-    set((s) => ({
+    set({
       terminalLines: [
         { text: '> ACME MAINFRAME :: INITIALIZING MISSION', color: 'cyan', type: 'system' },
         { text: '> Agent connected. Welcome, Detective.', color: 'green', type: 'system' },
       ],
-    }))
+    })
 
     try {
-      console.log('[completeBriefing] Ensuring Sepolia network...')
       await ensureSepoliaNetwork()
-      console.log('[completeBriefing] Network OK')
 
-      // If initGame already loaded an active mission, just resume it
-      if (existingMissionId) {
-        console.log('[completeBriefing] Resuming existing mission #', existingMissionId)
+      // Try to fetch active mission if we don't have one yet
+      let mId = existingMissionId
+      if (!mId) {
+        try {
+          const signer = await getSigner()
+          const signerAddr = await signer.getAddress()
+          const activeMissionId = await getPlayerActiveMission(signerAddr)
+          if (activeMissionId > 0n) {
+            mId = Number(activeMissionId)
+            const mission = await getMission(mId)
+            set({ missionId: mId, missionData: mission })
+          }
+        } catch (err) {
+          console.warn('[completeBriefing] Could not fetch active mission:', err.message)
+        }
+      }
 
+      // Load first CityNode city + first location
+      await get().selectCity(421614)
+      get().selectLocation(0)
+
+      if (mId) {
         const state = get()
-        state.hydrateMissionPlot(existingMissionId)
+        state.hydrateMissionPlot(mId)
 
         set({
           briefingDone: true,
@@ -690,158 +767,48 @@ export const useGameStore = create((set, get) => ({
           tourStep: 0,
         })
 
-        // Set up event listeners
-        await state._setupEventListeners(existingMissionId)
+        await state._setupEventListeners(mId)
 
+        const firstLoc = get().cityLocations[0]
         set((s) => ({
           terminalLines: [
             ...s.terminalLines,
-            { text: `> RESUMING MISSION #${existingMissionId}. Carmen's location committed.`, color: 'yellow', type: 'alert' },
-            { text: '> Use the MAP to investigate cities and find clues.', color: 'green', type: 'help' },
+            { text: `> MISSION #${mId} ACTIVE. Carmen's location committed.`, color: 'yellow', type: 'alert' },
+            { text: `> LOCATION: ${firstLoc?.name || 'Location 0'} — first clue available here.`, color: 'green', type: 'help' },
             { text: '> Type /MISSION in terminal to read your current assignment.', color: 'cyan', type: 'help' },
           ],
         }))
-
-        console.log('[completeBriefing] DONE (resumed)')
-        return
-      }
-
-      // Register player with ECIES public key if not already registered
-      if (!isRegistered) {
-        console.log('[completeBriefing] Not registered, generating ECIES keys...')
-        set((s) => ({
-          terminalLines: [
-            ...s.terminalLines,
-            { text: '> Generating ECIES encryption keys...', color: 'muted', type: 'system' },
-          ],
-        }))
-
-        const publicKeyHex = await getPublicKeyHex()
-        console.log('[completeBriefing] ECIES pubkey:', publicKeyHex.slice(0, 20) + '...')
-
-        set((s) => ({
-          terminalLines: [
-            ...s.terminalLines,
-            { text: '> Registering agent on-chain...', color: 'muted', type: 'system' },
-          ],
-        }))
-
-        console.log('[completeBriefing] Calling registerPlayer...')
-        const regReceipt = await registerPlayerOnChain(publicKeyHex)
-        console.log('[completeBriefing] registerPlayer TX:', regReceipt?.hash)
-
-        set((s) => ({
-          isRegistered: true,
-          terminalLines: [
-            ...s.terminalLines,
-            { text: '> AGENT REGISTERED. Public key stored on-chain.', color: 'green', type: 'system' },
-          ],
-        }))
       } else {
-        console.log('[completeBriefing] Already registered, skipping')
-      }
-
-      // Start mission (triggers VRF)
-      console.log('[completeBriefing] Calling startMission...')
-      set((s) => ({
-        terminalLines: [
-          ...s.terminalLines,
-          { text: '> Starting new mission (requesting VRF randomness)...', color: 'muted', type: 'system' },
-        ],
-      }))
-
-      const receipt = await startMissionOnChain()
-      console.log('[completeBriefing] startMission TX:', receipt?.hash)
-      console.log('[completeBriefing] TX status:', receipt?.status, '(1=success, 0=reverted)')
-
-      if (receipt?.status === 0) {
-        console.error('[completeBriefing] TX REVERTED on-chain!')
-        set((s) => ({
-          terminalLines: [
-            ...s.terminalLines,
-            { text: '> !! TX REVERTED — startMission failed on-chain.', color: 'red', type: 'alert' },
-          ],
-        }))
-        return
-      }
-
-      set((s) => ({
-        terminalLines: [
-          ...s.terminalLines,
-          { text: `> MISSION TX CONFIRMED: ${receipt.hash}`, color: 'green', type: 'system' },
-          { text: '> Awaiting VRF callback for target location...', color: 'cyan', type: 'system' },
-        ],
-      }))
-
-      // Fetch the newly created mission — use signer address
-      const signer = await getSigner()
-      const signerAddress = await signer.getAddress()
-      console.log('[completeBriefing] walletAddress (store):', walletAddress)
-      console.log('[completeBriefing] signerAddress (actual):', signerAddress)
-
-      const queryAddress = signerAddress || walletAddress
-      console.log('[completeBriefing] Fetching active mission ID for:', queryAddress)
-      const activeMissionId = await getPlayerActiveMission(queryAddress)
-      console.log('[completeBriefing] Active mission ID:', activeMissionId?.toString())
-
-      if (activeMissionId > 0n) {
-        const missionId = Number(activeMissionId)
-        console.log('[completeBriefing] Loading mission data for #', missionId)
-        const mission = await getMission(missionId)
-        console.log('[completeBriefing] Mission data:', mission)
-
+        // No on-chain mission — start in mock/demo mode
         set({
-          missionId,
-          missionData: mission,
           briefingDone: true,
           tourActive: true,
           tourStep: 0,
-          clues: [],
-          evidence: [],
-          currentMission: {
-            id: `mission-${missionId}`,
-            title: `Mission #${missionId}`,
-            description: 'Track Carmen Sandiego across the blockchain.',
-            status: 'active',
-          },
         })
 
-        const state = get()
-        state.hydrateMissionPlot(missionId)
-
-        // Set up event listeners
-        console.log('[completeBriefing] Setting up event listeners...')
-        await state._setupEventListeners(missionId)
-        console.log('[completeBriefing] Event listeners ready')
-
+        const firstLoc = get().cityLocations[0]
         set((s) => ({
           terminalLines: [
             ...s.terminalLines,
-            { text: `> MISSION #${missionId} ACTIVE. Carmen's location committed.`, color: 'yellow', type: 'alert' },
-            { text: '> Use the MAP to investigate cities and find clues.', color: 'green', type: 'help' },
+            { text: '> MISSION INITIALIZED. Carmen is on the move.', color: 'yellow', type: 'alert' },
+            { text: `> LOCATION: ${firstLoc?.name || 'Location 0'} — first clue available here.`, color: 'green', type: 'help' },
             { text: '> Type /MISSION in terminal to read your current assignment.', color: 'cyan', type: 'help' },
           ],
         }))
-      } else {
-        console.warn('[completeBriefing] No active mission found after startMission!')
       }
 
       console.log('[completeBriefing] DONE')
     } catch (error) {
       console.error('[completeBriefing] FAILED:', error)
-      console.error('[completeBriefing] Error details:', {
-        message: error.message,
-        reason: error.reason,
-        code: error.code,
-        data: error.data,
-      })
-      set((s) => ({
+      // Still enter the game even if setup fails
+      set({
+        briefingDone: true,
         terminalLines: [
-          ...s.terminalLines,
-          { text: `> !! ERROR: ${error.reason || error.message}`, color: 'red', type: 'alert' },
-          { text: '> Please check your wallet and try again.', color: 'yellow', type: 'system' },
+          ...get().terminalLines,
+          { text: `> !! WARNING: ${error.message}`, color: 'red', type: 'alert' },
+          { text: '> Entering investigation mode...', color: 'yellow', type: 'system' },
         ],
-      }))
+      })
     }
   },
 
@@ -910,6 +877,7 @@ export const useGameStore = create((set, get) => ({
   },
 
   closeClueModal: () => set({ showClueModal: false, activeClue: null }),
+  closeCityClueModal: () => set({ showCityClueModal: false, activeCityClue: null }),
   closeOutcomeModal: () => set({ showOutcomeModal: false }),
 
   /**
@@ -917,9 +885,10 @@ export const useGameStore = create((set, get) => ({
    * Resets game state and goes back to briefing flow.
    */
   startNewMission: async () => {
-    const { _unsubscribers, _blockPollInterval } = get()
+    const { _unsubscribers, _blockPollInterval, _cityNodeUnsub } = get()
     _unsubscribers.forEach((unsub) => unsub())
     if (_blockPollInterval) clearInterval(_blockPollInterval)
+    if (_cityNodeUnsub) _cityNodeUnsub()
 
     set({
       missionId: null,
@@ -934,6 +903,8 @@ export const useGameStore = create((set, get) => ({
       isInvestigating: false,
       showClueModal: false,
       activeClue: null,
+      showCityClueModal: false,
+      activeCityClue: null,
       showPlotModal: false,
       showOutcomeModal: false,
       missionOutcome: null,
@@ -944,6 +915,22 @@ export const useGameStore = create((set, get) => ({
       carmenMovedAlert: false,
       _blockPollInterval: null,
       _unsubscribers: [],
+      // reset gameplay loop state
+      currentCityId: null,
+      currentCityInfo: null,
+      cityLocations: [],
+      cityAnomalyTxRefs: [],
+      citySuspectWallets: [],
+      cityEvidence: [],
+      currentLocationIdx: null,
+      captureMode: false,
+      captureState: 'ready',
+      captureResult: null,
+      showDossierModal: false,
+      dossierData: null,
+      cityViewTab: 'overview',
+      gameplayLoading: false,
+      _cityNodeUnsub: null,
       terminalLines: [
         { text: '> MISSION RESET. Preparing new assignment...', color: 'cyan', type: 'system' },
       ],
@@ -999,6 +986,410 @@ export const useGameStore = create((set, get) => ({
   },
 
   closeMissionPlotModal: () => set({ showPlotModal: false }),
+
+  // ============================================================
+  //  Gameplay Loop Actions
+  // ============================================================
+
+  /**
+   * Combined action: load CityNode data + call inspectLocation on-chain.
+   * Used by InteractiveMap's "SCAN NETWORK" button.
+   */
+  scanAndInspect: async (chainId) => {
+    const state = get()
+    if (state.isScanning || state.scannedLocations.includes(chainId)) return
+
+    set({ isScanning: true })
+
+    try {
+      // 1. Load all CityNode data (locations, anomalies, suspects, energy)
+      await state.selectCity(chainId)
+
+      // 2. Call inspectLocation(0) on-chain (costs 1 energy)
+      await state.gameplayInspectLocation(0)
+
+      // 3. Mark city as scanned in the UI so case cards appear
+      set((s) => ({
+        isScanning: false,
+        scannedLocations: [...s.scannedLocations, chainId],
+      }))
+      saveProgress(get())
+    } catch (error) {
+      console.error('scanAndInspect error:', error)
+      set((s) => ({
+        isScanning: false,
+        terminalLines: [...s.terminalLines,
+          { text: `> !! SCAN FAILED: ${error.message}`, color: 'red', type: 'alert' },
+        ],
+      }))
+    }
+  },
+
+  selectCity: async (chainId) => {
+    set({ currentCityId: chainId, gameplayLoading: true, currentLocationIdx: null, cityViewTab: 'overview' })
+
+    const { walletAddress } = get()
+
+    try {
+      const [cityInfo, locations, anomalyTxRefs, suspectWallets] = await Promise.all([
+        getCityNodeInfo(chainId),
+        getCityNodeLocations(chainId),
+        getCityNodeAnomalyTxRefs(chainId),
+        getCityNodeSuspectWallets(chainId),
+      ])
+
+      // Restore saved location states (inspected/scanned) from localStorage
+      const saved = loadProgress()
+      if (saved?.cityLocationStates && saved.currentCityId === chainId) {
+        locations.forEach((loc, i) => {
+          const savedLoc = saved.cityLocationStates[i]
+          if (savedLoc) {
+            loc.inspected = loc.inspected || savedLoc.inspected
+            loc.scanned = loc.scanned || savedLoc.scanned
+          }
+        })
+      }
+
+      // build per-location transactions (normal txs + anomaly flags when Carmen present)
+      locations.forEach((loc, i) => {
+        loc.transactions = buildLocationTransactions(chainId, i, anomalyTxRefs, locations.length)
+      })
+
+      set({
+        currentCityInfo: cityInfo,
+        cityLocations: locations,
+        cityAnomalyTxRefs: anomalyTxRefs,
+        citySuspectWallets: suspectWallets,
+        gameplayLoading: false,
+        ...(saved?.scannedLocations ? { scannedLocations: saved.scannedLocations } : {}),
+        ...(saved?.blocksElapsed ? { blocksElapsed: saved.blocksElapsed } : {}),
+      })
+
+      const city = CITY_MAP[chainId]
+      set((s) => ({
+        terminalLines: [...s.terminalLines,
+          { text: '', color: 'muted', type: 'system' },
+          { text: `> NAVIGATING TO: ${city?.name || 'Unknown'} [${city?.chain || chainId}]`, color: 'cyan', type: 'action' },
+          { text: `> Suspicion level: ${cityInfo.suspicionLevel}%`, color: 'yellow', type: 'alert' },
+          { text: `> ${locations.length} locations discovered. Blocks: ${s.blocksElapsed}`, color: 'green', type: 'system' },
+        ],
+      }))
+
+      // Set up CityNode event listeners for real-time updates
+      const { _cityNodeUnsub, walletAddress: playerAddr } = get()
+      if (_cityNodeUnsub) _cityNodeUnsub()
+      if (playerAddr) {
+        const unsub = await onCityNodeEvents(chainId, playerAddr, {
+          onClueUnlocked: ({ idx, clueIndex, clueType, clueDataHash, anomalyRefId }) => {
+            const CLUE_NAMES = ["BEHAVIOR_FINGERPRINT", "RELATIONSHIP", "IDENTITY_COMMIT", "FUNDING_TRAIL", "TECHNICAL_SIGNATURE", "DEAD_END"]
+            set((s) => ({
+              terminalLines: [...s.terminalLines,
+                { text: `> [EVENT] Clue unlocked at location ${idx}, slot ${clueIndex}`, color: 'green', type: 'system' },
+              ],
+            }))
+          },
+        })
+        set({ _cityNodeUnsub: unsub })
+      }
+    } catch (error) {
+      console.error('selectCity error:', error)
+      set({ gameplayLoading: false })
+    }
+  },
+
+  backToMap: () => {
+    const { _cityNodeUnsub } = get()
+    if (_cityNodeUnsub) _cityNodeUnsub()
+    set({
+      currentCityId: null,
+      currentCityInfo: null,
+      cityLocations: [],
+      cityAnomalyTxRefs: [],
+      citySuspectWallets: [],
+      cityEvidence: [],
+      currentLocationIdx: null,
+      cityViewTab: 'overview',
+      _cityNodeUnsub: null,
+    })
+  },
+
+  selectLocation: (idx) => {
+    set({ currentLocationIdx: idx })
+  },
+
+  clearLocation: () => {
+    set({ currentLocationIdx: null })
+  },
+
+  setCityViewTab: (tab) => {
+    set({ cityViewTab: tab })
+  },
+
+  gameplayInspectLocation: async (locationIdx) => {
+    const { currentCityId } = get()
+    if (!currentCityId) return
+
+    set((s) => ({
+      blocksElapsed: s.blocksElapsed + 1,
+      terminalLines: [...s.terminalLines,
+        { text: '', color: 'muted', type: 'system' },
+        { text: `> INSPECT: ${s.cityLocations[locationIdx]?.name || `Location ${locationIdx}`}`, color: 'cyan', type: 'action' },
+        { text: `> +1 BLOCK (${s.blocksElapsed + 1} total)`, color: 'yellow', type: 'system' },
+      ],
+    }))
+
+    try {
+      const result = await cityNodeInspectLocation(currentCityId, locationIdx)
+      set((s) => ({
+        cityLocations: s.cityLocations.map((loc, i) =>
+          i === locationIdx ? { ...loc, inspected: true } : loc
+        ),
+        terminalLines: [...s.terminalLines,
+          { text: `> NOTE: ${s.cityLocations[locationIdx]?.description || 'Patterns detected...'}`, color: 'green', type: 'system' },
+          { text: `> TX: ${result.hash}`, color: 'muted', type: 'system' },
+        ],
+      }))
+      saveProgress(get())
+    } catch (error) {
+      set((s) => ({
+        blocksElapsed: Math.max(0, s.blocksElapsed - 1),
+        terminalLines: [...s.terminalLines,
+          { text: `> !! INSPECT FAILED: ${error.message}`, color: 'red', type: 'alert' },
+        ],
+      }))
+    }
+  },
+
+  gameplayScanAnomalies: async (locationIdx) => {
+    const { currentCityId } = get()
+    if (!currentCityId) return
+
+    set((s) => ({
+      blocksElapsed: s.blocksElapsed + 2,
+      terminalLines: [...s.terminalLines,
+        { text: `> SCAN ANOMALIES: ${s.cityLocations[locationIdx]?.name}`, color: 'cyan', type: 'action' },
+        { text: `> +2 BLOCKS (${s.blocksElapsed + 2} total)`, color: 'yellow', type: 'system' },
+      ],
+    }))
+
+    try {
+      const result = await cityNodeScanAnomalies(currentCityId, locationIdx)
+      set((s) => ({
+        cityLocations: s.cityLocations.map((loc, i) =>
+          i === locationIdx ? { ...loc, scanned: true } : loc
+        ),
+        terminalLines: [...s.terminalLines,
+          { text: `> ANOMALIES FOUND: ${result.anomaliesFound} tx refs linked`, color: 'yellow', type: 'alert' },
+          { text: `> SUSPECTS OBSERVED: ${result.suspectsFound} wallets`, color: 'yellow', type: 'alert' },
+          { text: `> TX: ${result.hash}`, color: 'muted', type: 'system' },
+        ],
+      }))
+
+      // refresh anomaly data
+      const [anomalyTxRefs, suspectWallets] = await Promise.all([
+        getCityNodeAnomalyTxRefs(currentCityId),
+        getCityNodeSuspectWallets(currentCityId),
+      ])
+      set({ cityAnomalyTxRefs: anomalyTxRefs, citySuspectWallets: suspectWallets })
+      saveProgress(get())
+    } catch (error) {
+      set((s) => ({
+        blocksElapsed: Math.max(0, s.blocksElapsed - 2),
+        terminalLines: [...s.terminalLines,
+          { text: `> !! SCAN FAILED: ${error.message}`, color: 'red', type: 'alert' },
+        ],
+      }))
+    }
+  },
+
+  gameplayRequestClue: async (locationIdx, clueIndex) => {
+    const { currentCityId } = get()
+    if (!currentCityId) return
+
+    set((s) => ({
+      blocksElapsed: s.blocksElapsed + 2,
+      terminalLines: [...s.terminalLines,
+        { text: `> REQUEST CLUE ${clueIndex + 1}/3: ${s.cityLocations[locationIdx]?.name}`, color: 'cyan', type: 'action' },
+        { text: `> +2 BLOCKS (${s.blocksElapsed + 2} total)`, color: 'yellow', type: 'system' },
+        { text: '> PENDING GM...', color: 'muted', type: 'system' },
+      ],
+    }))
+
+    try {
+      const result = await cityNodeRequestClue(currentCityId, locationIdx, clueIndex)
+
+      const isDeadEnd = result.clueType === 'DEAD_END'
+      const newClue = {
+        id: `city-clue-${Date.now()}`,
+        locationIdx,
+        clueIndex,
+        clueType: result.clueType,
+        data: result.clueData,
+        strength: result.strength,
+        anomalyRefId: result.anomalyRefId,
+        cityId: currentCityId,
+        isDeadEnd,
+        timestamp: Date.now(),
+      }
+
+      set((s) => ({
+        showCityClueModal: true,
+        activeCityClue: newClue,
+        cityLocations: s.cityLocations.map((loc, i) =>
+          i === locationIdx
+            ? { ...loc, clueSlots: loc.clueSlots.map((slot, ci) => ci === clueIndex ? newClue : slot) }
+            : loc
+        ),
+        cityEvidence: [...s.cityEvidence, newClue],
+        terminalLines: [...s.terminalLines,
+          isDeadEnd
+            ? { text: `> DEAD END at clue #${clueIndex + 1}. No actionable intel.`, color: 'red', type: 'alert' }
+            : { text: `> GM RESOLVED: CLUE #${clueIndex + 1} (${result.clueType})`, color: 'green', type: 'system' },
+          isDeadEnd
+            ? { text: `> Consolation hint available.`, color: 'muted', type: 'system' }
+            : { text: `> HIT: ${result.clueData}`, color: 'yellow', type: 'alert' },
+          { text: `> Strength: ${result.strength}/100 | Anomaly: ref#${result.anomalyRefId?.slice(2, 6) || '????'}`, color: 'muted', type: 'system' },
+        ],
+      }))
+      saveProgress(get())
+    } catch (error) {
+      set((s) => ({
+        blocksElapsed: Math.max(0, s.blocksElapsed - 2),
+        terminalLines: [...s.terminalLines,
+          { text: `> !! CLUE REQUEST FAILED: ${error.message}`, color: 'red', type: 'alert' },
+        ],
+      }))
+    }
+  },
+
+  gameplayFlagTx: async (refId) => {
+    const { currentCityId } = get()
+    if (!currentCityId) return
+
+    set((s) => ({
+      blocksElapsed: s.blocksElapsed + 1,
+      terminalLines: [...s.terminalLines,
+        { text: `> FLAG TX: ref#${refId?.slice(2, 10) || '????'}`, color: 'cyan', type: 'action' },
+        { text: `> +1 BLOCK (${s.blocksElapsed + 1} total)`, color: 'yellow', type: 'system' },
+      ],
+    }))
+
+    try {
+      await cityNodeFlagTx(currentCityId, refId)
+      set((s) => ({
+        terminalLines: [...s.terminalLines,
+          { text: '> TX FLAGGED. Added to evidence bundle.', color: 'green', type: 'system' },
+        ],
+      }))
+      saveProgress(get())
+    } catch (error) {
+      set((s) => ({
+        blocksElapsed: Math.max(0, s.blocksElapsed - 1),
+        terminalLines: [...s.terminalLines,
+          { text: `> !! FLAG FAILED: ${error.message}`, color: 'red', type: 'alert' },
+        ],
+      }))
+    }
+  },
+
+  gameplayRequestDossier: async () => {
+    const { currentCityId } = get()
+    if (!currentCityId) return
+
+    set((s) => ({
+      blocksElapsed: s.blocksElapsed + 1,
+      gameplayLoading: true,
+      terminalLines: [...s.terminalLines,
+        { text: '> REQUEST DOSSIER: Compiling evidence...', color: 'cyan', type: 'action' },
+        { text: `> +1 BLOCK (${s.blocksElapsed + 1} total)`, color: 'yellow', type: 'system' },
+      ],
+    }))
+
+    try {
+      const result = await cityNodeRequestDossier(currentCityId)
+      set((s) => ({
+        dossierData: result,
+        showDossierModal: true,
+        gameplayLoading: false,
+        terminalLines: [...s.terminalLines,
+          { text: `> DOSSIER RESOLVED: Confidence ${result.confidence}%`, color: 'green', type: 'system' },
+          { text: `> ${result.summary.slice(0, 80)}...`, color: 'yellow', type: 'alert' },
+        ],
+      }))
+    } catch (error) {
+      set((s) => ({
+        gameplayLoading: false,
+        blocksElapsed: Math.max(0, s.blocksElapsed - 1),
+        terminalLines: [...s.terminalLines,
+          { text: `> !! DOSSIER FAILED: ${error.message}`, color: 'red', type: 'alert' },
+        ],
+      }))
+    }
+  },
+
+  closeDossierModal: () => set({ showDossierModal: false }),
+
+  toggleCaptureMode: () => {
+    set((s) => ({
+      captureMode: !s.captureMode,
+      captureState: 'ready',
+      captureResult: null,
+    }))
+  },
+
+  gameplayRequestCapture: async (suspectWallet) => {
+    const { currentCityId } = get()
+    if (!currentCityId) return
+
+    set((s) => ({
+      captureState: 'pending',
+      blocksElapsed: s.blocksElapsed + 3,
+      terminalLines: [...s.terminalLines,
+        { text: '', color: 'muted', type: 'system' },
+        { text: '> ████████████████████████████████████████', color: 'red', type: 'system' },
+        { text: `> CAPTURE ATTEMPT: ${suspectWallet}`, color: 'red', type: 'action' },
+        { text: `> +3 BLOCKS (${s.blocksElapsed + 3} total)`, color: 'yellow', type: 'system' },
+        { text: '> Submitting evidence bundle to GameMaster...', color: 'muted', type: 'system' },
+      ],
+    }))
+
+    try {
+      const result = await cityNodeRequestCapture(currentCityId, suspectWallet, '0x0')
+
+      if (result.success) {
+        set((s) => ({
+          captureState: 'success',
+          captureResult: result,
+          terminalLines: [...s.terminalLines,
+            { text: '> ████████████████████████████████████████', color: 'green', type: 'system' },
+            { text: '> CARMEN SANDIEGO CAPTURED!', color: 'green', type: 'alert' },
+            { text: `> ${result.gmNote}`, color: 'yellow', type: 'alert' },
+            { text: '> MissionNFT minted as trophy!', color: 'cyan', type: 'system' },
+            { text: '> ████████████████████████████████████████', color: 'green', type: 'system' },
+          ],
+        }))
+      } else {
+        set((s) => ({
+          captureState: 'fail',
+          captureResult: result,
+          terminalLines: [...s.terminalLines,
+            { text: `> !! CAPTURE FAILED: ${result.reasonCode}`, color: 'red', type: 'alert' },
+            { text: `> GM Note: ${result.gmNote}`, color: 'yellow', type: 'system' },
+            { text: '> ████████████████████████████████████████', color: 'red', type: 'system' },
+          ],
+        }))
+      }
+    } catch (error) {
+      set((s) => ({
+        captureState: 'fail',
+        captureResult: { success: false, reasonCode: 'TX_FAILED', gmNote: error.message },
+        blocksElapsed: Math.max(0, s.blocksElapsed - 3),
+        terminalLines: [...s.terminalLines,
+          { text: `> !! CAPTURE TX FAILED: ${error.message}`, color: 'red', type: 'alert' },
+        ],
+      }))
+    }
+  },
 
   spendGas: (amount) => {
     set((s) => ({

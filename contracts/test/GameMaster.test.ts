@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { GameMaster } from "../typechain-types";
+import { GameMaster, CityNode } from "../typechain-types";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
 describe("GameMaster", function () {
@@ -305,6 +305,285 @@ describe("GameMaster", function () {
       await expect(
         gameMaster.connect(owner).setValidChainIds([421614])
       ).to.be.revertedWith("Need at least 2 cities");
+    });
+  });
+
+  // ============================================================
+  //          CITYNODE INTEGRATION
+  // ============================================================
+
+  describe("CityNode Integration", function () {
+    let cityNode: CityNode;
+    const gmAddress = () => gameMaster.getAddress();
+
+    const sampleLocations = [
+      {
+        name: "Shibuya",
+        descriptionHash: ethers.keccak256(ethers.toUtf8Bytes("shibuya")),
+        category: 1,
+        fakeLevel: 0,
+        riskLevel: 3,
+      },
+      {
+        name: "Akihabara",
+        descriptionHash: ethers.keccak256(ethers.toUtf8Bytes("akihabara")),
+        category: 2,
+        fakeLevel: 1,
+        riskLevel: 2,
+      },
+      {
+        name: "Tsukiji",
+        descriptionHash: ethers.keccak256(ethers.toUtf8Bytes("tsukiji")),
+        category: 3,
+        fakeLevel: 0,
+        riskLevel: 1,
+      },
+    ] as [CityNode.LocationInfoStruct, CityNode.LocationInfoStruct, CityNode.LocationInfoStruct];
+
+    beforeEach(async function () {
+      // deploy CityNode with gameMaster as its GM
+      const CityNodeFactory = await ethers.getContractFactory("CityNode");
+      cityNode = (await CityNodeFactory.deploy(
+        "Tokyo", "JP", ARBITRUM_SEPOLIA, 1, await gmAddress()
+      )) as CityNode;
+
+      // setup locations so players can interact
+      await cityNode.connect(owner).setupLocations(sampleLocations);
+      await cityNode.connect(owner).addAnomalyTxRef({
+        refId: 1,
+        txHashLike: ethers.keccak256(ethers.toUtf8Bytes("tx-1")),
+        from: player.address,
+        to: otherUser.address,
+        methodSigLike: "0xa9059cbb",
+        blockLike: 1000,
+        valueLike: 1000000n,
+        anomalyType: 0,
+      });
+    });
+
+    describe("resolveClueOnCity", function () {
+      beforeEach(async function () {
+        // player does: inspect -> scan -> requestClue on CityNode
+        await cityNode.connect(player).inspectLocation(0);
+        await cityNode.connect(player).scanAnomalies(0);
+        await cityNode.connect(player).requestClue(0, 0); // creates request ID 1
+      });
+
+      it("should resolve clue on CityNode via GameMaster", async function () {
+        const clueHash = ethers.keccak256(ethers.toUtf8Bytes("clue data"));
+        const anomalyRef = ethers.keccak256(ethers.toUtf8Bytes("anomaly"));
+
+        await expect(
+          gameMaster.connect(creOracle).resolveClueOnCity(
+            await cityNode.getAddress(), 1, 0, clueHash, anomalyRef
+          )
+        )
+          .to.emit(gameMaster, "ClueResolvedOnCity")
+          .withArgs(await cityNode.getAddress(), 1, 0, clueHash);
+
+        // verify CityNode state updated
+        const [, cluesFound] = await cityNode.getPlayerProgress(player.address);
+        expect(cluesFound).to.equal(1);
+      });
+
+      it("should reject non-CRE caller", async function () {
+        const clueHash = ethers.keccak256(ethers.toUtf8Bytes("clue"));
+        await expect(
+          gameMaster.connect(player).resolveClueOnCity(
+            await cityNode.getAddress(), 1, 0, clueHash, ethers.ZeroHash
+          )
+        ).to.be.revertedWith("Not CRE oracle");
+      });
+
+      it("should reject zero address city node", async function () {
+        const clueHash = ethers.keccak256(ethers.toUtf8Bytes("clue"));
+        await expect(
+          gameMaster.connect(creOracle).resolveClueOnCity(
+            ethers.ZeroAddress, 1, 0, clueHash, ethers.ZeroHash
+          )
+        ).to.be.revertedWith("Invalid city node");
+      });
+    });
+
+    describe("resolveDossierOnCity", function () {
+      beforeEach(async function () {
+        await cityNode.connect(player).requestDossier(); // creates request ID 1
+      });
+
+      it("should resolve dossier on CityNode via GameMaster", async function () {
+        const dossierHash = ethers.keccak256(ethers.toUtf8Bytes("dossier"));
+        const hintHash = ethers.keccak256(ethers.toUtf8Bytes("hint"));
+
+        await expect(
+          gameMaster.connect(creOracle).resolveDossierOnCity(
+            await cityNode.getAddress(), 1, dossierHash, 80, hintHash
+          )
+        )
+          .to.emit(gameMaster, "DossierResolvedOnCity")
+          .withArgs(await cityNode.getAddress(), 1, dossierHash, 80);
+      });
+
+      it("should reject non-CRE caller", async function () {
+        await expect(
+          gameMaster.connect(player).resolveDossierOnCity(
+            await cityNode.getAddress(), 1, ethers.ZeroHash, 50, ethers.ZeroHash
+          )
+        ).to.be.revertedWith("Not CRE oracle");
+      });
+    });
+
+    describe("resolveCaptureOnCity", function () {
+      let suspectWallet: string;
+
+      beforeEach(async function () {
+        suspectWallet = ethers.Wallet.createRandom().address;
+        const evidenceHash = ethers.keccak256(ethers.toUtf8Bytes("evidence"));
+        await cityNode.connect(player).requestCapture(suspectWallet, evidenceHash);
+      });
+
+      it("should resolve capture on CityNode via GameMaster", async function () {
+        const gmNote = ethers.keccak256(ethers.toUtf8Bytes("captured"));
+
+        await expect(
+          gameMaster.connect(creOracle).resolveCaptureOnCity(
+            await cityNode.getAddress(), 1, true, 0, gmNote
+          )
+        )
+          .to.emit(gameMaster, "CaptureResolvedOnCity")
+          .withArgs(await cityNode.getAddress(), 1, true, 0);
+      });
+
+      it("should store capture request city", async function () {
+        const gmNote = ethers.keccak256(ethers.toUtf8Bytes("captured"));
+        await gameMaster.connect(creOracle).resolveCaptureOnCity(
+          await cityNode.getAddress(), 1, true, 0, gmNote
+        );
+
+        expect(await gameMaster.captureRequestCity(1)).to.equal(await cityNode.getAddress());
+      });
+
+      it("should reject non-CRE caller", async function () {
+        await expect(
+          gameMaster.connect(player).resolveCaptureOnCity(
+            await cityNode.getAddress(), 1, true, 0, ethers.ZeroHash
+          )
+        ).to.be.revertedWith("Not CRE oracle");
+      });
+    });
+
+    describe("trackPlayerClue", function () {
+      it("should track clue count per city", async function () {
+        const cityId = ethers.keccak256(ethers.toUtf8Bytes("tokyo"));
+
+        await gameMaster.connect(creOracle).trackPlayerClue(player.address, cityId, ethers.ZeroHash);
+        await gameMaster.connect(creOracle).trackPlayerClue(player.address, cityId, ethers.ZeroHash);
+
+        const count = await gameMaster.getPlayerCityClueCount(player.address, cityId);
+        expect(count).to.equal(2);
+      });
+
+      it("should increment cities visited on first clue", async function () {
+        const city1 = ethers.keccak256(ethers.toUtf8Bytes("tokyo"));
+        const city2 = ethers.keccak256(ethers.toUtf8Bytes("paris"));
+
+        await gameMaster.connect(creOracle).trackPlayerClue(player.address, city1, ethers.ZeroHash);
+        await gameMaster.connect(creOracle).trackPlayerClue(player.address, city2, ethers.ZeroHash);
+
+        const [citiesVisited] = await gameMaster.getPlayerGlobalProgress(player.address);
+        expect(citiesVisited).to.equal(2);
+      });
+
+      it("should NOT double-count cities visited", async function () {
+        const cityId = ethers.keccak256(ethers.toUtf8Bytes("tokyo"));
+
+        await gameMaster.connect(creOracle).trackPlayerClue(player.address, cityId, ethers.ZeroHash);
+        await gameMaster.connect(creOracle).trackPlayerClue(player.address, cityId, ethers.ZeroHash);
+
+        const [citiesVisited] = await gameMaster.getPlayerGlobalProgress(player.address);
+        expect(citiesVisited).to.equal(1);
+      });
+
+      it("should store identity commits when provided", async function () {
+        const cityId = ethers.keccak256(ethers.toUtf8Bytes("tokyo"));
+        const commit = ethers.keccak256(ethers.toUtf8Bytes("identity-commit"));
+
+        await gameMaster.connect(creOracle).trackPlayerClue(player.address, cityId, commit);
+
+        const commits = await gameMaster.getPlayerIdentityCommits(player.address);
+        expect(commits.length).to.equal(1);
+        expect(commits[0]).to.equal(commit);
+      });
+
+      it("should NOT store zero-hash identity commits", async function () {
+        const cityId = ethers.keccak256(ethers.toUtf8Bytes("tokyo"));
+        await gameMaster.connect(creOracle).trackPlayerClue(player.address, cityId, ethers.ZeroHash);
+
+        const commits = await gameMaster.getPlayerIdentityCommits(player.address);
+        expect(commits.length).to.equal(0);
+      });
+
+      it("should reject non-CRE caller", async function () {
+        const cityId = ethers.keccak256(ethers.toUtf8Bytes("tokyo"));
+        await expect(
+          gameMaster.connect(player).trackPlayerClue(player.address, cityId, ethers.ZeroHash)
+        ).to.be.revertedWith("Not CRE oracle");
+      });
+    });
+
+    describe("getPlayerGlobalProgress", function () {
+      it("should return zeros for new player", async function () {
+        const [citiesVisited, totalClues, identityCommits] =
+          await gameMaster.getPlayerGlobalProgress(player.address);
+        expect(citiesVisited).to.equal(0);
+        expect(totalClues).to.equal(0);
+        expect(identityCommits).to.equal(0);
+      });
+
+      it("should return correct progress after tracking", async function () {
+        const city1 = ethers.keccak256(ethers.toUtf8Bytes("tokyo"));
+        const city2 = ethers.keccak256(ethers.toUtf8Bytes("paris"));
+        const commit1 = ethers.keccak256(ethers.toUtf8Bytes("commit-1"));
+        const commit2 = ethers.keccak256(ethers.toUtf8Bytes("commit-2"));
+
+        await gameMaster.connect(creOracle).trackPlayerClue(player.address, city1, commit1);
+        await gameMaster.connect(creOracle).trackPlayerClue(player.address, city2, commit2);
+        await gameMaster.connect(creOracle).trackPlayerClue(player.address, city1, ethers.ZeroHash);
+
+        const [citiesVisited, totalClues, identityCommits] =
+          await gameMaster.getPlayerGlobalProgress(player.address);
+        expect(citiesVisited).to.equal(2);
+        expect(totalClues).to.equal(2);      // 2 identity commits
+        expect(identityCommits).to.equal(2);
+      });
+    });
+
+    describe("Full Integration Flow", function () {
+      it("should support GameMaster resolving requests on CityNode end-to-end", async function () {
+        // player interacts with CityNode
+        await cityNode.connect(player).inspectLocation(0);
+        await cityNode.connect(player).scanAnomalies(0);
+        await cityNode.connect(player).requestClue(0, 0);
+
+        // CRE resolves via GameMaster
+        const clueHash = ethers.keccak256(ethers.toUtf8Bytes("important clue"));
+        await gameMaster.connect(creOracle).resolveClueOnCity(
+          await cityNode.getAddress(), 1, 0, clueHash, ethers.ZeroHash
+        );
+
+        // track the clue globally
+        const cityId = ethers.keccak256(ethers.toUtf8Bytes("tokyo"));
+        await gameMaster.connect(creOracle).trackPlayerClue(
+          player.address, cityId, clueHash
+        );
+
+        // verify both local and global state
+        const [, cluesFound] = await cityNode.getPlayerProgress(player.address);
+        expect(cluesFound).to.equal(1);
+
+        const [citiesVisited, totalClues] = await gameMaster.getPlayerGlobalProgress(player.address);
+        expect(citiesVisited).to.equal(1);
+        expect(totalClues).to.equal(1);
+      });
     });
   });
 });

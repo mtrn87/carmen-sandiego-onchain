@@ -644,6 +644,7 @@ export default function InteractiveMap({ onSelectCase }) {
     scannedLocations,
     isScanning,
     scanLocation,
+    scanAndInspect,
     investigate,
     gas,
     missionId,
@@ -776,6 +777,7 @@ export default function InteractiveMap({ onSelectCase }) {
         const loc = mapLocations.find((l) => l.id === selectedMarker)
         if (!loc) return null
         const isScanned = loc.alwaysScanned || scannedLocations.includes(loc.id)
+        const isCityNodeCity = [421614, 84532, 51].includes(loc.id)
         return (
           <div className={styles.locationPanel} style={{ '--chain-color': loc.chainColor }}>
             <div className={styles.locationPanelImage}>
@@ -800,10 +802,14 @@ export default function InteractiveMap({ onSelectCase }) {
                 <button
                   className={`${styles.scanBtn} ${isScanning ? styles.scanBtnDisabled : ''}`}
                   style={{ '--chain-color': loc.chainColor }}
-                  disabled={isScanning || gas < SCAN_COST}
+                  disabled={isScanning || (!isCityNodeCity && gas < SCAN_COST)}
                   onClick={(e) => {
                     e.stopPropagation()
-                    scanLocation(loc.id, SCAN_COST)
+                    if (isCityNodeCity) {
+                      scanAndInspect(loc.id)
+                    } else {
+                      scanLocation(loc.id, SCAN_COST)
+                    }
                   }}
                 >
                   {isScanning ? (
@@ -811,49 +817,32 @@ export default function InteractiveMap({ onSelectCase }) {
                       <span className={styles.scanBtnSpinner} />
                       SCANNING...
                     </>
+                  ) : isCityNodeCity ? (
+                    <>&#9211; SCAN NETWORK &mdash; 1 BLOCK</>
                   ) : (
                     <>&#9211; SCAN NETWORK &mdash; {SCAN_COST} GAS</>
                   )}
                 </button>
-                {gas < SCAN_COST && !isScanning && (
+                {false /* blocks always available */}
+                {!isCityNodeCity && gas < SCAN_COST && !isScanning && (
                   <span className={styles.scanNoGas}>INSUFFICIENT GAS</span>
                 )}
               </div>
             ) : (
               <div className={styles.locationPanelContent}>
-                {/* On-chain investigation button */}
-                <button
-                  className={`${styles.investigateBtn} ${isInvestigating ? styles.investigateBtnDisabled : ''}`}
-                  style={{ '--chain-color': loc.chainColor }}
-                  disabled={isInvestigating || !missionId || !loc.investigable}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (!loc.investigable) return
-                    investigate(loc.id)
-                  }}
-                >
-                  {isInvestigating
-                    ? '&#9203; INVESTIGATING...'
-                    : !loc.investigable
-                      ? '&#127968; PLOT ORIGIN — BRIEFING NODE'
-                      : !missionId
-                      ? '&#9888; START MISSION FIRST'
-                      : `&#128269; INVESTIGATE ${loc.name.toUpperCase()}`}
-                </button>
-
                 <div className={styles.locationPanelTitle}>
-                  <span>CONTRACTS FOUND</span>
+                  <span>{isCityNodeCity ? 'LOCATIONS UNLOCKED' : 'CONTRACTS FOUND'}</span>
                   <span className={styles.locationPanelCount}>{loc.cases.length}</span>
                 </div>
                 <div className={styles.locationPanelCases}>
-                  {loc.cases.map((c) => (
+                  {loc.cases.map((c, caseIdx) => (
                     <div
                       key={c.id}
                       className={styles.caseCard}
                       onClick={(e) => {
                         e.stopPropagation()
                         setSelectedMarker(null)
-                        onSelectCase?.(c)
+                        onSelectCase?.({ ...c, locationIdx: caseIdx })
                       }}
                     >
                       <div className={styles.caseImageWrap}>

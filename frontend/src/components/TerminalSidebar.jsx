@@ -53,6 +53,10 @@ export default function TerminalSidebar() {
     rank,
     currentPlot,
     openMissionPlotModal,
+    captureMode,
+    toggleCaptureMode,
+    citySuspectWallets,
+    currentCityId,
   } = useGameStore()
 
   const missionEnded = currentMission?.status === 'completed' || currentMission?.status === 'failed'
@@ -246,6 +250,18 @@ export default function TerminalSidebar() {
             ))}
             <span className={styles.cursor}>_</span>
           </div>
+
+          {/* capture button — shown when in a city with suspects */}
+          {currentCityId && citySuspectWallets.length > 0 && !missionEnded && (
+            <div className={styles.captureBar}>
+              <button
+                className={`${styles.captureBtn} ${captureMode ? styles.captureBtnActive : ''}`}
+                onClick={toggleCaptureMode}
+              >
+                {captureMode ? '[ EXIT CAPTURE ]' : '\u{1F6A8} CAPTURE'}
+              </button>
+            </div>
+          )}
 
           {/* new mission button — shown after completion/failure */}
           {missionEnded && (

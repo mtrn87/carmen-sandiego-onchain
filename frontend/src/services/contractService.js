@@ -6,6 +6,8 @@
  */
 
 import { ethers } from "ethers"
+import GameMasterArtifact from "../abi/GameMaster.json"
+import CityNodeArtifact from "../abi/CityNode.json"
 
 // ============================================================
 //  Constants
@@ -49,39 +51,62 @@ export const CITY_MAP = {
   51:     { name: "London", chain: "XDC Apothem",     color: "#ff6b00", emoji: "\u{1F3A1}" },
 }
 
-const GAME_MASTER_ABI = [
-  // Player functions
-  "function registerPlayer(bytes calldata publicKey) external",
-  "function startMission() external",
-  "function submitInvestigation(uint256 chainId) external",
+// Compiled ABIs from contract artifacts — source of truth
+const GAME_MASTER_ABI = GameMasterArtifact.abi
 
-  // View functions
-  "function getMission(uint256 missionId) external view returns (tuple(address player, uint256 startBlock, bytes32 targetHash, uint8 cluesReceived, uint8 investigationsCount, uint8 status))",
-  "function getMissionClues(uint256 missionId) external view returns (tuple(uint8 clueType, bytes32 contentHash, string ipfsPointer, uint256 timestamp)[])",
-  "function getPlayerActiveMission(address player) external view returns (uint256)",
-  "function getBlocksUsed(uint256 missionId) external view returns (uint256)",
-  "function getValidCities() external view returns (uint256[])",
-  "function getPlayerPublicKey(address player) external view returns (bytes)",
-  "function getMissionSalt(uint256 missionId) external view returns (bytes32)",
+// ============================================================
+//  CityNode Gameplay Constants & Helpers
+// ============================================================
 
-  // Events
-  "event PlayerRegistered(address indexed player, bytes publicKey)",
-  "event MissionStarted(uint256 indexed missionId, address indexed player, uint256 startBlock)",
-  "event CarmenLocationCommitted(uint256 indexed missionId, bytes32 targetHash)",
-  "event InvestigationSubmitted(uint256 indexed missionId, address indexed player, uint256 chainId)",
-  "event ClueReceived(uint256 indexed missionId, uint8 clueType, bytes32 contentHash, string ipfsPointer)",
-  "event CarmenCaptured(uint256 indexed missionId, address indexed player, uint256 blocksUsed, uint256 reward)",
-  "event CarmenMoved(uint256 indexed missionId, bytes32 newTargetHash)",
-  "event MissionFailed(uint256 indexed missionId, address indexed player)",
-]
+export const MAX_ENERGY = 10
+export const ENERGY_REGEN_INTERVAL = 15 * 60 // 15 minutes in seconds
 
-const CITY_NODE_ABI = [
-  "function cityName() view returns (string)",
-  "function chainId() view returns (uint256)",
-  "function owner() view returns (address)",
-  "function creOracle() view returns (address)",
-  "function getCarmenStatus(uint256 missionId) view returns (bool)",
-]
+// LocationInfo.category enum: uint8 → display label
+export const CATEGORY_MAP = {
+  0: "Bridge Relay",
+  1: "Signal Router",
+  2: "Swap Protocol",
+  3: "Monitoring Beacon",
+  4: "Custody Protocol",
+  5: "Cross-Chain Bridge",
+}
+
+// AnomalyType enum: uint8 → display label
+export const ANOMALY_TYPE_MAP = {
+  0: "UNUSUAL_GAS",
+  1: "BURST_NONCE",
+  2: "PRECISE_VALUE",
+  3: "RECURRING_COUNTERPARTY",
+  4: "BRIDGE_USAGE",
+  5: "CREATE2_DEPLOY",
+}
+
+// Suspect wallet tag bitmap: bit position → label
+export const TAG_BITS = {
+  0: "bridge-user",
+  1: "high-value",
+  2: "deployer",
+  3: "mixer",
+  4: "fee-recipient",
+  5: "flash-loan",
+  6: "multi-sig",
+  7: "new-account",
+}
+
+/** Decode a tagsBitmap (uint256) into an array of tag strings */
+export function decodeTags(bitmap) {
+  const tags = []
+  const bm = BigInt(bitmap)
+  for (const [bit, label] of Object.entries(TAG_BITS)) {
+    if (bm & (1n << BigInt(bit))) {
+      tags.push(label)
+    }
+  }
+  return tags
+}
+
+// CityNode gameplay ABI — compiled from contracts/src/CityNode.sol
+const CITY_NODE_GAMEPLAY_ABI = CityNodeArtifact.abi
 
 // ============================================================
 //  Provider / Signer / Contract
@@ -161,7 +186,7 @@ function getCityNodeReadContract(chainId) {
   }
 
   const provider = new ethers.JsonRpcProvider(rpcUrl)
-  return new ethers.Contract(address, CITY_NODE_ABI, provider)
+  return new ethers.Contract(address, CITY_NODE_GAMEPLAY_ABI, provider)
 }
 
 /**
@@ -595,4 +620,969 @@ export async function ensureSepoliaNetwork() {
     })
     resetConnection()
   }
+}
+
+// ============================================================
+//  CityNode Gameplay Service
+//  Real contract calls with mock fallback when addresses not configured.
+// ============================================================
+
+/** Chain parameters for wallet_addEthereumChain / wallet_switchEthereumChain */
+const CHAIN_PARAMS = {
+  421614: {
+    chainId: "0x66eee",
+    chainName: "Arbitrum Sepolia",
+    rpcUrls: ["https://sepolia-rollup.arbitrum.io/rpc"],
+    nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+    blockExplorerUrls: ["https://sepolia.arbiscan.io"],
+  },
+  84532: {
+    chainId: "0x14a34",
+    chainName: "Base Sepolia",
+    rpcUrls: ["https://sepolia.base.org"],
+    nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+    blockExplorerUrls: ["https://sepolia-explorer.base.org"],
+  },
+  51: {
+    chainId: "0x33",
+    chainName: "XDC Apothem",
+    rpcUrls: ["https://erpc.apothem.network"],
+    nativeCurrency: { name: "TXDC", symbol: "TXDC", decimals: 18 },
+    blockExplorerUrls: ["https://explorer.apothem.network"],
+  },
+}
+
+/**
+ * Get read-only CityNode gameplay contract via JsonRpcProvider.
+ * Returns null if address or rpc not configured.
+ */
+function getCityNodeGameplayContract(chainId) {
+  const address = CITY_NODE_ADDRESSES[chainId]
+  const rpcUrl = CITY_NODE_RPC_URLS[chainId]
+  if (!address || !rpcUrl) return null
+  const provider = new ethers.JsonRpcProvider(rpcUrl)
+  return new ethers.Contract(address, CITY_NODE_GAMEPLAY_ABI, provider)
+}
+
+/**
+ * Switch wallet to the CityNode's chain. Adds the chain if unknown.
+ */
+export async function ensureCityNodeNetwork(chainId) {
+  if (!window.ethereum) throw new Error("No wallet detected")
+  const current = parseInt(await window.ethereum.request({ method: "eth_chainId" }), 16)
+  if (current === chainId) return
+
+  const params = CHAIN_PARAMS[chainId]
+  if (!params) throw new Error(`Unknown chain ${chainId} — cannot switch wallet`)
+
+  try {
+    await window.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: params.chainId }],
+    })
+  } catch (err) {
+    if (err.code === 4902) {
+      await window.ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [params],
+      })
+    } else {
+      throw err
+    }
+  }
+  resetConnection()
+}
+
+/**
+ * Get signer-connected CityNode gameplay contract.
+ * Switches the wallet to the correct chain first.
+ */
+async function getCityNodeWriteContract(chainId) {
+  const address = CITY_NODE_ADDRESSES[chainId]
+  if (!address) throw new Error(`CityNode address not configured for chain ${chainId}`)
+  await ensureCityNodeNetwork(chainId)
+  const provider = new ethers.BrowserProvider(window.ethereum)
+  const signer = await provider.getSigner()
+
+  // Wrap signer to override gas estimation for local Hardhat nodes
+  // where baseFee can drift above ethers.js default maxFeePerGas
+  const rpcUrl = CITY_NODE_RPC_URLS[chainId] || ""
+  const isLocal = rpcUrl.includes("localhost") || rpcUrl.includes("127.0.0.1")
+  if (isLocal) {
+    const origSendTx = signer.sendTransaction.bind(signer)
+    signer.sendTransaction = async (tx) => {
+      const feeData = await provider.getFeeData()
+      const baseFee = feeData.maxFeePerGas || 30000000000n
+      tx.maxFeePerGas = baseFee * 2n
+      tx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas || 1000000000n
+      return origSendTx(tx)
+    }
+  }
+
+  return new ethers.Contract(address, CITY_NODE_GAMEPLAY_ABI, signer)
+}
+
+/**
+ * Check if a CityNode contract is configured (address + rpc).
+ */
+function isCityNodeConfigured(chainId) {
+  return Boolean(CITY_NODE_ADDRESSES[chainId] && CITY_NODE_RPC_URLS[chainId])
+}
+
+// ── Mock data generators (used when contracts are not deployed) ──
+
+const MOCK_CLUE_DATA = {
+  421614: {
+    0: [
+      "Cross-chain bridge packets routed through Senso-ji relay carry encoded wallet fragments. Pattern matches Carmen's known obfuscation — she was here within the last 12 blocks.",
+      "Temple node logs reveal a secondary handshake protocol — someone tested a custody transfer that was later aborted. The abort signature matches Carmen's operational style.",
+      "Dead end — incense smoke and encrypted noise. No actionable intel at this relay point.",
+    ],
+    1: [
+      "Tokyo Tower beacon intercepted a burst transmission containing partial coordinates. The destination chain resolves to Base Sepolia — Carmen may be heading to Paris.",
+      "Signal analysis reveals a repeating pattern: every 7 blocks, a micro-transaction pings this beacon. The sender wallet has ties to a known Carmen associate.",
+      "Beacon logs show routine traffic only. The signal router appears clean — this may be a decoy.",
+    ],
+    2: [
+      "Chochin Market swap logs expose a layering scheme: thousands of micro-swaps converging into a single wallet. The final destination is obscured but the volume matches a major asset extraction.",
+      "A swap pair was created and burned within 3 blocks — classic Carmen counter-forensics. The residual token dust points toward XDC Apothem.",
+      "Market noise. The swap volume here is organic — no signs of manipulation.",
+    ],
+  },
+  84532: {
+    0: [
+      "Eiffel relay captured bridge ingress from three separate L2 chains in a 5-block window. Cross-referencing reveals two flagged addresses — Carmen's network is active in Paris.",
+      "Monitoring data shows a custody pre-staging event. Someone moved a significant payload through this beacon — the gas pattern is identical to the Tokyo extraction.",
+      "Beacon monitoring returned nominal results. Traffic appears clean at this time.",
+    ],
+    1: [
+      "Louvre custody router processed a high-value vault operation: multi-sig approval with 3/5 threshold. One of the signers maps to a wallet seen at Senso-ji Temple Node.",
+      "Vault staging detected — assets are being consolidated here from multiple chains. The aggregation pattern suggests an imminent large transfer. Carmen is preparing something.",
+      "Custody logs reveal routine operations. The vault has not been accessed by flagged addresses recently.",
+    ],
+    2: [
+      "Notre-Dame gate funneled Base traffic from at least 4 distinct origin chains. The convergence timing aligns with Carmen's known movement windows — she uses the noise as cover.",
+      "Bridge relay detected an unusual gas spike: someone overpaid by 300% to embed metadata in the transaction. Decoded fragments contain encrypted coordinates.",
+      "Gate traffic is heavy but organic. No anomalous patterns detected in this scan window.",
+    ],
+  },
+  51: {
+    0: [
+      "Tower Bridge node processed fresh cross-chain transfers with deliberately overpaid gas. Decoded tx metadata contains what appears to be coordinate-based messaging — Carmen's signature technique.",
+      "Bridge signatures show a wallet hopping between XDC and Arbitrum every 4 blocks. The timing is too precise for a human — this is an automated extraction bot linked to Carmen.",
+      "Bridge node traffic appears routine. The suspect route signatures may have been a false positive.",
+    ],
+    1: [
+      "Buckingham Vault is accumulating tokens from 5 different chains through obfuscated intermediaries. The pattern is consistent with pre-extraction staging — Carmen is building a war chest.",
+      "Vault multi-sig triggered with an unusual signer rotation. One new signer wallet was created 2 blocks before approval — freshly minted for this operation.",
+      "Vault custody operations are within normal parameters. No unusual accumulation detected.",
+    ],
+    2: [
+      "London Eye router relayed encrypted packets in periodic bursts matching Carmen's known operational cadence. The destination resolves to an uncharted relay on Polygon Amoy.",
+      "Packet analysis reveals a steganographic layer: underneath routine XDC traffic, a hidden data stream carries wallet seed fragments. The technique is Carmen's trademark.",
+      "Router traffic is clean. Periodic bursts appear to be standard network heartbeat signals.",
+    ],
+  },
+}
+
+function _mockClueResult(chainId, locationIdx, clueIndex, txHash, blockNumber) {
+  const clueTypes = ["BEHAVIOR_FINGERPRINT", "RELATIONSHIP", "IDENTITY_COMMIT", "FUNDING_TRAIL", "TECHNICAL_SIGNATURE", "DEAD_END"]
+  const clueTexts = MOCK_CLUE_DATA[chainId]?.[locationIdx]
+  const isDeadEnd = clueTexts ? clueTexts[clueIndex]?.includes("Dead end") || clueTexts[clueIndex]?.includes("routine") || clueTexts[clueIndex]?.includes("clean") || clueTexts[clueIndex]?.includes("false positive") : Math.random() < 0.15
+  const clueData = clueTexts?.[clueIndex] || `Clue #${clueIndex + 1}: Suspect pattern detected at ${CITY_NODE_META[chainId]?.name || "unknown"} location ${locationIdx}.`
+
+  return {
+    hash: txHash || `0x${Math.random().toString(16).slice(2, 14)}...mock`,
+    blockNumber: blockNumber || 52884300 + Math.floor(Math.random() * 100),
+    requestId: Date.now(),
+    resolved: true,
+    clueType: isDeadEnd ? "DEAD_END" : clueTypes[Math.floor(Math.random() * 5)],
+    clueData,
+    anomalyRefId: `0x${Math.random().toString(16).slice(2, 14)}`,
+    strength: isDeadEnd ? 10 : 40 + Math.floor(Math.random() * 50),
+  }
+}
+
+function _mockCityInfo(chainId) {
+  const meta = CITY_NODE_META[chainId]
+  return {
+    city: meta?.name || `City ${chainId}`,
+    countryCode: chainId === 421614 ? "JP" : chainId === 84532 ? "FR" : "GB",
+    chainId,
+    cityId: chainId,
+    suspicionLevel: Math.floor(Math.random() * 40) + 30,
+    suspicionReasonHash: ethers.ZeroHash,
+  }
+}
+
+const MOCK_LOCATIONS = {
+  421614: [
+    { name: "Senso-ji Temple Node", category: 0, fakeLevel: 2, riskLevel: 3, description: "Ancient relay pulsing with cross-chain traffic." },
+    { name: "Tokyo Tower Beacon", category: 1, fakeLevel: 1, riskLevel: 4, description: "High-altitude signal bouncing encrypted bursts." },
+    { name: "Chochin Market", category: 2, fakeLevel: 3, riskLevel: 2, description: "Token swaps masking asset movements." },
+  ],
+  84532: [
+    { name: "Eiffel Tower Relay", category: 3, fakeLevel: 2, riskLevel: 3, description: "Monitoring beacon with bridge ingress traces." },
+    { name: "Louvre Custody Router", category: 4, fakeLevel: 1, riskLevel: 5, description: "High-value custody operations detected." },
+    { name: "Notre-Dame Gate", category: 0, fakeLevel: 3, riskLevel: 2, description: "Base traffic converges at this relay." },
+  ],
+  51: [
+    { name: "Tower Bridge Node", category: 5, fakeLevel: 1, riskLevel: 4, description: "Fresh suspect route signatures found." },
+    { name: "Buckingham Vault", category: 4, fakeLevel: 2, riskLevel: 3, description: "High-value asset staging area." },
+    { name: "London Eye Router", category: 1, fakeLevel: 3, riskLevel: 2, description: "XDC packets hopping across regions." },
+  ],
+}
+
+// ── Read functions ──
+
+/**
+ * Get city info from a CityNode.
+ * Calls cityInfo() + getSuspicionIndex(); falls back to mock.
+ */
+export async function getCityNodeInfo(chainId) {
+  const contract = getCityNodeGameplayContract(chainId)
+  if (!contract) return _mockCityInfo(chainId)
+
+  try {
+    const [info, suspicion] = await Promise.all([
+      contract.cityInfo(),
+      contract.getSuspicionIndex(),
+    ])
+    return {
+      city: info.city || info[0],
+      countryCode: info.countryCode || info[1],
+      chainId: Number(info.chain || info[2]),
+      cityId: Number(info._cityId || info[3]),
+      suspicionLevel: Number(suspicion.level ?? suspicion[0]),
+      suspicionReasonHash: suspicion.reasonHash || suspicion[1],
+    }
+  } catch (err) {
+    console.warn(`[cityNode] getCityNodeInfo real call failed for chain ${chainId}, using mock:`, err.message)
+    return _mockCityInfo(chainId)
+  }
+}
+
+/**
+ * Get locations for a CityNode (3 per city).
+ * Calls getLocations(); enriches with display fields. Falls back to mock.
+ */
+export async function getCityNodeLocations(chainId) {
+  const contract = getCityNodeGameplayContract(chainId)
+  if (!contract) {
+    return (MOCK_LOCATIONS[chainId] || []).map((loc, i) => ({
+      ...loc,
+      categoryLabel: CATEGORY_MAP[loc.category] || `Category ${loc.category}`,
+      descriptionHash: ethers.ZeroHash,
+      index: i,
+      clueSlots: [null, null, null],
+      inspected: false,
+      scanned: false,
+    }))
+  }
+
+  try {
+    const rawLocations = await contract.getLocations()
+    return rawLocations.map((loc, i) => ({
+      name: loc.name,
+      descriptionHash: loc.descriptionHash,
+      category: Number(loc.category),
+      categoryLabel: CATEGORY_MAP[Number(loc.category)] || `Category ${loc.category}`,
+      fakeLevel: Number(loc.fakeLevel),
+      riskLevel: Number(loc.riskLevel),
+      description: "", // would come from IPFS via descriptionHash
+      index: i,
+      clueSlots: [null, null, null],
+      inspected: false,
+      scanned: false,
+    }))
+  } catch (err) {
+    console.warn(`[cityNode] getLocations real call failed for chain ${chainId}, using mock:`, err.message)
+    return (MOCK_LOCATIONS[chainId] || []).map((loc, i) => ({
+      ...loc,
+      categoryLabel: CATEGORY_MAP[loc.category] || `Category ${loc.category}`,
+      descriptionHash: ethers.ZeroHash,
+      index: i,
+      clueSlots: [null, null, null],
+      inspected: false,
+      scanned: false,
+    }))
+  }
+}
+
+/**
+ * Get anomaly tx refs from a CityNode.
+ * Calls getAnomalyTxRefs(0, 50); enriches with display helpers. Falls back to mock.
+ */
+export async function getCityNodeAnomalyTxRefs(chainId) {
+  const contract = getCityNodeGameplayContract(chainId)
+  if (!contract) return _mockAnomalyTxRefs(chainId)
+
+  try {
+    const rawRefs = await contract.getAnomalyTxRefs(0, 50)
+    return rawRefs.map((tx) => {
+      const anomalyIdx = Number(tx.anomalyType)
+      const sigHex = tx.methodSigLike
+      return {
+        refId: Number(tx.refId),
+        txHashLike: tx.txHashLike,
+        from: tx.from,
+        to: tx.to,
+        methodSigLike: sigHex,
+        methodLabel: _methodSigToLabel(sigHex),
+        blockLike: Number(tx.blockLike),
+        valueLike: tx.valueLike,
+        valueDisplay: ethers.formatEther(tx.valueLike),
+        anomalyType: anomalyIdx,
+        anomalyLabel: ANOMALY_TYPE_MAP[anomalyIdx] || `Type ${anomalyIdx}`,
+      }
+    })
+  } catch (err) {
+    console.warn(`[cityNode] getAnomalyTxRefs real call failed for chain ${chainId}, using mock:`, err.message)
+    return _mockAnomalyTxRefs(chainId)
+  }
+}
+
+const KNOWN_METHOD_SIGS = {
+  "0xa9059cbb": "transfer",
+  "0x095ea7b3": "approve",
+  "0x38ed1739": "swap",
+  "0x3ce33bff": "bridge",
+  "0xd0e30db0": "deposit",
+  "0x23b872dd": "transferFrom",
+}
+
+function _methodSigToLabel(sigHex) {
+  if (!sigHex || sigHex === "0x00000000") return "unknown"
+  const key = sigHex.slice(0, 10).toLowerCase()
+  return KNOWN_METHOD_SIGS[key] || key
+}
+
+// ── Location transaction generators ──
+
+function _seedFromParams(chainId, locationIdx) {
+  let h = 5381
+  const s = `${chainId}-${locationIdx}-txgen`
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) + h + s.charCodeAt(i)) & 0x7fffffff
+  }
+  return h
+}
+
+function _seededRng(seed) {
+  let s = seed
+  return () => {
+    s = (s * 1103515245 + 12345) & 0x7fffffff
+    return s / 0x7fffffff
+  }
+}
+
+function _hexFromSeed(val, length) {
+  let hex = ""
+  let h = (val >>> 0) || 1
+  while (hex.length < length) {
+    h = Math.imul(h, 0x5bd1e995) ^ (h >>> 15)
+    hex += (h >>> 0).toString(16).padStart(8, "0")
+  }
+  return hex.slice(0, length)
+}
+
+function _generateLocationTxs(chainId, locationIdx) {
+  const seed = _seedFromParams(chainId, locationIdx)
+  const rng = _seededRng(seed)
+
+  const count = 3 + Math.floor(rng() * 3) // 3-5 txs
+  const normalMethods = [
+    { sig: "0xa9059cbb", label: "transfer" },
+    { sig: "0x095ea7b3", label: "approve" },
+    { sig: "0x38ed1739", label: "swap" },
+    { sig: "0x3ce33bff", label: "bridge" },
+    { sig: "0xd0e30db0", label: "deposit" },
+    { sig: "0x23b872dd", label: "transferFrom" },
+  ]
+
+  const txs = []
+  for (let i = 0; i < count; i++) {
+    const mIdx = Math.floor(rng() * normalMethods.length)
+    const blockOffset = Math.floor(rng() * 200)
+    const val = rng() * 5
+
+    txs.push({
+      txHashLike: `0x${_hexFromSeed(seed * 31 + i * 97, 64)}`,
+      from: `0x${_hexFromSeed(seed * 17 + i * 53 + 1, 40)}`,
+      to: `0x${_hexFromSeed(seed * 23 + i * 71 + 2, 40)}`,
+      methodSigLike: normalMethods[mIdx].sig,
+      methodLabel: normalMethods[mIdx].label,
+      blockLike: 52884200 + blockOffset,
+      valueLike: BigInt(Math.floor(val * 1e18)),
+      valueDisplay: val.toFixed(4),
+      anomalyType: null,
+      anomalyLabel: null,
+      isAnomaly: false,
+    })
+  }
+
+  return txs
+}
+
+/**
+ * Build transaction list for a location, merging anomaly data from city-wide anomalyTxRefs.
+ * Normal txs are always generated. Anomaly flags are set when refs exist (Carmen present).
+ */
+export function buildLocationTransactions(chainId, locationIdx, anomalyTxRefs, numLocations = 3) {
+  const txs = _generateLocationTxs(chainId, locationIdx)
+
+  if (!anomalyTxRefs || anomalyTxRefs.length === 0) return txs
+
+  // distribute anomaly refs across locations by index
+  const myAnomalies = anomalyTxRefs.filter((_, j) => j % numLocations === locationIdx)
+
+  // mark first N normal txs as anomalous
+  const limit = Math.min(myAnomalies.length, txs.length)
+  for (let k = 0; k < limit; k++) {
+    txs[k].isAnomaly = true
+    txs[k].anomalyType = myAnomalies[k].anomalyType
+    txs[k].anomalyLabel = myAnomalies[k].anomalyLabel
+  }
+
+  return txs
+}
+
+function _mockAnomalyTxRefs(chainId) {
+  const addrs = [
+    "0x1111111111111111111111111111111111111111",
+    "0x2222222222222222222222222222222222222222",
+    "0x3333333333333333333333333333333333333333",
+    "0x4444444444444444444444444444444444444444",
+    "0x5555555555555555555555555555555555555555",
+  ]
+  const sigs = ["0xa9059cbb", "0x095ea7b3", "0x38ed1739", "0x3ce33bff", "0xd0e30db0"]
+  const labels = ["transfer", "approve", "swap", "bridge", "deposit"]
+
+  return Array.from({ length: 5 }, (_, i) => ({
+    refId: i + 1,
+    txHashLike: ethers.id(`mock-tx-${chainId}-${i}`),
+    from: addrs[i],
+    to: addrs[(i + 2) % 5],
+    methodSigLike: sigs[i],
+    methodLabel: labels[i],
+    blockLike: 52884300 + i * 10,
+    valueLike: BigInt(Math.floor(Math.random() * 10e18)),
+    valueDisplay: (Math.random() * 10).toFixed(4),
+    anomalyType: i,
+    anomalyLabel: ANOMALY_TYPE_MAP[i],
+  }))
+}
+
+/**
+ * Get suspect wallets from a CityNode.
+ * Calls getSuspectWallets(0, 50); derives tags array. Falls back to mock.
+ */
+export async function getCityNodeSuspectWallets(chainId) {
+  const contract = getCityNodeGameplayContract(chainId)
+  if (!contract) return _mockSuspectWallets()
+
+  try {
+    const rawWallets = await contract.getSuspectWallets(0, 50)
+    return rawWallets.map((s) => ({
+      wallet: s.wallet,
+      suspicionLevel: Number(s.suspicionLevel),
+      txRefIds: s.txRefIds.map((id) => BigInt(id)),
+      tagsBitmap: BigInt(s.tagsBitmap),
+      tags: decodeTags(s.tagsBitmap),
+    }))
+  } catch (err) {
+    console.warn(`[cityNode] getSuspectWallets real call failed for chain ${chainId}, using mock:`, err.message)
+    return _mockSuspectWallets()
+  }
+}
+
+function _mockSuspectWallets() {
+  return [
+    {
+      wallet: "0xCa12e45a67B9c3D8E0F1234567890AbCdEf7f2a",
+      suspicionLevel: 87,
+      txRefIds: [1n, 2n, 3n, 4n],
+      tagsBitmap: 3n,
+      tags: decodeTags(3n),
+    },
+    {
+      wallet: "0x5a4d0wFaD9876543210FeDcBa9876543210e3e91",
+      suspicionLevel: 62,
+      txRefIds: [2n, 5n],
+      tagsBitmap: 12n,
+      tags: decodeTags(12n),
+    },
+    {
+      wallet: "0xF335a1b0B3c4D5e6F7a8B9c0D1e2F3a4B5c6d444",
+      suspicionLevel: 45,
+      txRefIds: [3n],
+      tagsBitmap: 16n,
+      tags: decodeTags(16n),
+    },
+  ]
+}
+
+/**
+ * Get player energy from a CityNode.
+ * Calls getEnergy(player); returns single uint32. Falls back to MAX_ENERGY.
+ */
+export async function getCityNodeEnergy(chainId, player) {
+  const contract = getCityNodeGameplayContract(chainId)
+  if (!contract || !player) return MAX_ENERGY
+
+  try {
+    const energy = await contract.getEnergy(player)
+    return Number(energy)
+  } catch (err) {
+    console.warn(`[cityNode] getEnergy real call failed for chain ${chainId}, using default:`, err.message)
+    return MAX_ENERGY
+  }
+}
+
+/**
+ * Get player progress on a CityNode.
+ * Calls getPlayerProgress(player). Falls back to zeros.
+ */
+export async function getCityNodePlayerProgress(chainId, player) {
+  const contract = getCityNodeGameplayContract(chainId)
+  if (!contract || !player) return { inspectedBitmap: 0, cluesFound: 0, scansCompleted: 0 }
+
+  try {
+    const progress = await contract.getPlayerProgress(player)
+    return {
+      inspectedBitmap: Number(progress.inspectedBitmap ?? progress[0]),
+      cluesFound: Number(progress.cluesFound ?? progress[1]),
+      scansCompleted: Number(progress.scansCompleted ?? progress[2]),
+    }
+  } catch (err) {
+    console.warn(`[cityNode] getPlayerProgress failed for chain ${chainId}:`, err.message)
+    return { inspectedBitmap: 0, cluesFound: 0, scansCompleted: 0 }
+  }
+}
+
+/**
+ * Get evidence summary for a player.
+ * Calls getEvidenceSummary(player). Falls back to zeros.
+ */
+export async function getCityNodeEvidenceSummary(chainId, player) {
+  const contract = getCityNodeGameplayContract(chainId)
+  if (!contract || !player) return { totalClues: 0, bundleHashLike: ethers.ZeroHash, confidence: 0 }
+
+  try {
+    const summary = await contract.getEvidenceSummary(player)
+    return {
+      totalClues: Number(summary.totalClues ?? summary[0]),
+      bundleHashLike: summary.bundleHashLike || summary[1],
+      confidence: Number(summary.confidence ?? summary[2]),
+    }
+  } catch (err) {
+    console.warn(`[cityNode] getEvidenceSummary failed for chain ${chainId}:`, err.message)
+    return { totalClues: 0, bundleHashLike: ethers.ZeroHash, confidence: 0 }
+  }
+}
+
+// ── Write functions ──
+
+/**
+ * Inspect a location on a CityNode.
+ * Direct tx — completes in one transaction (no oracle callback).
+ */
+export async function cityNodeInspectLocation(chainId, locationIdx) {
+  if (!isCityNodeConfigured(chainId)) {
+    console.log(`[cityNode] inspectLocation(${locationIdx}) on chain ${chainId} — MOCK`)
+    await new Promise((r) => setTimeout(r, 1500))
+    return {
+      hash: `0x${Math.random().toString(16).slice(2, 14)}...mock`,
+      blockNumber: 52884300 + Math.floor(Math.random() * 100),
+      noteHash: ethers.ZeroHash,
+    }
+  }
+
+  const contract = await getCityNodeWriteContract(chainId)
+  const tx = await contract.inspectLocation(locationIdx)
+  const receipt = await tx.wait()
+
+  // Parse LocationInspected event from receipt
+  let noteHash = ethers.ZeroHash
+  for (const log of receipt.logs) {
+    try {
+      const parsed = contract.interface.parseLog(log)
+      if (parsed?.name === "LocationInspected") {
+        noteHash = parsed.args.noteHash || parsed.args[2]
+        break
+      }
+    } catch (_) { /* skip unparseable logs */ }
+  }
+
+  return {
+    hash: receipt.hash,
+    blockNumber: receipt.blockNumber,
+    noteHash,
+  }
+}
+
+/**
+ * Scan anomalies at a location.
+ * Direct tx — completes in one transaction.
+ */
+export async function cityNodeScanAnomalies(chainId, locationIdx) {
+  if (!isCityNodeConfigured(chainId)) {
+    console.log(`[cityNode] scanAnomalies(${locationIdx}) on chain ${chainId} — MOCK`)
+    await new Promise((r) => setTimeout(r, 2000))
+    return {
+      hash: `0x${Math.random().toString(16).slice(2, 14)}...mock`,
+      blockNumber: 52884300 + Math.floor(Math.random() * 100),
+      anomaliesFound: 2 + Math.floor(Math.random() * 3),
+      suspectsFound: 1 + Math.floor(Math.random() * 2),
+    }
+  }
+
+  const contract = await getCityNodeWriteContract(chainId)
+  const tx = await contract.scanAnomalies(locationIdx)
+  const receipt = await tx.wait()
+
+  // Count linked anomalies and suspects from events
+  let anomaliesFound = 0
+  let suspectsFound = 0
+  for (const log of receipt.logs) {
+    try {
+      const parsed = contract.interface.parseLog(log)
+      if (parsed?.name === "AnomalyTxLinked") anomaliesFound++
+      if (parsed?.name === "SuspectWalletObserved") suspectsFound++
+    } catch (_) { /* skip */ }
+  }
+
+  return {
+    hash: receipt.hash,
+    blockNumber: receipt.blockNumber,
+    anomaliesFound,
+    suspectsFound,
+  }
+}
+
+/**
+ * Request a clue at a location.
+ * Async tx — sends request, then waits for GM resolve event (ClueUnlocked or DeadEnd).
+ */
+export async function cityNodeRequestClue(chainId, locationIdx, clueIndex) {
+  if (!isCityNodeConfigured(chainId)) {
+    console.log(`[cityNode] requestClue(${locationIdx}, ${clueIndex}) on chain ${chainId} — MOCK`)
+    await new Promise((r) => setTimeout(r, 2500))
+    return _mockClueResult(chainId, locationIdx, clueIndex)
+  }
+
+  // Try real contract call; fall back to mock if GM is unreachable
+  try {
+    const contract = await getCityNodeWriteContract(chainId)
+    const tx = await contract.requestClue(locationIdx, clueIndex)
+    const receipt = await tx.wait()
+
+    // Parse ClueRequested event for requestId
+    let requestId = 0
+    for (const log of receipt.logs) {
+      try {
+        const parsed = contract.interface.parseLog(log)
+        if (parsed?.name === "ClueRequested") {
+          requestId = Number(parsed.args.requestId || parsed.args[0])
+          break
+        }
+      } catch (_) { /* skip */ }
+    }
+
+    // Wait for ClueUnlocked or DeadEnd event from GM resolve (timeout 15s, then fallback)
+    const readContract = getCityNodeGameplayContract(chainId)
+    const CLUE_TYPE_NAMES = ["BEHAVIOR_FINGERPRINT", "RELATIONSHIP", "IDENTITY_COMMIT", "FUNDING_TRAIL", "TECHNICAL_SIGNATURE", "DEAD_END"]
+
+    return await new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        cleanup()
+        console.warn(`[cityNode] GM resolve timeout — using mock clue for location ${locationIdx}, clue ${clueIndex}`)
+        resolve(_mockClueResult(chainId, locationIdx, clueIndex, receipt.hash, receipt.blockNumber))
+      }, 15_000)
+
+      let clueUnsub, deadEndUnsub
+      const cleanup = () => {
+        clearTimeout(timeout)
+        if (clueUnsub) readContract.off("ClueUnlocked", clueUnsub)
+        if (deadEndUnsub) readContract.off("DeadEnd", deadEndUnsub)
+      }
+
+      clueUnsub = (player, idx, ci, clueType, clueDataHash, anomalyRefId) => {
+        if (Number(idx) !== locationIdx || Number(ci) !== clueIndex) return
+        cleanup()
+        resolve({
+          hash: receipt.hash,
+          blockNumber: receipt.blockNumber,
+          requestId,
+          resolved: true,
+          clueType: CLUE_TYPE_NAMES[Number(clueType)] || `Type ${clueType}`,
+          clueData: `Clue resolved: ${clueDataHash.slice(0, 14)}...`,
+          anomalyRefId: anomalyRefId,
+          strength: 50 + Math.floor(Math.random() * 40),
+        })
+      }
+
+      deadEndUnsub = (player, idx, consolationHintHash) => {
+        if (Number(idx) !== locationIdx) return
+        cleanup()
+        resolve({
+          hash: receipt.hash,
+          blockNumber: receipt.blockNumber,
+          requestId,
+          resolved: true,
+          clueType: "DEAD_END",
+          clueData: "Dead end — no actionable intel at this position.",
+          anomalyRefId: consolationHintHash,
+          strength: 10,
+        })
+      }
+
+      readContract.on("ClueUnlocked", clueUnsub)
+      readContract.on("DeadEnd", deadEndUnsub)
+    })
+  } catch (err) {
+    console.warn(`[cityNode] requestClue real call failed for chain ${chainId}, using mock:`, err.message)
+    await new Promise((r) => setTimeout(r, 2000))
+    return _mockClueResult(chainId, locationIdx, clueIndex)
+  }
+}
+
+/**
+ * Flag a transaction reference.
+ * Direct tx. Contract takes bytes32 refId.
+ */
+export async function cityNodeFlagTx(chainId, refId) {
+  if (!isCityNodeConfigured(chainId)) {
+    console.log(`[cityNode] flagTx(${refId}) on chain ${chainId} — MOCK`)
+    await new Promise((r) => setTimeout(r, 1000))
+    return { hash: `0x${Math.random().toString(16).slice(2, 14)}...mock` }
+  }
+
+  // Contract expects bytes32; convert if needed
+  let bytes32RefId = refId
+  if (typeof refId === "number" || typeof refId === "bigint") {
+    bytes32RefId = ethers.zeroPadValue(ethers.toBeHex(BigInt(refId)), 32)
+  }
+
+  const contract = await getCityNodeWriteContract(chainId)
+  const tx = await contract.flagTx(bytes32RefId)
+  const receipt = await tx.wait()
+  return { hash: receipt.hash }
+}
+
+/**
+ * Request a dossier (evidence summary analysis).
+ * Async tx — sends request, then waits for DossierResolved event.
+ */
+export async function cityNodeRequestDossier(chainId) {
+  if (!isCityNodeConfigured(chainId)) {
+    console.log(`[cityNode] requestDossier() on chain ${chainId} — MOCK`)
+    await new Promise((r) => setTimeout(r, 3000))
+    return {
+      hash: `0x${Math.random().toString(16).slice(2, 14)}...mock`,
+      requestId: Date.now(),
+      resolved: true,
+      summary: "Cross-chain bridge usage pattern matches known Carmen Sandiego operational signature. Assets move BNB\u2192Polygon\u2192Arbitrum in rapid succession.",
+      hypotheses: [
+        "Carmen is using shadow wrapping to disguise stolen NFTs across chains.",
+        "A custody router at the Airport node is the primary laundering venue.",
+      ],
+      gaps: ["No direct identity link yet \u2014 need more clue data from Location #2."],
+      nextObjective: "Investigate the Custody Protocol location for identity clues.",
+      confidence: 65,
+    }
+  }
+
+  const contract = await getCityNodeWriteContract(chainId)
+  const tx = await contract.requestDossier()
+  const receipt = await tx.wait()
+
+  // Parse DossierRequested for requestId
+  let requestId = 0
+  for (const log of receipt.logs) {
+    try {
+      const parsed = contract.interface.parseLog(log)
+      if (parsed?.name === "DossierRequested") {
+        requestId = Number(parsed.args.requestId || parsed.args[0])
+        break
+      }
+    } catch (_) { /* skip */ }
+  }
+
+  // Wait for DossierResolved (timeout 60s)
+  const readContract = getCityNodeGameplayContract(chainId)
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup()
+      reject(new Error("GM dossier resolve timeout (60s)"))
+    }, 60_000)
+
+    let handler
+    const cleanup = () => {
+      clearTimeout(timeout)
+      if (handler) readContract.off("DossierResolved", handler)
+    }
+
+    handler = (evtRequestId, player, dossierHash, confidence, nextObjectiveHintHash) => {
+      if (Number(evtRequestId) !== requestId) return
+      cleanup()
+      resolve({
+        hash: receipt.hash,
+        requestId,
+        resolved: true,
+        summary: `Dossier compiled: ${dossierHash.slice(0, 14)}...`,
+        hypotheses: ["Evidence pattern analysis complete."],
+        gaps: [],
+        nextObjective: `Next objective hint: ${nextObjectiveHintHash.slice(0, 14)}...`,
+        confidence: Number(confidence),
+      })
+    }
+
+    readContract.on("DossierResolved", handler)
+  })
+}
+
+/**
+ * Request capture of a suspect wallet.
+ * Async tx — sends request, then waits for CaptureResolved event.
+ */
+export async function cityNodeRequestCapture(chainId, suspectWallet, evidenceBundleHash) {
+  if (!isCityNodeConfigured(chainId)) {
+    console.log(`[cityNode] requestCapture(${suspectWallet}) on chain ${chainId} — MOCK`)
+    await new Promise((r) => setTimeout(r, 3500))
+    const success = Math.random() > 0.4
+    const reasonCodes = ["INSUFFICIENT_EVIDENCE", "WALLET_MISMATCH", "WRONG_CITY"]
+    return {
+      hash: `0x${Math.random().toString(16).slice(2, 14)}...mock`,
+      requestId: Date.now(),
+      resolved: true,
+      success,
+      reasonCode: success ? "OK" : reasonCodes[Math.floor(Math.random() * reasonCodes.length)],
+      gmNote: success
+        ? "Target confirmed! Carmen Sandiego apprehended."
+        : "Capture failed. Review your evidence and try again.",
+    }
+  }
+
+  const bundleHash = evidenceBundleHash || ethers.ZeroHash
+  const contract = await getCityNodeWriteContract(chainId)
+  const tx = await contract.requestCapture(suspectWallet, bundleHash)
+  const receipt = await tx.wait()
+
+  // Parse CaptureRequested for requestId
+  let requestId = 0
+  for (const log of receipt.logs) {
+    try {
+      const parsed = contract.interface.parseLog(log)
+      if (parsed?.name === "CaptureRequested") {
+        requestId = Number(parsed.args.requestId || parsed.args[0])
+        break
+      }
+    } catch (_) { /* skip */ }
+  }
+
+  // Wait for CaptureResolved (timeout 60s)
+  const REASON_CODE_NAMES = ["OK", "INSUFFICIENT_EVIDENCE", "WALLET_MISMATCH", "WRONG_CITY", "EXPIRED_REQUEST", "INVALID_BUNDLE"]
+  const readContract = getCityNodeGameplayContract(chainId)
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup()
+      reject(new Error("GM capture resolve timeout (60s)"))
+    }, 60_000)
+
+    let handler
+    const cleanup = () => {
+      clearTimeout(timeout)
+      if (handler) readContract.off("CaptureResolved", handler)
+    }
+
+    handler = (evtRequestId, player, wallet, success, reasonCode, gmNoteHash) => {
+      if (Number(evtRequestId) !== requestId) return
+      cleanup()
+      resolve({
+        hash: receipt.hash,
+        requestId,
+        resolved: true,
+        success: Boolean(success),
+        reasonCode: REASON_CODE_NAMES[Number(reasonCode)] || `Code ${reasonCode}`,
+        gmNote: success
+          ? "Target confirmed! Carmen Sandiego apprehended."
+          : `Capture failed: ${gmNoteHash.slice(0, 14)}...`,
+      })
+    }
+
+    readContract.on("CaptureResolved", handler)
+  })
+}
+
+// ── CityNode Event Listeners ──
+
+/**
+ * Listen for CityNode gameplay events for a specific player.
+ * Returns an unsubscribe function.
+ */
+export async function onCityNodeEvents(chainId, playerAddress, callbacks) {
+  const contract = getCityNodeGameplayContract(chainId)
+  if (!contract) return () => {}
+
+  const unsubs = []
+
+  if (callbacks.onLocationInspected) {
+    const handler = (player, idx, noteHash) => {
+      if (player.toLowerCase() !== playerAddress.toLowerCase()) return
+      callbacks.onLocationInspected({ player, idx: Number(idx), noteHash })
+    }
+    contract.on("LocationInspected", handler)
+    unsubs.push(() => contract.off("LocationInspected", handler))
+  }
+
+  if (callbacks.onClueUnlocked) {
+    const handler = (player, idx, clueIndex, clueType, clueDataHash, anomalyRefId) => {
+      if (player.toLowerCase() !== playerAddress.toLowerCase()) return
+      callbacks.onClueUnlocked({
+        player,
+        idx: Number(idx),
+        clueIndex: Number(clueIndex),
+        clueType: Number(clueType),
+        clueDataHash,
+        anomalyRefId,
+      })
+    }
+    contract.on("ClueUnlocked", handler)
+    unsubs.push(() => contract.off("ClueUnlocked", handler))
+  }
+
+  if (callbacks.onEnergySpent) {
+    const handler = (player, amount, remaining, actionType) => {
+      if (player.toLowerCase() !== playerAddress.toLowerCase()) return
+      callbacks.onEnergySpent({
+        player,
+        amount: Number(amount),
+        remaining: Number(remaining),
+        actionType: Number(actionType),
+      })
+    }
+    contract.on("EnergySpent", handler)
+    unsubs.push(() => contract.off("EnergySpent", handler))
+  }
+
+  if (callbacks.onCaptureResolved) {
+    const handler = (requestId, player, wallet, success, reasonCode, gmNoteHash) => {
+      if (player.toLowerCase() !== playerAddress.toLowerCase()) return
+      callbacks.onCaptureResolved({
+        requestId: Number(requestId),
+        player,
+        wallet,
+        success: Boolean(success),
+        reasonCode: Number(reasonCode),
+        gmNoteHash,
+      })
+    }
+    contract.on("CaptureResolved", handler)
+    unsubs.push(() => contract.off("CaptureResolved", handler))
+  }
+
+  return () => unsubs.forEach((fn) => fn())
 }
