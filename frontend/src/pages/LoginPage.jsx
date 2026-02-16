@@ -11,7 +11,7 @@ import { getEthereumAddressFromPrivy, generateMultiChainAddressesFromPrivy, getU
 import { saveAuthSession, clearAuthSession } from '../utils/authPersistence'
 import { initializePlayerRegistry, getPlayerData } from '../services/creService'
 import { getOrCreateKeyPair } from '../utils/ecies'
-import { isPlayerRegistered, registerPlayer as registerPlayerOnChain, ensureSepoliaNetwork, getSigner, startMission as startMissionOnChain, getPlayerActiveMission } from '../services/contractService'
+import { isPlayerRegistered, registerPlayer as registerPlayerOnChain, getSigner, startMission as startMissionOnChain, getPlayerActiveMission } from '../services/contractService'
 import styles from './LoginPage.module.css'
 
 const LEADERBOARD_MSG = 'Leaderboard coming soon! Complete missions to build your rank.'
@@ -125,9 +125,6 @@ export default function LoginPage() {
           }
 
           console.log('[LoginPage] Wallet address:', address)
-
-          // Ensure Sepolia network
-          await ensureSepoliaNetwork()
 
           // Initialize PlayerRegistry contract
           const playerRegistryAddress = import.meta.env.VITE_PLAYER_REGISTRY_ADDRESS_SEPOLIA
