@@ -11,7 +11,7 @@ import { getEthereumAddressFromPrivy, generateMultiChainAddressesFromPrivy, getU
 import { saveAuthSession, clearAuthSession } from '../utils/authPersistence'
 import { initializePlayerRegistry, getPlayerData } from '../services/creService'
 import { getOrCreateKeyPair } from '../utils/ecies'
-import { isPlayerRegistered, registerPlayer as registerPlayerOnChain, getSigner, startMission as startMissionOnChain, getPlayerActiveMission } from '../services/contractService'
+import { isPlayerRegistered, registerPlayer as registerPlayerOnChain, getPlayerActiveMission } from '../services/contractService'
 import styles from './LoginPage.module.css'
 
 const LEADERBOARD_MSG = 'Leaderboard coming soon! Complete missions to build your rank.'
@@ -289,14 +289,7 @@ export default function LoginPage() {
                         navigate('/game')
                         return
                       }
-                      // no active mission — start one on-chain, then show briefing
-                      setStartingMission(true)
-                      try {
-                        await ensureSepoliaNetwork()
-                        await startMissionOnChain()
-                      } catch (err) {
-                        console.error('[LoginPage] startMission failed:', err)
-                      }
+                      // no active mission — navigate to game to start briefing
                       setStartingMission(false)
                       navigate('/game')
                     }}
