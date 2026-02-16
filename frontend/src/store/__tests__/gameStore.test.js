@@ -26,6 +26,9 @@ describe('gameStore', () => {
       player: null,
       missionId: null,
       missionData: null,
+      currentPlot: null,
+      showPlotModal: false,
+      lastKnownLocation: null,
       isRegistered: false,
       clues: [],
       evidence: [],
@@ -38,7 +41,11 @@ describe('gameStore', () => {
       rank: 0,
       rankTitle: 'Detective Rookie',
       currentMission: null,
+      carmenWalletAddress: null,
+      carmenLocationIdx: null,
     })
+
+    localStorage.clear()
 
     vi.clearAllMocks()
   })
@@ -143,7 +150,7 @@ describe('gameStore', () => {
       expect(useGameStore.getState().briefingDone).toBe(true)
     })
 
-    it('registers player and starts mission when not registered', async () => {
+    it('fetches active mission and sets briefingDone when not registered', async () => {
       contractMocks.getPlayerActiveMission.mockResolvedValueOnce(1n)
       contractMocks.getMission.mockResolvedValueOnce({
         player: '0x1234567890abcdef1234567890abcdef12345678', startBlock: 100n, targetHash: '0xhash',
@@ -153,13 +160,13 @@ describe('gameStore', () => {
       const { completeBriefing } = useGameStore.getState()
       await completeBriefing()
 
-      expect(contractMocks.registerPlayer).toHaveBeenCalled()
-      expect(contractMocks.startMission).toHaveBeenCalled()
-      expect(useGameStore.getState().isRegistered).toBe(true)
+      // completeBriefing no longer registers or starts missions (moved to LoginPage)
+      expect(contractMocks.registerPlayer).not.toHaveBeenCalled()
+      expect(contractMocks.startMission).not.toHaveBeenCalled()
       expect(useGameStore.getState().briefingDone).toBe(true)
     })
 
-    it('skips registration when already registered', async () => {
+    it('enters briefing with existing mission when already registered', async () => {
       useGameStore.setState({ isRegistered: true })
       contractMocks.getPlayerActiveMission.mockResolvedValueOnce(1n)
       contractMocks.getMission.mockResolvedValueOnce({
@@ -171,7 +178,8 @@ describe('gameStore', () => {
       await completeBriefing()
 
       expect(contractMocks.registerPlayer).not.toHaveBeenCalled()
-      expect(contractMocks.startMission).toHaveBeenCalled()
+      expect(contractMocks.startMission).not.toHaveBeenCalled()
+      expect(useGameStore.getState().briefingDone).toBe(true)
     })
 
     it('adds error terminal line on failure', async () => {
@@ -184,6 +192,46 @@ describe('gameStore', () => {
       const errorLine = lines.find((l) => l.color === 'red')
       expect(errorLine).toBeDefined()
       expect(errorLine.text).toContain('Network fail')
+    })
+  })
+
+  // ============================================================
+  //  plot persistence
+  // ============================================================
+
+  describe('mission plot persistence', () => {
+    it('hydrates and persists plot for active mission', () => {
+      useGameStore.setState({ missionId: 2 })
+      const { hydrateMissionPlot } = useGameStore.getState()
+
+      const plot = hydrateMissionPlot(2)
+
+      expect(plot).toBeTruthy()
+      expect(plot.missionId).toBe(2)
+      expect(plot.title).toBe('The Stolen Bored Ape')
+
+      const raw = localStorage.getItem('carmen_current_mission_plot')
+      expect(raw).toBeTruthy()
+      expect(JSON.parse(raw).missionId).toBe(2)
+    })
+
+    it('opens mission plot modal for current mission', () => {
+      useGameStore.setState({
+        missionId: 1,
+        currentPlot: {
+          missionId: 1,
+          scenarioId: 'heist-of-cryptopunk',
+          title: 'The Heist of the Lost CryptoPunk',
+          briefing: 'Test briefing',
+          cities: {},
+        },
+      })
+
+      const { openMissionPlotModal } = useGameStore.getState()
+      openMissionPlotModal()
+
+      const state = useGameStore.getState()
+      expect(state.showPlotModal).toBe(true)
     })
   })
 

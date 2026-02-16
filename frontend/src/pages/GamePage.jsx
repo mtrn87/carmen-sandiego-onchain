@@ -3,14 +3,30 @@ import { useNavigate } from 'react-router-dom'
 import TerminalSidebar from '../components/TerminalSidebar'
 import InteractiveMap from '../components/InteractiveMap'
 import ContractExplorer from '../components/ContractExplorer'
+import CaptureMode from '../components/CaptureMode'
 import MissionBriefing from '../components/MissionBriefing'
 import MissionOutcome from '../components/MissionOutcome'
+import MissionPlotModal from '../components/MissionPlotModal'
+import ClueModal from '../components/ClueModal'
+
 import { useGameStore } from '../store/gameStore'
 import styles from './GamePage.module.css'
 
 export default function GamePage() {
   const navigate = useNavigate()
-  const { isConnected, briefingDone, showOutcomeModal, setCurrentCase, initGame } = useGameStore()
+  const {
+    isConnected,
+    briefingDone,
+    showOutcomeModal,
+    showPlotModal,
+    showCityClueModal,
+    setCurrentCase,
+    initGame,
+    selectCity,
+    selectLocation,
+    currentCityId,
+    captureMode,
+  } = useGameStore()
   const [showMap, setShowMap] = useState(false)
 
   // redirect to login if not connected
@@ -29,8 +45,46 @@ export default function GamePage() {
 
   if (!isConnected) return null
 
+  const handleSelectCase = (c) => {
+    // CityNode cities: load city data and set location index
+    const cityNodeChains = [421614, 84532, 51]
+    if (c?.chainId && cityNodeChains.includes(c.chainId)) {
+      // find location index within the city's cases
+      const locIdx = c.locationIdx ?? 0
+      if (!currentCityId || currentCityId !== c.chainId) {
+        selectCity(c.chainId).then(() => selectLocation(locIdx))
+      } else {
+        selectLocation(locIdx)
+      }
+    } else if (c?.id) {
+      setCurrentCase(c.id)
+    }
+    setShowMap(false)
+  }
+
+  // determine what to show in the main area
+  const renderMainContent = () => {
+    if (showMap) {
+      return (
+        <>
+          <InteractiveMap
+            onSelectCase={handleSelectCase}
+          />
+          <button
+            className={styles.backToExplorer}
+            onClick={() => setShowMap(false)}
+          >
+            &#9664; BACK TO EXPLORER
+          </button>
+        </>
+      )
+    }
+
+    return <ContractExplorer onOpenMap={() => setShowMap(true)} />
+  }
+
   return (
-    <div className={styles.layout}>
+    <div className={`${styles.layout} ${captureMode ? styles.layoutCapture : ''}`}>
       {/* CRT scanlines + rolling bar over entire page */}
       <div className={styles.crtScanlines} />
       <div className={styles.crtRollingBar} />
@@ -42,32 +96,25 @@ export default function GamePage() {
       {/* victory/defeat overlay — shown when mission ends */}
       {showOutcomeModal && <MissionOutcome />}
 
-      {/* left sidebar — terminal (empty until briefing done) */}
-      <aside className={styles.sidebar}>
+      {/* mission plot overlay — opened from terminal command */}
+      {showPlotModal && <MissionPlotModal />}
+
+      {/* city clue modal — shown after requesting a clue */}
+      {showCityClueModal && <ClueModal />}
+
+      {/* left sidebar — terminal (dimmed in capture mode) */}
+      <aside className={`${styles.sidebar} ${captureMode ? styles.sidebarDimmed : ''}`}>
         <TerminalSidebar />
       </aside>
 
-      {/* right area — explorer/map + evidence */}
+      {/* right area — explorer/map + capture bar */}
       <main className={styles.main}>
         <div className={styles.mapArea}>
-          {showMap ? (
-            <>
-              <InteractiveMap onSelectCase={(c) => {
-                if (c?.id) setCurrentCase(c.id)
-                setShowMap(false)
-              }} />
-              <button
-                className={styles.backToExplorer}
-                onClick={() => setShowMap(false)}
-              >
-                &#9664; BACK TO EXPLORER
-              </button>
-            </>
-          ) : (
-            <ContractExplorer onOpenMap={() => setShowMap(true)} />
-          )}
+          {renderMainContent()}
         </div>
+        {captureMode && <CaptureMode />}
       </main>
+
     </div>
   )
 }

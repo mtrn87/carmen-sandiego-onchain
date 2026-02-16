@@ -10,10 +10,11 @@ import { useGameStore } from '../store/gameStore'
 import { getEthereumAddressFromPrivy, generateMultiChainAddressesFromPrivy, getUserInfoFromPrivy } from '../utils/privyProvider'
 import { saveAuthSession, clearAuthSession } from '../utils/authPersistence'
 import { initializePlayerRegistry, getPlayerData } from '../services/creService'
-import { ensureSepoliaNetwork } from '../services/contractService'
+import { getOrCreateKeyPair } from '../utils/ecies'
+import { isPlayerRegistered, registerPlayer as registerPlayerOnChain, ensureSepoliaNetwork, getSigner, startMission as startMissionOnChain, getPlayerActiveMission } from '../services/contractService'
+import styles from './LoginPage.module.css'
 
 const LEADERBOARD_MSG = 'Leaderboard coming soon! Complete missions to build your rank.'
-import styles from './LoginPage.module.css'
 
 const BOOT_LINES = [
   '> ACME DETECTIVE AGENCY :: MAINFRAME v3.1.4',
@@ -33,7 +34,15 @@ export default function LoginPage() {
   const [connecting, setConnecting] = useState(false)
   const [flickerClass, setFlickerClass] = useState('')
   const [showNicknameModal, setShowNicknameModal] = useState(false)
-  const { connectWallet, isConnected, walletAddress, playerNickname, disconnectWallet } = useGameStore()
+  const { connectWallet, isConnected, walletAddress, playerNickname, disconnectWallet, missionId, initGame } = useGameStore()
+  const [startingMission, setStartingMission] = useState(false)
+
+  // load on-chain state to detect existing mission
+  useEffect(() => {
+    if (isConnected && walletAddress) {
+      initGame()
+    }
+  }, [isConnected, walletAddress, initGame])
 
   // boot sequence
   useEffect(() => {
@@ -254,8 +263,48 @@ export default function LoginPage() {
                     </div>
                   )}
 
-                  <NeonButton variant="green" onClick={() => navigate('/game')}>
-                    Start Investigation
+                  <NeonButton
+                    variant="green"
+                    loading={startingMission}
+                    onClick={async () => {
+                      if (missionId) {
+                        // mission already active — skip briefing, load city and go to game
+                        setStartingMission(true)
+                        try {
+                          const store = useGameStore.getState()
+                          await store.selectCity(421614)
+                          store.selectLocation(0)
+                          store.hydrateMissionPlot(missionId)
+                          await store._setupEventListeners(missionId)
+                        } catch (err) {
+                          console.warn('[LoginPage] City setup failed:', err.message)
+                        }
+                        useGameStore.setState({
+                          briefingDone: true,
+                          terminalLines: [
+                            { text: '> ACME MAINFRAME :: INITIALIZING MISSION', color: 'cyan', type: 'system' },
+                            { text: '> Agent connected. Welcome, Detective.', color: 'green', type: 'system' },
+                            { text: `> RESUMING MISSION #${missionId}. Carmen's location committed.`, color: 'yellow', type: 'alert' },
+                            { text: '> Type /MISSION in terminal to read your current assignment.', color: 'cyan', type: 'help' },
+                          ],
+                        })
+                        setStartingMission(false)
+                        navigate('/game')
+                        return
+                      }
+                      // no active mission — start one on-chain, then show briefing
+                      setStartingMission(true)
+                      try {
+                        await ensureSepoliaNetwork()
+                        await startMissionOnChain()
+                      } catch (err) {
+                        console.error('[LoginPage] startMission failed:', err)
+                      }
+                      setStartingMission(false)
+                      navigate('/game')
+                    }}
+                  >
+                    {startingMission ? 'Starting Mission...' : missionId ? 'Continue Mission' : 'Start Investigation'}
                   </NeonButton>
 
                   <NeonButton variant="magenta" onClick={() => alert(LEADERBOARD_MSG)}>

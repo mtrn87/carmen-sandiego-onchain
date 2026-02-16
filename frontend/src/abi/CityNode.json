@@ -1,0 +1,1581 @@
+{
+  "contractName": "CityNode",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_cityName",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_countryCode",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_chainId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_cityId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "_gameMaster",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "refId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "txHashLike",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum ICityNode.AnomalyType",
+          "name": "anomalyType",
+          "type": "uint8"
+        }
+      ],
+      "name": "AnomalyTxLinked",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "requestId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "suspectWallet",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "evidenceBundleHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "CaptureRequested",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "requestId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "suspectWallet",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum ICityNode.CaptureReasonCode",
+          "name": "reasonCode",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "gmNoteHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "CaptureResolved",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "CarmenArrived",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "CarmenDeparted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        }
+      ],
+      "name": "CityInvestigated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "requestId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "idx",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "clueIndex",
+          "type": "uint8"
+        }
+      ],
+      "name": "ClueRequested",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "idx",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "clueIndex",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum ICityNode.ClueType",
+          "name": "clueType",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "clueDataHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "anomalyRefId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "ClueUnlocked",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "idx",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "consolationHintHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "DeadEnd",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "contentHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "ipfsPointer",
+          "type": "string"
+        }
+      ],
+      "name": "DepartureHintRecorded",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "requestId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "cityId",
+          "type": "uint256"
+        }
+      ],
+      "name": "DossierRequested",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "requestId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "dossierHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "confidence",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "nextObjectiveHintHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "DossierResolved",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "amount",
+          "type": "uint32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "remaining",
+          "type": "uint32"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum ICityNode.ActionType",
+          "name": "actionType",
+          "type": "uint8"
+        }
+      ],
+      "name": "EnergySpent",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "idx",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "noteHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "LocationInspected",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "wallet",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "refId",
+          "type": "uint256"
+        }
+      ],
+      "name": "SuspectWalletObserved",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "refId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "TxFlagged",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "CLUES_PER_LOCATION",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "ENERGY_REGEN_INTERVAL",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MAX_ENERGY",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "NUM_LOCATIONS",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "refId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "txHashLike",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "address",
+              "name": "from",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "to",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes4",
+              "name": "methodSigLike",
+              "type": "bytes4"
+            },
+            {
+              "internalType": "uint64",
+              "name": "blockLike",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint128",
+              "name": "valueLike",
+              "type": "uint128"
+            },
+            {
+              "internalType": "enum ICityNode.AnomalyType",
+              "name": "anomalyType",
+              "type": "uint8"
+            }
+          ],
+          "internalType": "struct ICityNode.TxRef",
+          "name": "txRef",
+          "type": "tuple"
+        }
+      ],
+      "name": "addAnomalyTxRef",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "wallet",
+              "type": "address"
+            },
+            {
+              "internalType": "uint8",
+              "name": "suspicionLevel",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256[]",
+              "name": "txRefIds",
+              "type": "uint256[]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "tagsBitmap",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct ICityNode.SuspectWallet",
+          "name": "suspect",
+          "type": "tuple"
+        }
+      ],
+      "name": "addSuspectWallet",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "chainId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "cityId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "cityInfo",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "city",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_countryCode",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "chain",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_cityId",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "cityName",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "countryCode",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "refId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "flagTx",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "gameMaster",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "refId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getAnomalyTxRefById",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "refId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "txHashLike",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "address",
+              "name": "from",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "to",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes4",
+              "name": "methodSigLike",
+              "type": "bytes4"
+            },
+            {
+              "internalType": "uint64",
+              "name": "blockLike",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint128",
+              "name": "valueLike",
+              "type": "uint128"
+            },
+            {
+              "internalType": "enum ICityNode.AnomalyType",
+              "name": "anomalyType",
+              "type": "uint8"
+            }
+          ],
+          "internalType": "struct ICityNode.TxRef",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "cursor",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "limit",
+          "type": "uint256"
+        }
+      ],
+      "name": "getAnomalyTxRefs",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "refId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "txHashLike",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "address",
+              "name": "from",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "to",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes4",
+              "name": "methodSigLike",
+              "type": "bytes4"
+            },
+            {
+              "internalType": "uint64",
+              "name": "blockLike",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint128",
+              "name": "valueLike",
+              "type": "uint128"
+            },
+            {
+              "internalType": "enum ICityNode.AnomalyType",
+              "name": "anomalyType",
+              "type": "uint8"
+            }
+          ],
+          "internalType": "struct ICityNode.TxRef[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getCarmenStatus",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getClueSchema",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "totalClues",
+          "type": "uint8"
+        },
+        {
+          "internalType": "enum ICityNode.ClueType[]",
+          "name": "",
+          "type": "uint8[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getDepartureHints",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "bytes32",
+              "name": "contentHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "string",
+              "name": "ipfsPointer",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct ICityNode.DepartureHint[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        }
+      ],
+      "name": "getEnergy",
+      "outputs": [
+        {
+          "internalType": "uint32",
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        }
+      ],
+      "name": "getEvidenceSummary",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "totalClues",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "bundleHashLike",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "confidence",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "locationIdx",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "clueIndex",
+          "type": "uint8"
+        }
+      ],
+      "name": "getHint",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "hintHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "hintStrength",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "idx",
+          "type": "uint8"
+        }
+      ],
+      "name": "getLocationMeta",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "descriptionHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint8",
+              "name": "category",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "fakeLevel",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "riskLevel",
+              "type": "uint8"
+            }
+          ],
+          "internalType": "struct ICityNode.LocationInfo",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getLocations",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "descriptionHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint8",
+              "name": "category",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "fakeLevel",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "riskLevel",
+              "type": "uint8"
+            }
+          ],
+          "internalType": "struct ICityNode.LocationInfo[3]",
+          "name": "",
+          "type": "tuple[3]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        }
+      ],
+      "name": "getPlayerProgress",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "inspectedBitmap",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "cluesFound",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "scansCompleted",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "wallet",
+          "type": "address"
+        }
+      ],
+      "name": "getSuspectWallet",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "wallet",
+              "type": "address"
+            },
+            {
+              "internalType": "uint8",
+              "name": "suspicionLevel",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256[]",
+              "name": "txRefIds",
+              "type": "uint256[]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "tagsBitmap",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct ICityNode.SuspectWallet",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "cursor",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "limit",
+          "type": "uint256"
+        }
+      ],
+      "name": "getSuspectWallets",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "wallet",
+              "type": "address"
+            },
+            {
+              "internalType": "uint8",
+              "name": "suspicionLevel",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint256[]",
+              "name": "txRefIds",
+              "type": "uint256[]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "tagsBitmap",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct ICityNode.SuspectWallet[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getSuspicionIndex",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "level",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "reasonHash",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "idx",
+          "type": "uint8"
+        }
+      ],
+      "name": "inspectLocation",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "locationsConfigured",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "contentHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "string",
+          "name": "ipfsPointer",
+          "type": "string"
+        }
+      ],
+      "name": "recordDepartureHint",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "suspectWallet",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "evidenceBundleHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "requestCapture",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "idx",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "clueIndex",
+          "type": "uint8"
+        }
+      ],
+      "name": "requestClue",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "requestDossier",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        }
+      ],
+      "name": "resetPlayerProgress",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "requestId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint8",
+          "name": "reasonCode",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "gmNoteHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "resolveCapture",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "requestId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "clueType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "clueDataHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "anomalyRefId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "resolveClue",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "requestId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "dossierHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "confidence",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "nextObjectiveHintHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "resolveDossier",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "idx",
+          "type": "uint8"
+        }
+      ],
+      "name": "scanAnomalies",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "enum ICityNode.ClueType[]",
+          "name": "_clueTypes",
+          "type": "uint8[]"
+        }
+      ],
+      "name": "setClueSchema",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_gameMaster",
+          "type": "address"
+        }
+      ],
+      "name": "setGameMaster",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "locationIdx",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "clueIndex",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "_hintHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "_hintStrength",
+          "type": "uint8"
+        }
+      ],
+      "name": "setHint",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "level",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "reasonHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "setSuspicionIndex",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "descriptionHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint8",
+              "name": "category",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "fakeLevel",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "riskLevel",
+              "type": "uint8"
+            }
+          ],
+          "internalType": "struct ICityNode.LocationInfo[3]",
+          "name": "_locations",
+          "type": "tuple[3]"
+        }
+      ],
+      "name": "setupLocations",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "isPresent",
+          "type": "bool"
+        }
+      ],
+      "name": "updateCarmenPresence",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ]
+}

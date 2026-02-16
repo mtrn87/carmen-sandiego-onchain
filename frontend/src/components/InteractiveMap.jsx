@@ -1,635 +1,9 @@
 import { useRef, useEffect, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
+import { CITY_POOL, CITY_POOL_MAP } from '../data/cityRegistry'
 import styles from './InteractiveMap.module.css'
 
 const SCAN_COST = 30
-
-const MAP_LOCATIONS = [
-  {
-    id: 421614,
-    name: 'Tokyo',
-    flag: '\u{1F5FE}',
-    chain: 'Arbitrum Sepolia',
-    chainColor: '#28A0F0',
-    chainIcon: '/blockchain_icon/arbitrum.png',
-    image: '/tokyo.png',
-    coords: { left: '83%', top: '34%' },
-    cases: [
-      {
-        id: 'tokyo-sensoji',
-        name: 'Senso-ji Temple Node',
-        type: 'Bridge Relay',
-        status: 'active',
-        description: 'A bridge relay hidden near the ancient Senso-ji temple. Cross-chain asset ingress detected.',
-        image: '/tokyo_1.png',
-        chainId: 421614,
-      },
-      {
-        id: 'tokyo-tower',
-        name: 'Tokyo Tower Beacon',
-        type: 'Signal Router',
-        status: 'active',
-        description: 'A signal router broadcasting from the Tokyo Tower node. Encrypted transmissions intercepted.',
-        image: '/tokyo_2.png',
-        chainId: 421614,
-      },
-      {
-        id: 'tokyo-chochin',
-        name: 'Chochin Market',
-        type: 'Swap Protocol',
-        status: 'active',
-        description: 'A swap protocol operating under the Chochin lantern district. High-frequency token swaps obscuring stolen assets.',
-        image: '/tokyo_3.png',
-        chainId: 421614,
-      },
-    ],
-  },
-  {
-    id: 4216141,
-    name: 'Ottawa',
-    flag: '\u{1F1E8}\u{1F1E6}',
-    chain: 'Arbitrum Sepolia',
-    chainColor: '#28A0F0',
-    chainIcon: '/blockchain_icon/arbitrum.png',
-    image: '/ottawa.png',
-    coords: { left: '29%', top: '27%' },
-    cases: [
-      {
-        id: 'ottawa-rideau',
-        name: 'Rideau Canal Relay',
-        type: 'Bridge Relay',
-        status: 'active',
-        description: 'A relay node pulsing under the frozen Rideau Canal. Arbitrum ingress confirmed.',
-        image: '/ottawa_1.png',
-        chainId: 421614,
-      },
-      {
-        id: 'ottawa-parliament',
-        name: 'Parliament Hill Beacon',
-        type: 'Signal Router',
-        status: 'active',
-        description: 'A beacon tucked near Parliament Hill. Encrypted bursts match known thief signatures.',
-        image: '/ottawa_2.png',
-        chainId: 421614,
-      },
-      {
-        id: 'ottawa-gallery',
-        name: 'National Gallery Vault',
-        type: 'Custody Protocol',
-        status: 'active',
-        description: 'Custody traffic spiking near the National Gallery. Assets are being staged here.',
-        image: '/ottawa_3.png',
-        chainId: 421614,
-      },
-    ],
-  },
-  {
-    id: 97,
-    name: 'London',
-    flag: '\u{1F3A1}',
-    chain: 'BNB Testnet',
-    chainColor: '#F0B90B',
-    chainIcon: '/blockchain_icon/bnb.png',
-    image: '/london.png',
-    coords: { left: '47%', top: '24%' },
-    cases: [
-      {
-        id: 'london-big-ben',
-        name: 'Big Ben Sentinel',
-        type: 'Monitoring Contract',
-        status: 'active',
-        description: 'A monitoring sentinel hidden in the clockworks of Big Ben. Timing anomalies detected.',
-        image: '/london_1.png',
-        chainId: 97,
-      },
-      {
-        id: 'london-buckingham',
-        name: 'Buckingham Vault',
-        type: 'Custody Protocol',
-        status: 'active',
-        description: 'Custody transactions funneling through the Buckingham node. High-value assets spotted.',
-        image: '/london_2.png',
-        chainId: 97,
-      },
-      {
-        id: 'london-eye',
-        name: 'London Eye Router',
-        type: 'Signal Router',
-        status: 'active',
-        description: 'A high-altitude router on the London Eye. BNB packets hopping across regions.',
-        image: '/london_3.png',
-        chainId: 97,
-      },
-    ],
-  },
-  {
-    id: 98,
-    name: 'Shanghai',
-    flag: '\u{1F3E2}',
-    chain: 'BNB Testnet',
-    chainColor: '#F0B90B',
-    chainIcon: '/blockchain_icon/bnb.png',
-    image: '/shanghai.png',
-    coords: { left: '78%', top: '39%' },
-    cases: [
-      {
-        id: 'shanghai-pearl',
-        name: 'Oriental Pearl Relay',
-        type: 'Bridge Relay',
-        status: 'active',
-        description: 'A relay broadcasting from the Oriental Pearl. Cross-chain drift detected.',
-        image: '/shanghai_1.png',
-        chainId: 97,
-      },
-      {
-        id: 'shanghai-tower',
-        name: 'Shanghai Tower Node',
-        type: 'Signal Router',
-        status: 'active',
-        description: 'A signal node perched at the Shanghai Tower. Data spikes match the stolen NFT trail.',
-        image: '/shanghai_2.png',
-        chainId: 97,
-      },
-      {
-        id: 'shanghai-bund',
-        name: 'The Bund Market',
-        type: 'Market Router',
-        status: 'active',
-        description: 'Heavy market routing on the Bund. Suspicious liquidity loops detected.',
-        image: '/shanghai_3.png',
-        chainId: 97,
-      },
-    ],
-  },
-  {
-    id: 99,
-    name: 'Reykjavík',
-    flag: '\u2744\uFE0F',
-    chain: 'BNB Testnet',
-    chainColor: '#F0B90B',
-    chainIcon: '/blockchain_icon/bnb.png',
-    image: '/island.png',
-    coords: { left: '38%', top: '14%' },
-    cases: [
-      {
-        id: 'reykjavik-hallgrimskirkja',
-        name: 'Hallgrímskirkja Node',
-        type: 'Signal Router',
-        status: 'active',
-        description: 'A signal node hidden within Hallgrímskirkja. BNB transmissions spike in the northern aurora.',
-        image: '/island_1.png',
-        chainId: 97,
-      },
-      {
-        id: 'reykjavik-harpa',
-        name: 'Harpa Concert Relay',
-        type: 'Bridge Relay',
-        status: 'active',
-        description: 'A relay embedded in the Harpa Concert Hall. Cross-chain flows converge in the cold.',
-        image: '/island_2.png',
-        chainId: 97,
-      },
-      {
-        id: 'reykjavik-lagoon',
-        name: 'Blue Lagoon Vault',
-        type: 'Custody Protocol',
-        status: 'active',
-        description: 'Custody traffic pools at the Blue Lagoon. Assets are being laundered in geothermal cover.',
-        image: '/island_3.png',
-        chainId: 97,
-      },
-    ],
-  },
-  {
-    id: 84532,
-    name: 'Paris',
-    flag: '\u{1F5FC}',
-    chain: 'Base Sepolia',
-    chainColor: '#0052FF',
-    chainIcon: '/blockchain_icon/base.png',
-    image: '/paris.png',
-    coords: { left: '48%', top: '29%' },
-    cases: [
-      {
-        id: 'paris-eiffel',
-        name: 'Eiffel Tower Relay',
-        type: 'Monitoring Contract',
-        status: 'active',
-        description: 'A monitoring beacon deployed near the Eiffel Tower node. Bridge ingress detected.',
-        image: '/paris_1.png',
-        chainId: 84532,
-      },
-      {
-        id: 'paris-louvre',
-        name: 'Louvre Custody Router',
-        type: 'Custody Protocol',
-        status: 'active',
-        description: 'A custody router at the Louvre node. High-value cross-chain asset arrival confirmed.',
-        image: '/paris_2.png',
-        chainId: 84532,
-      },
-      {
-        id: 'paris-notre',
-        name: 'Notre-Dame Gate',
-        type: 'Bridge Relay',
-        status: 'active',
-        description: 'A relay concealed beneath Notre-Dame. Base traffic converges here at night.',
-        image: '/paris_3.png',
-        chainId: 84532,
-      },
-    ],
-  },
-  {
-    id: 845321,
-    name: 'Rome',
-    flag: '\u{1F3DB}',
-    chain: 'Base Sepolia',
-    chainColor: '#0052FF',
-    chainIcon: '/blockchain_icon/base.png',
-    image: '/roma.png',
-    coords: { left: '53%', top: '34%' },
-    cases: [
-      {
-        id: 'rome-st-peter',
-        name: 'Saint Peter Relay',
-        type: 'Bridge Relay',
-        status: 'active',
-        description: 'A relay node hidden near Saint Peter. Base hops stacking rapidly.',
-        image: '/roma_1.png',
-        chainId: 84532,
-      },
-      {
-        id: 'rome-colosseum',
-        name: 'Colosseum Beacon',
-        type: 'Signal Router',
-        status: 'active',
-        description: 'A beacon in the Colosseum district. Signal echoes align with the theft trail.',
-        image: '/roma_2.png',
-        chainId: 84532,
-      },
-      {
-        id: 'rome-trevi',
-        name: 'Trevi Fountain Vault',
-        type: 'Custody Protocol',
-        status: 'active',
-        description: 'Custody flows spike near Trevi. Someone is staging assets for export.',
-        image: '/roma_3.png',
-        chainId: 84532,
-      },
-    ],
-  },
-  {
-    id: 51,
-    name: 'Sydney',
-    flag: '\u{1F3A7}',
-    chain: 'XDC Apothem',
-    chainColor: '#00AEEF',
-    chainIcon: '/blockchain_icon/xdc.png',
-    image: '/sydney.png',
-    coords: { left: '87%', top: '78%' },
-    cases: [
-      {
-        id: 'sydney-opera',
-        name: 'Opera House Node',
-        type: 'Signal Router',
-        status: 'active',
-        description: 'A router disguised within the Opera House. XDC transmissions intensify after dusk.',
-        image: '/sydney_1.png',
-        chainId: 51,
-      },
-      {
-        id: 'sydney-bridge',
-        name: 'Harbour Bridge Relay',
-        type: 'Bridge Relay',
-        status: 'active',
-        description: 'A relay strung across the Harbour Bridge. Cross-chain drips forming a trail.',
-        image: '/sydney_2.png',
-        chainId: 51,
-      },
-      {
-        id: 'sydney-bondi',
-        name: 'Bondi Beach Market',
-        type: 'Market Router',
-        status: 'active',
-        description: 'Market routes surge near Bondi. Unusual swaps mask the stolen assets.',
-        image: '/sydney_3.png',
-        chainId: 51,
-      },
-    ],
-  },
-  {
-    id: 511,
-    name: 'Nairobi',
-    flag: '\u{1F333}',
-    chain: 'XDC Apothem',
-    chainColor: '#00AEEF',
-    chainIcon: '/blockchain_icon/xdc.png',
-    image: '/nairobi.png',
-    coords: { left: '59%', top: '61%' },
-    cases: [
-      {
-        id: 'nairobi-park',
-        name: 'National Park Relay',
-        type: 'Bridge Relay',
-        status: 'active',
-        description: 'A relay hidden within Nairobi National Park. XDC ingress confirmed.',
-        image: '/nairobi_1.png',
-        chainId: 51,
-      },
-      {
-        id: 'nairobi-giraffe',
-        name: 'Giraffe Centre Beacon',
-        type: 'Signal Router',
-        status: 'active',
-        description: "Beacon signals ping from the Giraffe Centre. The thief's route is close.",
-        image: '/nairobi_2.png',
-        chainId: 51,
-      },
-      {
-        id: 'nairobi-museum',
-        name: 'National Museum Vault',
-        type: 'Custody Protocol',
-        status: 'active',
-        description: 'Custody movements spike near the National Museum. Assets in staging.',
-        image: '/nairobi_3.png',
-        chainId: 51,
-      },
-    ],
-  },
-  {
-    id: 512,
-    name: 'Rio de Janeiro',
-    flag: '\u{1F3D6}',
-    chain: 'XDC Apothem',
-    chainColor: '#00AEEF',
-    chainIcon: '/blockchain_icon/xdc.png',
-    image: '/rio.png',
-    coords: { left: '34%', top: '74%' },
-    cases: [
-      {
-        id: 'rio-cristo',
-        name: 'Cristo Redentor Node',
-        type: 'Signal Router',
-        status: 'active',
-        description: 'A router hidden beneath Cristo Redentor. XDC traffic flares at night.',
-        image: '/rio_1.png',
-        chainId: 51,
-      },
-      {
-        id: 'rio-copacabana',
-        name: 'Copacabana Vault',
-        type: 'Custody Protocol',
-        status: 'active',
-        description: 'Custody flows pool near Copacabana Palace. Assets are being laundered.',
-        image: '/rio_2.png',
-        chainId: 51,
-      },
-      {
-        id: 'rio-selaron',
-        name: 'Escadaria Selaron Market',
-        type: 'Market Router',
-        status: 'active',
-        description: 'A bustling router at Escadaria Selaron. Swap activity masking the trail.',
-        image: '/rio_3.png',
-        chainId: 51,
-      },
-    ],
-  },
-  {
-    id: 80002,
-    name: 'Santiago',
-    flag: '\u{1F5FB}',
-    chain: 'Polygon Amoy',
-    chainColor: '#8247E5',
-    chainIcon: '/blockchain_icon/polygon.png',
-    image: '/chile.png',
-    coords: { left: '26%', top: '82%' },
-    cases: [
-      {
-        id: 'santiago-easter',
-        name: 'Easter Island Relay',
-        type: 'Bridge Relay',
-        status: 'active',
-        description: 'A relay route anchored to Easter Island. Polygon flows converge here.',
-        image: '/chile_1.png',
-        chainId: 80002,
-      },
-      {
-        id: 'santiago-torre',
-        name: 'Gran Torre Node',
-        type: 'Signal Router',
-        status: 'active',
-        description: 'A signal node atop Gran Torre. Polygon pings align with the suspect route.',
-        image: '/chile_2.png',
-        chainId: 80002,
-      },
-      {
-        id: 'santiago-moneda',
-        name: 'La Moneda Vault',
-        type: 'Custody Protocol',
-        status: 'active',
-        description: 'Custody traffic spikes near La Moneda. Assets may be staged for exit.',
-        image: '/chile_3.png',
-        chainId: 80002,
-      },
-    ],
-  },
-  {
-    id: 800021,
-    name: 'Dakar',
-    flag: '\u{1F30D}',
-    chain: 'Polygon Amoy',
-    chainColor: '#8247E5',
-    chainIcon: '/blockchain_icon/polygon.png',
-    image: '/dakar.png',
-    coords: { left: '36%', top: '56%' },
-    cases: [
-      {
-        id: 'dakar-renaissance',
-        name: 'Renaissance Monument Relay',
-        type: 'Bridge Relay',
-        status: 'active',
-        description: 'A relay hidden at the Renaissance Monument. Polygon ingress rising.',
-        image: '/dakar_1.png',
-        chainId: 80002,
-      },
-      {
-        id: 'dakar-goree',
-        name: 'Goree Island Node',
-        type: 'Signal Router',
-        status: 'active',
-        description: 'A signal node on Goree Island. Traffic spikes match the stolen route.',
-        image: '/dakar_2.png',
-        chainId: 80002,
-      },
-      {
-        id: 'dakar-mosque',
-        name: 'Grand Mosque Vault',
-        type: 'Custody Protocol',
-        status: 'active',
-        description: 'Custody vault activity at the Grand Mosque. Assets being staged.',
-        image: '/dakar_3.png',
-        chainId: 80002,
-      },
-    ],
-  },
-  {
-    id: 800022,
-    name: 'Moscow',
-    flag: '\u26EA',
-    chain: 'Polygon Amoy',
-    chainColor: '#8247E5',
-    chainIcon: '/blockchain_icon/polygon.png',
-    image: '/moscow.png',
-    coords: { left: '58%', top: '22%' },
-    cases: [
-      {
-        id: 'moscow-red-square',
-        name: 'Red Square Relay',
-        type: 'Bridge Relay',
-        status: 'active',
-        description: 'A relay node pulsing beneath Red Square. Polygon ingress rising fast.',
-        image: '/moscow_1.png',
-        chainId: 80002,
-      },
-      {
-        id: 'moscow-kremlin',
-        name: 'Kremlin Beacon',
-        type: 'Signal Router',
-        status: 'active',
-        description: 'A signal beacon within the Kremlin walls. Encrypted traffic matches the suspect trail.',
-        image: '/moscow_2.png',
-        chainId: 80002,
-      },
-      {
-        id: 'moscow-bolshoi',
-        name: 'Bolshoi Theatre Vault',
-        type: 'Custody Protocol',
-        status: 'active',
-        description: 'Custody flows surge near the Bolshoi Theatre. Assets are being staged for exit.',
-        image: '/moscow_3.png',
-        chainId: 80002,
-      },
-    ],
-  },
-  {
-    id: 11155111,
-    name: 'New York City',
-    flag: '\u{1F30E}',
-    chain: 'Ethereum Sepolia',
-    chainColor: '#627EEA',
-    chainIcon: '/blockchain_icon/eth.png',
-    image: '/nyc.png',
-    coords: { left: '27%', top: '34%' },
-    cases: [
-      {
-        id: 'nyc-liberty',
-        name: 'Liberty Island Relay',
-        type: 'Bridge Relay',
-        status: 'active',
-        description: 'A relay hidden near the Statue of Liberty. Ethereum ingress confirmed.',
-        image: '/nyc_1.png',
-        chainId: 11155111,
-      },
-      {
-        id: 'nyc-central',
-        name: 'Central Park Beacon',
-        type: 'Signal Router',
-        status: 'active',
-        description: 'Signal bursts ripple across Central Park. The trail is still warm.',
-        image: '/nyc_2.png',
-        chainId: 11155111,
-      },
-      {
-        id: 'nyc-times',
-        name: 'Times Square Market',
-        type: 'Market Router',
-        status: 'active',
-        description: 'Market routing intensifies in Times Square. Liquidity loops detected.',
-        image: '/nyc_3.png',
-        chainId: 11155111,
-      },
-    ],
-  },
-  {
-    id: 11155112,
-    name: 'Mexico City',
-    flag: '\u{1F5FD}',
-    chain: 'Ethereum Sepolia',
-    chainColor: '#627EEA',
-    chainIcon: '/blockchain_icon/eth.png',
-    image: '/mexico.png',
-    coords: { left: '23%', top: '50%' },
-    cases: [
-      {
-        id: 'mexico-bellas',
-        name: 'Bellas Artes Relay',
-        type: 'Bridge Relay',
-        status: 'active',
-        description: 'Relay activity near Palacio de Bellas Artes. Ethereum hops intensify.',
-        image: '/mexico_1.png',
-        chainId: 11155111,
-      },
-      {
-        id: 'mexico-chapultepec',
-        name: 'Chapultepec Beacon',
-        type: 'Signal Router',
-        status: 'active',
-        description: 'Beacon signals from Chapultepec. The suspects route passes through here.',
-        image: '/mexico_2.png',
-        chainId: 11155111,
-      },
-      {
-        id: 'mexico-mayor',
-        name: 'Templo Mayor Vault',
-        type: 'Custody Protocol',
-        status: 'active',
-        description: 'Custody vault activity at Templo Mayor. Assets possibly staged.',
-        image: '/mexico_3.png',
-        chainId: 11155111,
-      },
-    ],
-  },
-  {
-    id: 11155113,
-    name: 'Dubai',
-    flag: '\u{1F3E0}',
-    chain: 'Ethereum Sepolia',
-    chainColor: '#627EEA',
-    chainIcon: '/blockchain_icon/eth.png',
-    image: '/dubai.png',
-    coords: { left: '62%', top: '46%' },
-    cases: [
-      {
-        id: 'dubai-burj',
-        name: 'Burj Khalifa Node',
-        type: 'Signal Router',
-        status: 'active',
-        description: 'A high-altitude node at Burj Khalifa. Ethereum bursts align with the theft.',
-        image: '/dubai_1.png',
-        chainId: 11155111,
-      },
-      {
-        id: 'dubai-airport',
-        name: 'Dubai Airport Relay',
-        type: 'Bridge Relay',
-        status: 'active',
-        description: 'Bridge relays echo near Dubai Airport. Cross-chain transfers accelerating.',
-        image: '/dubai_2.png',
-        chainId: 11155111,
-      },
-      {
-        id: 'dubai-mall',
-        name: 'Dubai Mall Market',
-        type: 'Market Router',
-        status: 'active',
-        description: 'Market routing spikes at Dubai Mall. Liquidity trails are fresh.',
-        image: '/dubai_3.png',
-        chainId: 11155111,
-      },
-    ],
-  },
-]
 
 export default function InteractiveMap({ onSelectCase }) {
   const canvasRef = useRef(null)
@@ -643,16 +17,22 @@ export default function InteractiveMap({ onSelectCase }) {
     scannedLocations,
     isScanning,
     scanLocation,
+    scanAndInspect,
     investigate,
     gas,
     missionId,
     blocksElapsed,
     carmenMovedAlert,
+    discoveredCityIds,
+    visitedCityIds,
   } = useGameStore()
 
   const blockColor = blocksElapsed <= 20 ? 'green' : blocksElapsed <= 35 ? 'yellow' : 'red'
 
   const [selectedMarker, setSelectedMarker] = useState(null)
+  const mapLocations = discoveredCityIds && discoveredCityIds.length > 0
+    ? CITY_POOL.filter((c) => discoveredCityIds.includes(c.id))
+    : CITY_POOL
 
   // background canvas animation
   useEffect(() => {
@@ -751,12 +131,12 @@ export default function InteractiveMap({ onSelectCase }) {
       <canvas ref={canvasRef} className={styles.canvas} />
 
       {/* blockchain entities on map */}
-      {MAP_LOCATIONS.map((loc) => {
-        const isScanned = scannedLocations.includes(loc.id)
+      {mapLocations.map((loc) => {
+        const isScanned = loc.alwaysScanned || scannedLocations.includes(loc.id)
         return (
           <div
             key={loc.id}
-            className={`${styles.entityMarker} ${selectedMarker === loc.id ? styles.entityMarkerActive : ''} ${!isScanned ? styles.entityMarkerLocked : ''}`}
+            className={`${styles.entityMarker} ${selectedMarker === loc.id ? styles.entityMarkerActive : ''} ${!isScanned ? styles.entityMarkerLocked : ''} ${visitedCityIds?.includes(loc.id) ? styles.entityMarkerVisited : ''} ${discoveredCityIds?.includes(loc.id) && !scannedLocations.includes(loc.id) && !visitedCityIds?.includes(loc.id) ? styles.entityMarkerNew : ''}`}
             style={{ left: loc.coords.left, top: loc.coords.top, '--chain-color': loc.chainColor }}
             onClick={() => setSelectedMarker(selectedMarker === loc.id ? null : loc.id)}
           >
@@ -771,9 +151,10 @@ export default function InteractiveMap({ onSelectCase }) {
 
       {/* location panel */}
       {selectedMarker && (() => {
-        const loc = MAP_LOCATIONS.find((l) => l.id === selectedMarker)
+        const loc = mapLocations.find((l) => l.id === selectedMarker)
         if (!loc) return null
-        const isScanned = scannedLocations.includes(loc.id)
+        const isScanned = loc.alwaysScanned || scannedLocations.includes(loc.id)
+        const isCityNodeCity = CITY_POOL_MAP[loc.id] !== undefined
         return (
           <div className={styles.locationPanel} style={{ '--chain-color': loc.chainColor }}>
             <div className={styles.locationPanelImage}>
@@ -798,10 +179,14 @@ export default function InteractiveMap({ onSelectCase }) {
                 <button
                   className={`${styles.scanBtn} ${isScanning ? styles.scanBtnDisabled : ''}`}
                   style={{ '--chain-color': loc.chainColor }}
-                  disabled={isScanning || gas < SCAN_COST}
+                  disabled={isScanning || (!isCityNodeCity && gas < SCAN_COST)}
                   onClick={(e) => {
                     e.stopPropagation()
-                    scanLocation(loc.id, SCAN_COST)
+                    if (isCityNodeCity) {
+                      scanAndInspect(loc.id)
+                    } else {
+                      scanLocation(loc.id, SCAN_COST)
+                    }
                   }}
                 >
                   {isScanning ? (
@@ -809,46 +194,32 @@ export default function InteractiveMap({ onSelectCase }) {
                       <span className={styles.scanBtnSpinner} />
                       SCANNING...
                     </>
+                  ) : isCityNodeCity ? (
+                    <>&#9211; SCAN NETWORK &mdash; 1 BLOCK</>
                   ) : (
                     <>&#9211; SCAN NETWORK &mdash; {SCAN_COST} GAS</>
                   )}
                 </button>
-                {gas < SCAN_COST && !isScanning && (
+                {false /* blocks always available */}
+                {!isCityNodeCity && gas < SCAN_COST && !isScanning && (
                   <span className={styles.scanNoGas}>INSUFFICIENT GAS</span>
                 )}
               </div>
             ) : (
               <div className={styles.locationPanelContent}>
-                {/* On-chain investigation button */}
-                <button
-                  className={`${styles.investigateBtn} ${isInvestigating ? styles.investigateBtnDisabled : ''}`}
-                  style={{ '--chain-color': loc.chainColor }}
-                  disabled={isInvestigating || !missionId}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    investigate(loc.id)
-                  }}
-                >
-                  {isInvestigating
-                    ? '&#9203; INVESTIGATING...'
-                    : !missionId
-                      ? '&#9888; START MISSION FIRST'
-                      : `&#128269; INVESTIGATE ${loc.name.toUpperCase()}`}
-                </button>
-
                 <div className={styles.locationPanelTitle}>
-                  <span>CONTRACTS FOUND</span>
+                  <span>{isCityNodeCity ? 'LOCATIONS UNLOCKED' : 'CONTRACTS FOUND'}</span>
                   <span className={styles.locationPanelCount}>{loc.cases.length}</span>
                 </div>
                 <div className={styles.locationPanelCases}>
-                  {loc.cases.map((c) => (
+                  {loc.cases.map((c, caseIdx) => (
                     <div
                       key={c.id}
                       className={styles.caseCard}
                       onClick={(e) => {
                         e.stopPropagation()
                         setSelectedMarker(null)
-                        onSelectCase?.(c)
+                        onSelectCase?.({ ...c, locationIdx: caseIdx })
                       }}
                     >
                       <div className={styles.caseImageWrap}>

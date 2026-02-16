@@ -59,7 +59,7 @@ describe("Carmen Sandiego - Full Game E2E (Commit-Reveal)", function () {
   async function deliverClue(missionId: number | bigint, clueType: number = 0) {
     const hash = ethers.keccak256(ethers.toUtf8Bytes(`clue-${missionId}-${Date.now()}-${Math.random()}`));
     const ipfs = clueType >= 1 ? "QmEncryptedContent" : "";
-    await gameMaster.connect(creOracle).receiveClue(missionId, clueType, hash, ipfs);
+    await gameMaster.connect(creOracle).receiveClue(missionId, clueType, hash, ipfs, 50);
   }
 
   beforeEach(async function () {
@@ -105,9 +105,9 @@ describe("Carmen Sandiego - Full Game E2E (Commit-Reveal)", function () {
 
     // 7. Deploy CityNode contracts
     const CityNodeFactory = await ethers.getContractFactory("CityNode");
-    cityTokyo = await CityNodeFactory.deploy("Tokyo", ARBITRUM_SEPOLIA, creOracle.address) as CityNode;
-    cityParis = await CityNodeFactory.deploy("Paris", BASE_SEPOLIA, creOracle.address) as CityNode;
-    cityLondon = await CityNodeFactory.deploy("London", XDC_APOTHEM, creOracle.address) as CityNode;
+    cityTokyo = await CityNodeFactory.deploy("Tokyo", "JP", ARBITRUM_SEPOLIA, 1, creOracle.address) as CityNode;
+    cityParis = await CityNodeFactory.deploy("Paris", "FR", BASE_SEPOLIA, 2, creOracle.address) as CityNode;
+    cityLondon = await CityNodeFactory.deploy("London", "GB", XDC_APOTHEM, 3, creOracle.address) as CityNode;
   });
 
   // ============================================================
@@ -508,6 +508,27 @@ describe("Carmen Sandiego - Full Game E2E (Commit-Reveal)", function () {
       const r2 = await missionNFT.getMissionRecord(2);
       expect(r1.capturedChainId).to.equal(ARBITRUM_SEPOLIA);
       expect(r2.capturedChainId).to.equal(BASE_SEPOLIA);
+    });
+
+    it("should set token URI via setMissionTokenURI after capture", async function () {
+      const missionId = await setupMission(player, 3);
+      await deliverClue(missionId, 0);
+      await deliverClue(missionId, 1);
+      await deliverClue(missionId, 2);
+
+      const { salt } = computeTargetHash(ARBITRUM_SEPOLIA, 3, Number(missionId));
+      await gameMaster.connect(creOracle).resolveCapture(missionId, ARBITRUM_SEPOLIA, salt);
+
+      // Verify missionToTokenId mapping
+      const tokenId = await missionNFT.missionToTokenId(missionId);
+      expect(tokenId).to.equal(1);
+
+      // Set token URI (simulating generate-finale CRE workflow)
+      const metadataUri = "data:application/json;base64,eyJuYW1lIjoiQ2FybWVuIFNhbmRpZWdvIE1pc3Npb24gIzEiLCJkZXNjcmlwdGlvbiI6IkdPTEQgUkFOSyJ9";
+      await gameMaster.connect(creOracle).setMissionTokenURI(missionId, metadataUri);
+
+      // Verify URI was set on the NFT
+      expect(await missionNFT.tokenURI(tokenId)).to.equal(metadataUri);
     });
   });
 

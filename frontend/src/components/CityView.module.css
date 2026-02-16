@@ -1,0 +1,449 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--dark-bg);
+  font-family: var(--font-mono);
+}
+
+/* top bar */
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+  background: rgba(0, 240, 255, 0.02);
+  flex-shrink: 0;
+  gap: 10px;
+}
+
+.topBarLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.topBarRight {
+  flex-shrink: 0;
+}
+
+.backBtn {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 1px;
+  color: var(--cyan);
+  background: rgba(0, 240, 255, 0.06);
+  border: 1px solid rgba(0, 240, 255, 0.15);
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.backBtn:hover {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: rgba(0, 240, 255, 0.3);
+}
+
+.cityDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cityLabel {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  font-weight: bold;
+}
+
+.chainLabel {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.sep {
+  color: var(--text-muted);
+  opacity: 0.3;
+}
+
+.explorerLabel {
+  font-size: 0.6rem;
+  color: var(--cyan);
+  letter-spacing: 2px;
+}
+
+.suspicionBadge {
+  font-size: 0.6rem;
+  color: var(--yellow);
+  letter-spacing: 1px;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 230, 0, 0.15);
+  background: rgba(255, 230, 0, 0.04);
+}
+
+/* tabs */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.tab {
+  flex: 1;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.tab:hover {
+  color: var(--cyan);
+  background: rgba(0, 240, 255, 0.03);
+}
+
+.tabActive {
+  color: var(--cyan);
+  border-bottom-color: var(--cyan);
+  background: rgba(0, 240, 255, 0.04);
+}
+
+/* content */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.content::-webkit-scrollbar { width: 4px; }
+.content::-webkit-scrollbar-track { background: transparent; }
+.content::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.12); border-radius: 2px; }
+
+/* loading */
+.loadingOverlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px;
+}
+
+.loadingSpinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(0, 240, 255, 0.15);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loadingText {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+/* overview */
+.overviewContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+.cityInfoCard {
+  padding: 14px;
+  background: rgba(0, 240, 255, 0.02);
+  border: 1px solid rgba(0, 240, 255, 0.08);
+}
+
+.cityInfoHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cityEmoji {
+  font-size: 1.8rem;
+  flex-shrink: 0;
+}
+
+.cityName {
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: normal;
+  margin: 0;
+}
+
+.cityCountry {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+}
+
+.suspicionMeter {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.suspicionLabel {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+}
+
+.suspicionBar {
+  width: 80px;
+  height: 6px;
+  background: rgba(0, 240, 255, 0.06);
+  overflow: hidden;
+}
+
+.suspicionFill {
+  height: 100%;
+  transition: width 0.5s ease;
+}
+
+.suspicionValue {
+  font-size: 0.65rem;
+  color: var(--text-primary);
+}
+
+/* section title */
+.sectionTitle {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.06);
+}
+
+/* locations list */
+.locationsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.locationCard {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(0, 240, 255, 0.02);
+  border: 1px solid rgba(0, 240, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  gap: 10px;
+}
+
+.locationCard:hover {
+  background: rgba(0, 240, 255, 0.06);
+  border-color: rgba(0, 240, 255, 0.2);
+}
+
+.locationMain {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-width: 0;
+}
+
+.locationInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.locationName {
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.locationCategory {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+.locationMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.locationRisk {
+  font-size: 0.6rem;
+  letter-spacing: 1px;
+}
+
+.locationStatus {
+  display: flex;
+  gap: 4px;
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.statusDot[data-status="inspected"] {
+  background: var(--cyan);
+  box-shadow: 0 0 4px rgba(0, 240, 255, 0.4);
+}
+
+.statusDot[data-status="scanned"] {
+  background: var(--yellow);
+  box-shadow: 0 0 4px rgba(255, 230, 0, 0.4);
+}
+
+.statusDot[data-status="clues"] {
+  background: var(--green);
+  box-shadow: 0 0 4px rgba(5, 255, 161, 0.4);
+}
+
+.locationArrow {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* anomaly tx refs */
+.anomalyPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.txRefList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.txRefRow {
+  display: flex;
+  gap: 8px;
+  padding: 4px 6px;
+  background: rgba(0, 240, 255, 0.02);
+  border: 1px solid rgba(0, 240, 255, 0.05);
+  font-size: 0.6rem;
+  align-items: center;
+}
+
+.txRefHash {
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.txRefMethod {
+  color: var(--yellow);
+  flex-shrink: 0;
+}
+
+.txRefFrom {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.txRefMore {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  opacity: 0.5;
+  padding: 4px 0;
+}
+
+/* contracts tab */
+.contractsContent {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.methodsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.methodGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.methodGroupTitle {
+  font-size: 0.7rem;
+  color: var(--cyan);
+  padding: 4px 8px;
+  background: rgba(0, 240, 255, 0.03);
+  border-left: 2px solid var(--cyan);
+}
+
+.methodBtns {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-left: 10px;
+}
+
+.methodBtn {
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.5px;
+  color: var(--cyan);
+  background: rgba(0, 240, 255, 0.02);
+  border: 1px solid rgba(0, 240, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.methodBtn:hover:not(:disabled) {
+  background: rgba(0, 240, 255, 0.08);
+  border-color: rgba(0, 240, 255, 0.3);
+}
+
+.methodBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.methodDone {
+  color: var(--green);
+  border-color: rgba(5, 255, 161, 0.15);
+}

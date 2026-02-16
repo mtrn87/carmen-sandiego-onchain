@@ -1,9 +1,11 @@
 // ─── contract exploration data per case ───
+import { CITY_POOL_MAP } from './cityRegistry'
 
 export const CHAIN_CONFIG = {
+  'Ethereum Sepolia': { color: '#627EEA', logo: 'ETH', name: 'Ethereum Sepolia', symbol: 'ETH', location: 'New York', flag: '\u{1F5FD}' },
   'Arbitrum Sepolia': { color: '#28a0f0', logo: 'ARB', name: 'Arbitrum Sepolia', symbol: 'ETH', location: 'Tokyo', flag: '\u{1F1EF}\u{1F1F5}' },
   'Base Sepolia': { color: '#0052ff', logo: 'BASE', name: 'Base Sepolia', symbol: 'ETH', location: 'Paris', flag: '\u{1F1EB}\u{1F1F7}' },
-  'XDC Apothem': { color: '#ff6b00', logo: 'XDC', name: 'XDC Apothem', symbol: 'XDC', location: 'London', flag: '\u{1F1EC}\u{1F1E7}' },
+  'XDC Apothem': { color: '#ff6b00', logo: 'XDC', name: 'XDC Apothem', symbol: 'XDC', location: 'New York', flag: '\u{1F1FA}\u{1F1F8}' },
   'Multi-Chain': { color: '#00f0ff', logo: 'CCIP', name: 'Multi-Chain', symbol: 'ETH', location: '', flag: '' },
 }
 
@@ -437,6 +439,45 @@ const MALL_EVENTS = [
   { name: 'ExitSignal', block: '52884515', data: { caseId: 'CASE-7804-DXB', next: 'AIRPORT', strength: 52, reasonCode: 'EXIT_SIGNAL' }, color: 'red' },
 ]
 
+const MIN_CITYNODE_TX_COUNT = 12
+
+function padFakeTransactions(transactions, seed) {
+  const txs = [...transactions]
+  const baseBlock = Number.parseInt(String(transactions?.[0]?.block || '52884600'), 10) || 52884600
+
+  for (let i = txs.length; i < MIN_CITYNODE_TX_COUNT; i++) {
+    const index = i + 1
+    const suffix = `${seed}${String(index).padStart(2, '0')}`
+
+    txs.push({
+      id: `${seed}-fake-${index}`,
+      hash: `0x${suffix.slice(0, 12)}...${suffix.slice(-5)}`,
+      fullHash: `0x${suffix.repeat(6).slice(0, 64)}`,
+      method: 'syncRoute',
+      block: String(baseBlock + index),
+      age: `${Math.max(1, MIN_CITYNODE_TX_COUNT - index)} min ago`,
+      from: `${seed.toUpperCase()}Router`,
+      to: `${seed.toUpperCase()}Node`,
+      value: '—',
+      fee: '0.0008 ETH',
+      status: 'success',
+      description: 'Synthetic activity generated to simulate city-node traffic volume',
+      gasCost: 3,
+      investigation: {
+        title: 'Background Traffic Sample',
+        insight: 'Low-value maintenance transaction. Pattern consistent with normal node noise and route synchronization.',
+      },
+    })
+  }
+
+  return txs
+}
+
+const SHANGHAI_CITYNODE_TXS = padFakeTransactions(SHANGHAI_TXS, 'shanghai')
+const BURJ_CITYNODE_TXS = padFakeTransactions(BURJ_TXS, 'burj')
+const AIRPORT_CITYNODE_TXS = padFakeTransactions(AIRPORT_TXS, 'airport')
+const MALL_CITYNODE_TXS = padFakeTransactions(MALL_TXS, 'mall')
+
 // ─── all cases registry ───
 // Keys must match the case IDs in InteractiveMap.jsx's MAP_LOCATIONS
 
@@ -445,7 +486,7 @@ const TOKYO_SENSOJI_CASE = {
   headerType: 'nft',
   locationImage: '/tokyo_1.png',
   nft: SHANGHAI_NFT,
-  transactions: SHANGHAI_TXS,
+  transactions: SHANGHAI_CITYNODE_TXS,
   events: SHANGHAI_EVENTS,
 }
 
@@ -454,7 +495,7 @@ const TOKYO_TOWER_CASE = {
   headerType: 'contract',
   locationImage: '/tokyo_2.png',
   contract: { ...AIRPORT_CONTRACT, name: 'TokyoTowerBeacon.sol', caseId: 'CASE-ARB-001', type: 'Signal Router' },
-  transactions: AIRPORT_TXS,
+  transactions: AIRPORT_CITYNODE_TXS,
   events: AIRPORT_EVENTS,
 }
 
@@ -463,7 +504,7 @@ const TOKYO_CHOCHIN_CASE = {
   headerType: 'contract',
   locationImage: '/tokyo_3.png',
   contract: { ...MALL_CONTRACT, name: 'ChochinMarket.sol', caseId: 'CASE-ARB-002', type: 'Swap Protocol' },
-  transactions: MALL_TXS,
+  transactions: MALL_CITYNODE_TXS,
   events: MALL_EVENTS,
 }
 
@@ -472,7 +513,7 @@ const PARIS_EIFFEL_CASE = {
   headerType: 'contract',
   locationImage: '/dubai_1.png',
   contract: { ...BURJ_CONTRACT, name: 'EiffelTowerRelay.sol', caseId: 'CASE-BASE-001', type: 'Monitoring Beacon' },
-  transactions: BURJ_TXS,
+  transactions: BURJ_CITYNODE_TXS,
   events: BURJ_EVENTS,
 }
 
@@ -481,7 +522,7 @@ const PARIS_LOUVRE_CASE = {
   headerType: 'contract',
   locationImage: '/dubai_2.png',
   contract: { ...AIRPORT_CONTRACT, name: 'LouvreCustody.sol', caseId: 'CASE-BASE-002', type: 'Custody Router' },
-  transactions: AIRPORT_TXS,
+  transactions: AIRPORT_CITYNODE_TXS,
   events: AIRPORT_EVENTS,
 }
 
@@ -490,20 +531,61 @@ const PARIS_MARKET_CASE = {
   headerType: 'contract',
   locationImage: '/dubai_3.png',
   contract: { ...MALL_CONTRACT, name: 'MaraisMarket.sol', caseId: 'CASE-BASE-003', type: 'Market Router' },
-  transactions: MALL_TXS,
+  transactions: MALL_CITYNODE_TXS,
   events: MALL_EVENTS,
 }
 
-const LONDON_BRIDGE_CASE = {
+const NYC_WALL_STREET_CASE = {
   chain: 'XDC Apothem',
   headerType: 'contract',
-  locationImage: '/shanghai_1.png',
-  contract: { ...AIRPORT_CONTRACT, name: 'TowerBridgeNode.sol', caseId: 'CASE-XDC-001', type: 'Cross-Chain Bridge' },
-  transactions: AIRPORT_TXS,
+  locationImage: '/nyc_1.png',
+  contract: { ...AIRPORT_CONTRACT, name: 'WallStreetExchange.sol', caseId: 'CASE-XDC-001', type: 'Cross-Chain Bridge' },
+  transactions: AIRPORT_CITYNODE_TXS,
   events: AIRPORT_EVENTS,
 }
 
+const NYC_HQ_CASE = {
+  chain: 'Ethereum Sepolia',
+  headerType: 'contract',
+  locationImage: '/nyc_1.png',
+  contract: {
+    name: 'AcmeMissionHub.sol',
+    address: '0x19281fB23Fa8C423c22A8856DD168c1eb0e9a8aD',
+    caseId: 'CASE-HQ-000',
+    type: 'Mission Control',
+    status: 'Verified',
+    deployer: 'ACME Ops',
+    deployedAge: 'Live',
+  },
+  transactions: [
+    {
+      id: 'hq-tx-0',
+      hash: '0xacf34...f0a11',
+      fullHash: '0xacf34bb7c9e2d1f6a4b3c8d5e0f2a1b7c6d4e9f3a2b5c8d1e7f0a6b9c3f0a11',
+      method: 'startMission',
+      block: 'latest',
+      age: 'now',
+      from: '0xPlayerWallet',
+      to: 'GameMaster',
+      value: '—',
+      fee: '0.0009 ETH',
+      status: 'success',
+      description: 'Mission bootstrap from ACME HQ',
+      gasCost: 0,
+      investigation: {
+        title: 'Mission Bootstrap',
+        insight: 'This is the origin city of the plot. Mission initialization, player registration and briefing events originate from HQ.',
+      },
+    },
+  ],
+  events: [
+    { name: 'MissionBootstrap', block: 'latest', data: { source: 'ACME HQ', network: 'Ethereum Sepolia' }, color: 'cyan' },
+  ],
+}
+
 export const CASE_DATA = {
+  // New York — Ethereum Sepolia (starting point)
+  'nyc-hq': NYC_HQ_CASE,
   // Tokyo — Arbitrum Sepolia (chainId 421614)
   'tokyo-sensoji': TOKYO_SENSOJI_CASE,
   'tokyo-tower': TOKYO_TOWER_CASE,
@@ -512,9 +594,162 @@ export const CASE_DATA = {
   'paris-eiffel': PARIS_EIFFEL_CASE,
   'paris-louvre': PARIS_LOUVRE_CASE,
   'paris-market': PARIS_MARKET_CASE,
-  // London — XDC Apothem (chainId 51)
-  'london-bridge': LONDON_BRIDGE_CASE,
+  // New York — XDC Apothem (chainId 51)
+  'nyc-wall-street': NYC_WALL_STREET_CASE,
 }
 
-// default case for initial load
+export const CONTRACT_CITY_REGISTRY = Object.fromEntries(
+  Object.entries(CITY_POOL_MAP).map(([id, city]) => [
+    Number(id),
+    { name: city.name, emoji: city.flag, chain: city.chain, investigable: Number(id) !== 11155111 },
+  ])
+)
+
+export const PLATFORM_CITY_OPTIONS = [
+  {
+    id: 11155111,
+    name: 'New York',
+    flag: '\u{1F5FD}',
+    chain: 'Ethereum Sepolia',
+    chainColor: '#627EEA',
+    chainIcon: '/blockchain_icon/eth.png',
+    image: '/nyc.png',
+    coords: { left: '27%', top: '34%' },
+    alwaysScanned: true,
+    investigable: false,
+    cases: [
+      {
+        id: 'nyc-hq',
+        name: 'ACME Mission HQ',
+        type: 'Mission Control',
+        status: 'active',
+        description: 'Origin node where the plot starts and mission briefing is dispatched.',
+        image: '/nyc_1.png',
+        chainId: 11155111,
+      },
+    ],
+  },
+  {
+    id: 421614,
+    name: 'Tokyo',
+    flag: '\u{1F5FE}',
+    chain: 'Arbitrum Sepolia',
+    chainColor: '#28A0F0',
+    chainIcon: '/blockchain_icon/arbitrum.png',
+    image: '/tokyo.png',
+    coords: { left: '83%', top: '34%' },
+    investigable: true,
+    cases: [
+      {
+        id: 'tokyo-sensoji',
+        name: 'Senso-ji Temple Node',
+        type: 'Bridge Relay',
+        status: 'active',
+        description: 'Ancient relay pulsing with cross-chain traffic.',
+        image: '/tokyo_1.png',
+        chainId: 421614,
+      },
+      {
+        id: 'tokyo-tower',
+        name: 'Tokyo Tower Beacon',
+        type: 'Signal Router',
+        status: 'active',
+        description: 'High-altitude signal bouncing encrypted bursts.',
+        image: '/tokyo_2.png',
+        chainId: 421614,
+      },
+      {
+        id: 'tokyo-chochin',
+        name: 'Chochin Market',
+        type: 'Swap Protocol',
+        status: 'active',
+        description: 'Token swaps masking asset movements.',
+        image: '/tokyo_3.png',
+        chainId: 421614,
+      },
+    ],
+  },
+  {
+    id: 84532,
+    name: 'Paris',
+    flag: '\u{1F5FC}',
+    chain: 'Base Sepolia',
+    chainColor: '#0052FF',
+    chainIcon: '/blockchain_icon/base.png',
+    image: '/paris.png',
+    coords: { left: '48%', top: '29%' },
+    investigable: true,
+    cases: [
+      {
+        id: 'paris-notre',
+        name: 'Notre-Dame Gate',
+        type: 'Bridge Relay',
+        status: 'active',
+        description: 'Base traffic converges at this relay.',
+        image: '/paris_3.png',
+        chainId: 84532,
+      },
+      {
+        id: 'paris-louvre',
+        name: 'Louvre Custody Router',
+        type: 'Custody Protocol',
+        status: 'active',
+        description: 'High-value custody operations detected.',
+        image: '/paris_2.png',
+        chainId: 84532,
+      },
+      {
+        id: 'paris-eiffel',
+        name: 'Eiffel Tower Relay',
+        type: 'Monitoring Beacon',
+        status: 'active',
+        description: 'Monitoring beacon with bridge ingress traces.',
+        image: '/paris_1.png',
+        chainId: 84532,
+      },
+    ],
+  },
+  {
+    id: 51,
+    name: 'Sydney',
+    flag: '\u{1F3A7}',
+    chain: 'XDC Apothem',
+    chainColor: '#00AEEF',
+    chainIcon: '/blockchain_icon/xdc.png',
+    image: '/sydney.png',
+    coords: { left: '87%', top: '78%' },
+    investigable: true,
+    cases: [
+      {
+        id: 'sydney-opera',
+        name: 'Opera House Node',
+        type: 'Signal Router',
+        status: 'active',
+        description: 'XDC transmissions intensify after dusk at the Opera House.',
+        image: '/sydney_1.png',
+        chainId: 51,
+      },
+      {
+        id: 'sydney-bridge',
+        name: 'Harbour Bridge Relay',
+        type: 'Bridge Relay',
+        status: 'active',
+        description: 'Cross-chain drips forming a trail across the Harbour Bridge.',
+        image: '/sydney_2.png',
+        chainId: 51,
+      },
+      {
+        id: 'sydney-bondi',
+        name: 'Bondi Beach Market',
+        type: 'Market Router',
+        status: 'active',
+        description: 'Unusual swaps mask the stolen assets near Bondi.',
+        image: '/sydney_3.png',
+        chainId: 51,
+      },
+    ],
+  },
+]
+
+// default case for initial load (start at theft scene, not ACME HQ)
 export const DEFAULT_CASE = 'tokyo-sensoji'

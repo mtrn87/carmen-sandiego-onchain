@@ -1,0 +1,192 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: var(--font-mono);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  font-size: 0.7rem;
+  color: var(--cyan);
+  letter-spacing: 3px;
+}
+
+.fragmentCount {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.fragmentCount strong {
+  color: var(--cyan);
+}
+
+.available {
+  color: var(--green) !important;
+}
+
+/* wallet grid: 40 hex cells */
+.walletGrid {
+  display: grid;
+  grid-template-columns: repeat(20, 1fr);
+  gap: 2px;
+  padding: 8px;
+  background: rgba(0, 240, 255, 0.02);
+  border: 1px solid rgba(0, 240, 255, 0.1);
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  height: 22px;
+  color: var(--text-muted);
+  opacity: 0.25;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  transition: all 0.3s ease;
+}
+
+.cellRevealed {
+  color: var(--cyan);
+  opacity: 1;
+  background: rgba(0, 240, 255, 0.08);
+  border-color: rgba(0, 240, 255, 0.25);
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.5);
+  animation: cellReveal 0.5s ease;
+}
+
+@keyframes cellReveal {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.prefix {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  opacity: 0.4;
+  margin-bottom: 4px;
+}
+
+/* fragment list */
+.fragmentList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fragmentItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 0.6rem;
+  background: rgba(0, 240, 255, 0.02);
+  border: 1px solid rgba(0, 240, 255, 0.08);
+}
+
+.fragmentIdx {
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+.fragmentChars {
+  color: var(--cyan);
+  letter-spacing: 2px;
+}
+
+.fragmentPos {
+  color: var(--text-muted);
+  opacity: 0.6;
+  margin-left: auto;
+}
+
+/* capture section */
+.captureSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(0, 240, 255, 0.15);
+  background: rgba(0, 240, 255, 0.03);
+  animation: sectionIn 0.3s ease;
+}
+
+@keyframes sectionIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.inputPrefix {
+  font-size: 0.75rem;
+  color: var(--cyan);
+  opacity: 0.5;
+}
+
+.walletInput {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+  outline: none;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  caret-color: var(--cyan);
+  padding: 4px 0;
+}
+
+.walletInput::placeholder {
+  color: var(--text-muted);
+  opacity: 0.3;
+}
+
+.buildBtn {
+  width: 100%;
+  padding: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 3px;
+  color: var(--dark-bg);
+  background: var(--cyan);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.buildBtn:hover:not(:disabled) {
+  background: #33ffff;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+}
+
+.buildBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.hint {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  opacity: 0.5;
+  text-align: center;
+}
+
+.empty {
+  text-align: center;
+  color: var(--text-muted);
+  opacity: 0.4;
+  font-size: 0.7rem;
+  padding: 16px 0;
+}

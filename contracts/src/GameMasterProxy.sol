@@ -8,7 +8,9 @@ import {IGameMaster} from "./interfaces/IGameMaster.sol";
  * @title GameMasterProxy
  * @notice Receives CRE workflow reports via KeystoneForwarder and forwards
  *         decoded actions to GameMaster.
- *         Actions: 1=receiveClue, 2=resolveCapture, 3=updateTarget
+ *         Actions: 1=receiveClue, 2=resolveCapture, 3=updateTarget,
+ *                  4=receiveWalletFragment, 5=resolveWalletCapture,
+ *                  6=setMissionTokenURI
  */
 contract GameMasterProxy is ReceiverTemplate {
     IGameMaster public gameMaster;
@@ -16,6 +18,9 @@ contract GameMasterProxy is ReceiverTemplate {
     uint8 public constant ACTION_RECEIVE_CLUE = 1;
     uint8 public constant ACTION_RESOLVE_CAPTURE = 2;
     uint8 public constant ACTION_UPDATE_TARGET = 3;
+    uint8 public constant ACTION_RECEIVE_WALLET_FRAGMENT = 4;
+    uint8 public constant ACTION_RESOLVE_WALLET_CAPTURE = 5;
+    uint8 public constant ACTION_SET_TOKEN_URI = 6;
 
     event ActionForwarded(uint8 action, uint256 missionId);
 
@@ -32,9 +37,9 @@ contract GameMasterProxy is ReceiverTemplate {
         (uint8 action, bytes memory data) = abi.decode(report, (uint8, bytes));
 
         if (action == ACTION_RECEIVE_CLUE) {
-            (uint256 missionId, uint8 clueType, bytes32 contentHash, string memory ipfsPointer) =
-                abi.decode(data, (uint256, uint8, bytes32, string));
-            gameMaster.receiveClue(missionId, IGameMaster.ClueType(clueType), contentHash, ipfsPointer);
+            (uint256 missionId, uint8 clueType, bytes32 contentHash, string memory ipfsPointer, uint8 strength) =
+                abi.decode(data, (uint256, uint8, bytes32, string, uint8));
+            gameMaster.receiveClue(missionId, IGameMaster.ClueType(clueType), contentHash, ipfsPointer, strength);
             emit ActionForwarded(action, missionId);
         } else if (action == ACTION_RESOLVE_CAPTURE) {
             (uint256 missionId, uint256 revealedChainId, bytes32 salt) =
@@ -45,6 +50,21 @@ contract GameMasterProxy is ReceiverTemplate {
             (uint256 missionId, bytes32 newTargetHash) =
                 abi.decode(data, (uint256, bytes32));
             gameMaster.updateTarget(missionId, newTargetHash);
+            emit ActionForwarded(action, missionId);
+        } else if (action == ACTION_RECEIVE_WALLET_FRAGMENT) {
+            (uint256 missionId, uint8 startIndex, uint8 length, bytes32 contentHash, string memory ipfsPointer) =
+                abi.decode(data, (uint256, uint8, uint8, bytes32, string));
+            gameMaster.receiveWalletFragment(missionId, startIndex, length, contentHash, ipfsPointer);
+            emit ActionForwarded(action, missionId);
+        } else if (action == ACTION_RESOLVE_WALLET_CAPTURE) {
+            (uint256 missionId, address submittedWallet, uint256 revealedChainId, bytes32 salt) =
+                abi.decode(data, (uint256, address, uint256, bytes32));
+            gameMaster.resolveWalletCapture(missionId, submittedWallet, revealedChainId, salt);
+            emit ActionForwarded(action, missionId);
+        } else if (action == ACTION_SET_TOKEN_URI) {
+            (uint256 missionId, string memory uri) =
+                abi.decode(data, (uint256, string));
+            gameMaster.setMissionTokenURI(missionId, uri);
             emit ActionForwarded(action, missionId);
         } else {
             revert UnknownAction(action);

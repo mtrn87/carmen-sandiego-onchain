@@ -116,6 +116,18 @@
   text-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
 }
 
+/* ── capture mode ── */
+.layoutCapture {
+  /* subtle red tint on the entire layout border */
+}
+
+.sidebarDimmed {
+  opacity: 0.25;
+  pointer-events: none;
+  filter: brightness(0.3);
+  transition: all 0.4s ease;
+}
+
 /* ── responsive ── */
 @media (max-width: 768px) {
   .layout {

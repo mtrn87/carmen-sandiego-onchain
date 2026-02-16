@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useGameStore } from '../store/gameStore'
 import scenariosData from '../data/scenarios.json'
+import { CONTRACT_CITY_REGISTRY } from '../data/contractData'
 import styles from './MissionBriefing.module.css'
 
 const LINE_TYPE_SPEED = 28 // ms per character
@@ -47,18 +48,6 @@ function buildTypedLines(scenario) {
         lines.push({ text: '', color: 'muted' })
         colorIdx++
       }
-    }
-  }
-
-  // Cities involved
-  if (scenario.cities) {
-    lines.push({ text: '', color: 'muted' })
-    lines.push({ text: 'SUSPECTED LOCATIONS:', color: 'red' })
-    for (const [, city] of Object.entries(scenario.cities)) {
-      lines.push({
-        text: `  ${city.emoji} ${city.name} [${city.chain}]`,
-        color: 'red',
-      })
     }
   }
 

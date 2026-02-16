@@ -51,6 +51,12 @@ export default function TerminalSidebar() {
     missionId,
     playerNickname,
     rank,
+    currentPlot,
+    openMissionPlotModal,
+    captureMode,
+    toggleCaptureMode,
+    citySuspectWallets,
+    currentCityId,
   } = useGameStore()
 
   const missionEnded = currentMission?.status === 'completed' || currentMission?.status === 'failed'
@@ -144,6 +150,13 @@ export default function TerminalSidebar() {
     if (!msg) return
     addTerminalLine(`> ${msg}`, 'cyan', 'user')
     setChatInput('')
+
+    const command = msg.toLowerCase()
+    if (command === '/mission') {
+      openMissionPlotModal()
+      return
+    }
+
     setTimeout(() => {
       addTerminalLine('> ACME AI: Processing your request...', 'muted', 'system')
       setTimeout(() => {
@@ -238,6 +251,18 @@ export default function TerminalSidebar() {
             <span className={styles.cursor}>_</span>
           </div>
 
+          {/* capture button — shown when in a city with suspects */}
+          {currentCityId && citySuspectWallets.length > 0 && !missionEnded && (
+            <div className={styles.captureBar}>
+              <button
+                className={`${styles.captureBtn} ${captureMode ? styles.captureBtnActive : ''}`}
+                onClick={toggleCaptureMode}
+              >
+                {captureMode ? '[ EXIT CAPTURE ]' : '\u{1F6A8} CAPTURE'}
+              </button>
+            </div>
+          )}
+
           {/* new mission button — shown after completion/failure */}
           {missionEnded && (
             <div className={styles.newMissionBar}>
@@ -259,11 +284,18 @@ export default function TerminalSidebar() {
               ref={inputRef}
               className={styles.chatField}
               type="text"
-              placeholder="Ask ACME AI for help..."
+              placeholder="Ask ACME AI or type /mission"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={handleKeyDown}
             />
+            <button
+              className={styles.quickMissionBtn}
+              onClick={openMissionPlotModal}
+              disabled={!currentPlot && !missionId}
+            >
+              MISSION
+            </button>
             <button
               className={styles.chatSend}
               onClick={handleSendMessage}

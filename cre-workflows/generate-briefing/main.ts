@@ -120,6 +120,7 @@ function getScenario(missionId: bigint): ScenarioData {
 }
 
 const ACTION_RECEIVE_CLUE = 1
+const ZERO_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
 // ============================================================
 //  Helper: read contract — reduces boilerplate for EVM reads
@@ -255,26 +256,26 @@ function buildEnrichedBriefing(
   scenario: ScenarioData,
   missionId: bigint,
   cities: bigint[],
+  targetCityId?: string,
 ): string {
-  const cityIntel = cities
-    .map((c) => {
-      const info = scenario.cities[c.toString()]
-      const clue = scenario.cityClues?.[c.toString()]
-      if (!info) return `  - Chain ${c}: Unknown location`
-      const landmark = clue?.landmark ? ` (near ${clue.landmark})` : ""
-      return `  - ${info.emoji} ${info.name}${landmark} — ${info.chain}`
-    })
-    .join("\n")
+  const primaryCity = targetCityId ? scenario.cities[targetCityId] : undefined
+  const primaryClue = targetCityId ? scenario.cityClues[targetCityId] : undefined
 
-  const cultureHints = cities
-    .map((c) => {
-      const clue = scenario.cityClues?.[c.toString()]
-      const info = scenario.cities[c.toString()]
-      if (!clue || !info) return null
-      return `${info.name}: ${clue.culture}`
-    })
-    .filter(Boolean)
-    .join(" | ")
+  const fallbackCityId = cities[0]?.toString()
+  const fallbackCity = fallbackCityId ? scenario.cities[fallbackCityId] : undefined
+  const fallbackClue = fallbackCityId ? scenario.cityClues[fallbackCityId] : undefined
+
+  const resolvedCity = primaryCity || fallbackCity
+  const resolvedClue = primaryClue || fallbackClue
+
+  const chainName = resolvedCity?.chain || "an unknown network"
+  const networkTrait = inferNetworkTrait(chainName)
+  const cultureHint = resolvedClue?.culture || "regional habits linked to the laundering route"
+  const landmarkHint = resolvedClue?.landmark || "a landmark near the receiver wallet's activity"
+  const heistSignature = extractHeistSignature(scenario.briefing)
+  const locationLine = targetCityId
+    ? `LAST KNOWN LOCATION: ${resolvedCity?.name || "Unknown"} (${chainName})`
+    : `LAST KNOWN LOCATION: pending first confirmed route`
 
   return [
     `╔══════════════════════════════════════════════╗`,
@@ -282,47 +283,50 @@ function buildEnrichedBriefing(
     `╚══════════════════════════════════════════════╝`,
     ``,
     `MISSION #${missionId}: ${scenario.title.toUpperCase()}`,
-    `CLASSIFICATION: TOP SECRET / BLOCKCHAIN-SENSITIVE`,
-    `PRIORITY: CRITICAL — TIME-SENSITIVE`,
+    `CLASSIFICATION: TOP SECRET / FIRST CLUE DOSSIER`,
+    `PRIORITY: CRITICAL`,
     ``,
     `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    `SITUATION BRIEFING:`,
+    `OPENING CLUE:`,
     `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
     ``,
-    scenario.briefing,
+    `The theft signature matches: ${heistSignature}`,
+    `On-chain exit routing indicates the stolen asset settled through ${chainName}.`,
+    `Network profile: ${networkTrait}.`,
+    `Field intel mentions ${cultureHint} around ${landmarkHint}.`,
+    ``,
+    `Follow the network behavior and local culture pattern to pursue the receiver wallet.`,
     ``,
     `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    `SUSPECT LOCATIONS — ACTIVE CHAINS:`,
-    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    ``,
-    cityIntel,
-    ``,
-    `CULTURAL INTEL: ${cultureHints}`,
-    ``,
-    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    `OPERATIONAL DETAILS:`,
-    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    ``,
-    `Your ECIES encryption keys are active. All clues will be`,
-    `encrypted with your public key — only you can decrypt them.`,
-    ``,
-    `PROCEDURE:`,
-    `  1. Select a city to investigate`,
-    `  2. Submit investigation on-chain (costs gas)`,
-    `  3. CRE oracle will analyze and deliver encrypted clue`,
-    `  4. Collect 3+ clues to enable capture`,
-    `  5. Investigate the correct city to capture Carmen`,
-    ``,
-    `WARNING: Carmen relocates every 3 minutes. Previous clues`,
-    `may become stale. Move fast, detective.`,
-    ``,
-    `MAX INVESTIGATIONS: 10 | MAX BLOCKS: 50`,
-    ``,
-    `The clock is ticking. Carmen won't wait.`,
-    `Good luck, detective.`,
+    locationLine,
     ``,
     `— Chief, ACME Detective Agency`,
   ].join("\n")
+}
+
+function extractHeistSignature(briefing: string): string {
+  const normalized = briefing.replace(/\s+/g, " ").trim()
+  const firstSentence = normalized.split(/[.!?]/)[0]?.trim()
+  if (!firstSentence) return "coordinated cross-chain exfiltration"
+  return firstSentence
+}
+
+function inferNetworkTrait(chainName: string): string {
+  const normalized = chainName.toLowerCase()
+
+  if (normalized.includes("arbitrum")) {
+    return "high-throughput L2 hops with aggressive fee minimization"
+  }
+
+  if (normalized.includes("base")) {
+    return "rapid settlement lanes and retail-heavy wallet flow"
+  }
+
+  if (normalized.includes("xdc")) {
+    return "enterprise-leaning settlement corridors and steady bridge patterns"
+  }
+
+  return "cross-chain routing with low-latency wallet movement"
 }
 
 // ============================================================
@@ -371,7 +375,31 @@ const onMissionStarted = (runtime: Runtime<Config>, log: EVMLog): Record<string,
   }) as `0x${string}`
   runtime.log(`Player public key: ${playerPubKeyHex.slice(0, 20)}...`)
 
-  // ── Step 3: Read valid cities ──
+  // ── Step 3: Read mission salt + target hash ──
+  const saltData = readContract(evmClient, runtime, gm, encodeFunctionData({
+    abi: GameMasterABI,
+    functionName: "getMissionSalt",
+    args: [missionId],
+  }))
+  const salt = decodeFunctionResult({
+    abi: GameMasterABI,
+    functionName: "getMissionSalt",
+    data: bytesToHex(saltData),
+  }) as `0x${string}`
+
+  const missionData = readContract(evmClient, runtime, gm, encodeFunctionData({
+    abi: GameMasterABI,
+    functionName: "getMission",
+    args: [missionId],
+  }))
+  const [, , targetHash] = decodeFunctionResult({
+    abi: GameMasterABI,
+    functionName: "getMission",
+    data: bytesToHex(missionData),
+  }) as [string, bigint, string, number, number, number]
+  runtime.log(`TargetHash: ${targetHash}, salt: ${salt}`)
+
+  // ── Step 4: Read valid cities ──
   const citiesData = readContract(evmClient, runtime, gm, encodeFunctionData({
     abi: GameMasterABI,
     functionName: "getValidCities",
@@ -383,7 +411,27 @@ const onMissionStarted = (runtime: Runtime<Config>, log: EVMLog): Record<string,
   }) as bigint[]
   runtime.log(`Valid cities: ${cities.join(", ")}`)
 
-  // ── Step 4: Generate briefing text ──
+  // Brute-force Carmen city from committed hash
+  let targetCityId: string | undefined
+  if (salt !== ZERO_HASH && targetHash !== ZERO_HASH) {
+    for (const city of cities) {
+      const candidateHash = keccak256(
+        encodeAbiParameters(parseAbiParameters("uint256, bytes32"), [city, salt])
+      )
+      if (candidateHash === targetHash) {
+        targetCityId = city.toString()
+        break
+      }
+    }
+  }
+
+  runtime.log(
+    targetCityId
+      ? `Derived destination city for opening clue: ${targetCityId}`
+      : "Could not derive destination city; using fallback opening clue"
+  )
+
+  // ── Step 5: Generate opening clue text ──
   const scenario = getScenario(missionId)
   runtime.log(`Scenario: "${scenario.title}"`)
 
@@ -391,28 +439,28 @@ const onMissionStarted = (runtime: Runtime<Config>, log: EVMLog): Record<string,
 
   if (config.openaiApiKey && config.openaiApiKey !== "" && config.openaiApiKey !== "YOUR_OPENAI_API_KEY") {
     try {
-      briefingText = buildEnrichedBriefing(scenario, missionId, cities)
-      runtime.log("Using enriched briefing (async AI planned for CRE v2)")
+      briefingText = buildEnrichedBriefing(scenario, missionId, cities, targetCityId)
+      runtime.log("Using enriched opening clue (async AI planned for CRE v2)")
       // TODO: When CRE supports async handlers, replace with:
       // briefingText = await generateAIBriefing(scenario, missionId, cities, config.openaiApiKey, config.openaiModel, runtime.log)
     } catch {
-      briefingText = buildEnrichedBriefing(scenario, missionId, cities)
+      briefingText = buildEnrichedBriefing(scenario, missionId, cities, targetCityId)
     }
   } else {
-    briefingText = buildEnrichedBriefing(scenario, missionId, cities)
-    runtime.log("No AI API key — using enriched scenario briefing")
+    briefingText = buildEnrichedBriefing(scenario, missionId, cities, targetCityId)
+    runtime.log("No AI API key — using enriched opening clue")
   }
 
-  runtime.log(`Briefing ready (${briefingText.length} chars)`)
+  runtime.log(`Opening clue ready (${briefingText.length} chars)`)
 
-  // ── Step 5: ECIES-encrypt the briefing ──
+  // ── Step 6: ECIES-encrypt the clue ──
   const pubKeyBytes = parsePubKey(playerPubKeyHex, runtime.log)
   if (!pubKeyBytes) return {}
 
   const encryptedBriefing = eciesEncrypt(pubKeyBytes, briefingText)
-  runtime.log(`Briefing encrypted (${encryptedBriefing.length} hex chars)`)
+  runtime.log(`Opening clue encrypted (${encryptedBriefing.length} hex chars)`)
 
-  // ── Step 6: Compute contentHash and send report ──
+  // ── Step 7: Compute contentHash and send report ──
   const contentHash = keccak256(toBytes(briefingText))
 
   const clueData = encodeAbiParameters(
@@ -424,7 +472,7 @@ const onMissionStarted = (runtime: Runtime<Config>, log: EVMLog): Record<string,
     [ACTION_RECEIVE_CLUE, clueData as `0x${string}`]
   )
 
-  runtime.log("Sending encrypted briefing to proxy...")
+  runtime.log("Sending encrypted opening clue to proxy...")
   const reportResponse = runtime
     .report({
       encodedPayload: hexToBase64(clueReport),
@@ -442,7 +490,7 @@ const onMissionStarted = (runtime: Runtime<Config>, log: EVMLog): Record<string,
     })
     .result()
 
-  runtime.log("Encrypted briefing delivered on-chain!")
+  runtime.log("Encrypted opening clue delivered on-chain!")
 
   return {}
 }

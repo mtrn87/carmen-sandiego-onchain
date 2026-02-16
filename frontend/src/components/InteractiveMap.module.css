@@ -283,6 +283,29 @@
   gap: 10px;
 }
 
+.cityViewBtn {
+  width: 100%;
+  padding: 10px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--cyan);
+  background: rgba(0, 240, 255, 0.06);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.cityViewBtn:hover {
+  background: rgba(0, 240, 255, 0.14);
+  border-color: rgba(0, 240, 255, 0.5);
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.12);
+}
+
 .investigateBtn {
   width: 100%;
   padding: 14px 16px;
@@ -919,4 +942,37 @@
   font-size: 0.62rem;
   color: var(--text-muted);
   letter-spacing: 1px;
+}
+
+/* ── visited city marker ── */
+.entityMarkerVisited {
+  opacity: 0.3;
+  filter: grayscale(0.8);
+  pointer-events: none;
+}
+
+.entityMarkerVisited .entityPulse {
+  display: none;
+}
+
+/* ── newly revealed city marker ── */
+.entityMarkerNew .entityIcon {
+  animation: newCityPulse 2s ease-in-out infinite;
+}
+
+.entityMarkerNew .entityPulse {
+  animation: entityPulse 1.5s ease-out infinite;
+}
+
+@keyframes newCityPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 10px color-mix(in srgb, var(--chain-color, #00f0ff) 40%, transparent),
+      0 0 20px color-mix(in srgb, var(--chain-color, #00f0ff) 15%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 20px color-mix(in srgb, var(--chain-color, #00f0ff) 70%, transparent),
+      0 0 40px color-mix(in srgb, var(--chain-color, #00f0ff) 30%, transparent);
+  }
 }
