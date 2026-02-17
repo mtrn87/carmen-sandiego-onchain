@@ -15,7 +15,7 @@ export default function NicknameModal({ onConfirm }) {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const { setPlayerNickname } = useGameStore()
-  const { user } = usePrivy()
+  const { user, signMessage } = usePrivy()
 
   const validateNickname = useCallback((value) => {
     setError('')
@@ -61,7 +61,7 @@ export default function NicknameModal({ onConfirm }) {
       return
     }
 
-    if (!user) {
+    if (!user || !signMessage) {
       setError('User not authenticated. Please reconnect.')
       return
     }
@@ -78,7 +78,7 @@ export default function NicknameModal({ onConfirm }) {
       
       // Step 1: Sign message (zero gas)
       console.log('[NicknameModal] Signing registration message...')
-      const signedData = await signRegistrationMessage(user, walletAddress, nickname)
+      const signedData = await signRegistrationMessage(signMessage, walletAddress, nickname)
       
       // Step 2: Call Chainlink Functions to relay (Chainlink pays gas)
       console.log('[NicknameModal] Calling Chainlink Functions...')

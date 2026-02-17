@@ -117,36 +117,21 @@ export async function isNicknameAvailable(nickname) {
 /**
  * Sign message for EIP-2771 (Chainlink Functions will relay)
  * Uses Privy's embedded wallet to sign - no MetaMask required
- * @param {Object} user - Privy user object
+ * @param {Object} privySignMessage - Privy's signMessage function from usePrivy hook
  * @param {string} playerAddress - Player's address (from Privy login)
  * @param {string} nickname - Player's nickname
  */
-export async function signRegistrationMessage(user, playerAddress, nickname) {
-  if (!user || !user.wallet) {
-    throw new Error("Privy user not authenticated or wallet not available");
+export async function signRegistrationMessage(privySignMessage, playerAddress, nickname) {
+  if (!privySignMessage || typeof privySignMessage !== 'function') {
+    throw new Error("Privy signMessage function not available");
   }
 
-  // Get Privy's embedded wallet provider
-  const provider = await user.wallet.getEthersProvider();
-  if (!provider) {
-    throw new Error("Could not get Privy Ethereum provider");
-  }
-
-  const signer = await provider.getSigner();
-  if (!signer) {
-    throw new Error("Could not get signer from Privy provider");
-  }
-
-  // Get signer address (from Privy's embedded wallet)
-  const signerAddress = await signer.getAddress();
-  console.log("[creService] Signer address (Privy wallet):", signerAddress);
+  // Use the player address (from Privy login) as the signer address
+  const actualPlayerAddress = playerAddress;
+  console.log("[creService] Using Privy wallet address:", actualPlayerAddress);
   console.log("[creService] Player address:", playerAddress);
 
-  // Note: Privy may use a different embedded wallet for signing than the login wallet
-  // We'll use the signer's address for the signature verification instead
-  const actualPlayerAddress = signerAddress;
-
-  // Get current nonce from contract (use the signer's address, not the login address)
+  // Get current nonce from contract
   const contract = getPlayerRegistryContract();
   const nonceBigInt = await contract.nonces(actualPlayerAddress);
   const nonce = Number(nonceBigInt);  // Convert BigInt to number
@@ -157,7 +142,6 @@ export async function signRegistrationMessage(user, playerAddress, nickname) {
   const contractAddress = import.meta.env.VITE_PLAYER_REGISTRY_ADDRESS_SEPOLIA;
 
   // Step 1: Pack the data (nonce must be a number, not BigInt or string)
-  // Use the actual signer address for the hash
   const packed = ethers.solidityPacked(
     ["address", "string", "uint256", "address"],
     [actualPlayerAddress, nickname, nonce, contractAddress]
@@ -168,14 +152,13 @@ export async function signRegistrationMessage(user, playerAddress, nickname) {
 
   console.log("[creService] Message hash:", messageHash);
 
-  // Step 3: Sign the hash with Privy's embedded wallet
-  // signMessage() adds the Ethereum prefix automatically
-  const signature = await signer.signMessage(ethers.getBytes(messageHash));
+  // Step 3: Sign the hash with Privy's embedded wallet using Privy's signMessage
+  const signature = await privySignMessage(ethers.getBytes(messageHash));
 
   console.log("[creService] Message signed with Privy wallet:", signature);
 
   return {
-    playerAddress: actualPlayerAddress,  // Use the signer's address
+    playerAddress: actualPlayerAddress,
     nickname,
     nonce: nonce.toString(),
     signature,
