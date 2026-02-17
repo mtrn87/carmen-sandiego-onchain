@@ -1,0 +1,17 @@
+{
+  "name": "carmen-clue-generator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "tsx generate-ai-clues.ts",
+    "generate:dry-run": "tsx generate-ai-clues.ts --dry-run"
+  },
+  "dependencies": {
+    "openai": "^4.0.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0"
+  }
+}
