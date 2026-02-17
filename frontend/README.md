@@ -1,25 +1,107 @@
-# React + Vite
+# Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Interface do jogo Carmen Sandiego On-Chain. React 18 + Vite + Zustand + Privy Auth.
 
-Currently, two official plugins are available:
+## Prerequisites
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Node.js 20+ (22 recommended)
+- Contratos deployados (enderecos configurados no `.env`)
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-
-## How to run
-
-On your local machine, switch to the frontend directory and run the following commands:
+## Setup
 
 ```bash
-npm i # `npm` used for this project
-npm run dev # For development version, or `npm run preview` for production version
+npm install
+```
+
+### Variaveis de ambiente
+
+Crie um arquivo `.env` neste diretorio com as variaveis `VITE_`-prefixed:
+
+```env
+# Contract addresses (preenchidos apos deploy)
+VITE_GAME_MASTER_ADDRESS=0x...
+VITE_GAME_MASTER_PROXY_ADDRESS=0x...
+VITE_MISSION_NFT_ADDRESS=0x...
+
+# RPC URLs
+VITE_SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
+VITE_ARBITRUM_SEPOLIA_RPC_URL=https://arb-sepolia.g.alchemy.com/v2/YOUR_KEY
+VITE_BASE_SEPOLIA_RPC_URL=https://base-sepolia.g.alchemy.com/v2/YOUR_KEY
+
+# Auth
+VITE_WALLET_CONNECT_PROJECT_ID=your_walletconnect_project_id
+```
+
+## Rodando o Dev Server
+
+```bash
+npm run dev
+```
+
+Acesse http://localhost:5173. O Vite faz hot-reload automatico.
+
+## Testes
+
+```bash
+# Watch mode (re-roda ao salvar)
+npm run test
+
+# Single run (para CI)
+npm run test:run
+```
+
+Testes usam Vitest + Testing Library (jsdom). Ficam co-localizados em pastas `__tests__/` ao lado dos componentes.
+
+## Lint
+
+```bash
+npm run lint
+```
+
+ESLint com flat config (`eslint.config.js`).
+
+## Build de Producao
+
+```bash
+# Gerar bundle otimizado
+npm run build
+
+# Preview local do build
+npm run preview
+```
+
+O bundle e gerado em `dist/`.
+
+## Estrutura
+
+```
+frontend/
+  src/
+    main.jsx                # Entry point
+    App.jsx                 # Router e providers (Privy, React Query)
+    pages/
+      LoginPage.jsx         # Tela de login (Privy wallet + social)
+      GamePage.jsx          # Tela principal do jogo
+    components/
+      InteractiveMap.jsx    # Mapa interativo com cidades
+      CityView.jsx          # Vista de uma cidade (locais, pistas)
+      MissionBriefing.jsx   # Briefing da missao
+      CaptureMode.jsx       # Modo captura de Carmen
+      WalletEvidence.jsx    # Fragmentos de wallet evidence
+      EvidencePanel.jsx     # Painel de evidencias coletadas
+      ClueModal.jsx         # Modal de pista decriptada
+      TerminalSidebar.jsx   # Terminal lateral com logs on-chain
+      ContractExplorer.jsx  # Explorer de contratos
+      ...
+    services/
+      contractService.js    # Wrapper ethers.js v6 (calls + event listeners)
+    store/
+      gameStore.js          # Zustand store (auth, mission, player state)
+    utils/
+      ecies.js              # ECIES encryption/decryption (@noble/curves)
+      authPersistence.js    # Persistencia de sessao
+    data/
+      cityRegistry.js       # Registry de cidades e chain IDs
+      contractData.js       # ABIs e enderecos
+  vite.config.js            # Config Vite + Web3 polyfills
 ```
