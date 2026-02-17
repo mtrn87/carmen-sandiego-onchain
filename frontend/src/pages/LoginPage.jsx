@@ -141,12 +141,15 @@ export default function LoginPage() {
 
           // Check if player exists (simple read, no CRE)
           console.log('[LoginPage] Checking if player exists...')
-          const playerData = await getPlayerData(address)
+          
+          // Try to use the registered address if available (for returning players)
+          const addressToCheck = localStorage.getItem('player_registered_address') || address
+          const playerData = await getPlayerData(addressToCheck)
 
           if (playerData) {
             // Player exists, go to game
             console.log('[LoginPage] Player exists:', playerData)
-            saveAuthSession(address, userInfo, null, playerData.nickname)
+            saveAuthSession(address, userInfo, null, playerData.nickname, addressToCheck)
             navigate('/game')
           } else {
             // Player doesn't exist, show nickname modal
