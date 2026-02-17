@@ -116,20 +116,35 @@ export async function isNicknameAvailable(nickname) {
 
 /**
  * Sign message for EIP-2771 (Chainlink Functions will relay)
- * Uses Privy's embedded wallet to sign - no MetaMask required
+ * Supports both Privy embedded wallet and MetaMask
+ * @param {Object} user - Privy user object
  * @param {Object} privySignMessage - Privy's signMessage function from usePrivy hook
  * @param {string} playerAddress - Player's address (from Privy login)
  * @param {string} nickname - Player's nickname
  */
-export async function signRegistrationMessage(privySignMessage, playerAddress, nickname) {
-  if (!privySignMessage || typeof privySignMessage !== 'function') {
-    throw new Error("Privy signMessage function not available");
+export async function signRegistrationMessage(user, privySignMessage, playerAddress, nickname) {
+  if (!user || !privySignMessage || typeof privySignMessage !== 'function') {
+    throw new Error("Privy user or signMessage function not available");
   }
 
-  // Use the player address (from Privy login) as the signer address
-  const actualPlayerAddress = playerAddress;
-  console.log("[creService] Using Privy wallet address:", actualPlayerAddress);
+  // Detect which wallet to use
+  let actualPlayerAddress = playerAddress;
+  let signatureMethod = 'privy'; // default to privy
+
+  // Check if user has a linked wallet (MetaMask or other external wallet)
+  if (user.linkedAccounts && user.linkedAccounts.length > 0) {
+    const externalWallet = user.linkedAccounts.find(acc => acc.type === 'wallet');
+    if (externalWallet && externalWallet.address) {
+      // User has external wallet (MetaMask), use it
+      actualPlayerAddress = externalWallet.address;
+      signatureMethod = 'metamask';
+      console.log("[creService] Using MetaMask wallet address:", actualPlayerAddress);
+    }
+  }
+
+  console.log("[creService] Wallet method:", signatureMethod);
   console.log("[creService] Player address:", playerAddress);
+  console.log("[creService] Signer address:", actualPlayerAddress);
 
   // Get current nonce from contract
   const contract = getPlayerRegistryContract();
@@ -152,11 +167,19 @@ export async function signRegistrationMessage(privySignMessage, playerAddress, n
 
   console.log("[creService] Message hash:", messageHash);
 
-  // Step 3: Sign the hash with Privy's embedded wallet using Privy's signMessage
-  // Privy's signMessage expects a string, not bytes
-  const signature = await privySignMessage(messageHash);
-
-  console.log("[creService] Message signed with Privy wallet:", signature);
+  // Step 3: Sign the hash with the appropriate wallet
+  let signature;
+  if (signatureMethod === 'metamask' && window.ethereum) {
+    // Use MetaMask to sign
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    signature = await signer.signMessage(ethers.getBytes(messageHash));
+    console.log("[creService] Message signed with MetaMask:", signature);
+  } else {
+    // Use Privy's signMessage (expects string, not bytes)
+    signature = await privySignMessage(messageHash);
+    console.log("[creService] Message signed with Privy wallet:", signature);
+  }
 
   return {
     playerAddress: actualPlayerAddress,

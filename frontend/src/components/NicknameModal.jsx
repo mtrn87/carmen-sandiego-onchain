@@ -78,7 +78,7 @@ export default function NicknameModal({ onConfirm }) {
       
       // Step 1: Sign message (zero gas)
       console.log('[NicknameModal] Signing registration message...')
-      const signedData = await signRegistrationMessage(signMessage, walletAddress, nickname)
+      const signedData = await signRegistrationMessage(user, signMessage, walletAddress, nickname)
       
       // Step 2: Call Chainlink Functions to relay (Chainlink pays gas)
       console.log('[NicknameModal] Calling Chainlink Functions...')

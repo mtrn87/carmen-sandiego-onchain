@@ -7,7 +7,7 @@ import App from './App'
 import './styles/global.css'
 
 const privyConfig = {
-  loginMethods: ['google'],
+  loginMethods: ['google', 'wallet'],
   appearance: {
     theme: 'dark',
     accentColor: '#00ffff',
