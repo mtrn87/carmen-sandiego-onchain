@@ -1,4 +1,5 @@
 import { ethers } from "ethers";
+import { getReadProvider } from "./contractService";
 
 const PLAYER_REGISTRY_ABI = [
   // View functions (simple reads, no CRE needed)
@@ -30,8 +31,7 @@ export async function initializePlayerRegistry(address) {
   _playerRegistryAddress = address;
 
   // Use read-only provider for initialization (no wallet access needed)
-  const rpcUrl = "https://eth-sepolia.g.alchemy.com/v2/cZgx1scPSDR68tWHfflr7";
-  const provider = new ethers.JsonRpcProvider(rpcUrl);
+  const provider = await getReadProvider();
 
   _playerRegistryContract = new ethers.Contract(
     address,
