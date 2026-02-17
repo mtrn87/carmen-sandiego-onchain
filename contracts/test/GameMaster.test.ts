@@ -589,6 +589,143 @@ describe("GameMaster", function () {
   });
 
   // ============================================================
+  //          ACTIVE MISSION TRACKING
+  // ============================================================
+
+  describe("getActiveMissionIds", function () {
+    let gm: GameMaster;
+    let vrfCoordinator: any;
+
+    beforeEach(async function () {
+      const VRFMock = await ethers.getContractFactory("VRFCoordinatorV2PlusMock");
+      vrfCoordinator = await VRFMock.deploy(0, 0, 0);
+      const createSubTx = await vrfCoordinator.createSubscription();
+      const createSubReceipt = await createSubTx.wait();
+      const subCreatedEvent = createSubReceipt?.logs.find((log: any) => {
+        try {
+          return vrfCoordinator.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "SubscriptionCreated";
+        } catch { return false; }
+      });
+      const subId = vrfCoordinator.interface.parseLog({
+        topics: [...subCreatedEvent!.topics], data: subCreatedEvent!.data
+      })!.args[0];
+      await vrfCoordinator.fundSubscription(subId, 1000000);
+
+      const GMFactory = await ethers.getContractFactory("GameMaster");
+      gm = await GMFactory.deploy(
+        await vrfCoordinator.getAddress(), subId, VRF_KEY_HASH, validChainIds, creOracle.address
+      ) as GameMaster;
+      await gm.waitForDeployment();
+      await vrfCoordinator.addConsumer(subId, await gm.getAddress());
+    });
+
+    it("should return empty array when no missions exist", async function () {
+      const ids = await gm.getActiveMissionIds();
+      expect(ids.length).to.equal(0);
+    });
+
+    it("should track mission after startMission", async function () {
+      await gm.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm.connect(player).startMission();
+
+      const ids = await gm.getActiveMissionIds();
+      expect(ids.length).to.equal(1);
+      expect(ids[0]).to.equal(1);
+    });
+
+    it("should remove mission after capture", async function () {
+      await gm.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm.connect(player).startMission();
+      const missionId = await gm.getPlayerActiveMission(player.address);
+      await vrfCoordinator.fulfillRandomWordsWithOverride(missionId, await gm.getAddress(), [42]);
+
+      // Deliver 3 clues and capture
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("clue"));
+      for (let i = 0; i < 3; i++) {
+        await gm.connect(creOracle).receiveClue(missionId, 0, contentHash, "ipfs://Qm...", 50);
+      }
+
+      const mission = await gm.getMission(missionId);
+      const salt = await gm.getMissionSalt(missionId);
+      let revealedChainId = 0n;
+      for (const cid of validChainIds) {
+        const hash = ethers.keccak256(ethers.solidityPacked(["uint256", "bytes32"], [cid, salt]));
+        if (hash === mission.targetHash) {
+          revealedChainId = BigInt(cid);
+          break;
+        }
+      }
+      await gm.connect(creOracle).resolveCapture(missionId, revealedChainId, salt);
+
+      const ids = await gm.getActiveMissionIds();
+      expect(ids.length).to.equal(0);
+    });
+
+    it("should remove mission after failure (auto-close on new startMission)", async function () {
+      await gm.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm.connect(player).startMission(); // mission 1
+
+      let ids = await gm.getActiveMissionIds();
+      expect(ids.length).to.equal(1);
+      expect(ids[0]).to.equal(1);
+
+      // Starting a new mission auto-fails mission 1
+      await gm.connect(player).startMission(); // mission 2
+
+      ids = await gm.getActiveMissionIds();
+      expect(ids.length).to.equal(1);
+      expect(ids[0]).to.equal(2);
+    });
+
+    it("should track multiple players simultaneously", async function () {
+      await gm.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm.connect(otherUser).registerPlayer(MOCK_PUBLIC_KEY);
+
+      await gm.connect(player).startMission();    // mission 1
+      await gm.connect(otherUser).startMission();  // mission 2
+
+      const ids = await gm.getActiveMissionIds();
+      expect(ids.length).to.equal(2);
+      expect(ids).to.include(1n);
+      expect(ids).to.include(2n);
+    });
+
+    it("should handle swap-and-pop correctly when middle mission completes", async function () {
+      await gm.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm.connect(otherUser).registerPlayer(MOCK_PUBLIC_KEY);
+
+      await gm.connect(player).startMission();    // mission 1
+      await gm.connect(otherUser).startMission();  // mission 2
+
+      // Fulfill VRF for mission 1 and capture it
+      const missionId1 = await gm.getPlayerActiveMission(player.address);
+      await vrfCoordinator.fulfillRandomWordsWithOverride(missionId1, await gm.getAddress(), [42]);
+
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("clue"));
+      for (let i = 0; i < 3; i++) {
+        await gm.connect(creOracle).receiveClue(missionId1, 0, contentHash, "ipfs://Qm...", 50);
+      }
+
+      const mission = await gm.getMission(missionId1);
+      const salt = await gm.getMissionSalt(missionId1);
+      let revealedChainId = 0n;
+      for (const cid of validChainIds) {
+        const hash = ethers.keccak256(ethers.solidityPacked(["uint256", "bytes32"], [cid, salt]));
+        if (hash === mission.targetHash) {
+          revealedChainId = BigInt(cid);
+          break;
+        }
+      }
+      await gm.connect(creOracle).resolveCapture(missionId1, revealedChainId, salt);
+
+      // Only mission 2 should remain
+      const ids = await gm.getActiveMissionIds();
+      expect(ids.length).to.equal(1);
+      expect(ids[0]).to.equal(2);
+    });
+  });
+
+  // ============================================================
   //          WALLET EVIDENCE
   // ============================================================
 

@@ -54,6 +54,7 @@ interface IGameMaster {
     function getMissionFragmentCount(uint256 missionId) external view returns (uint8);
     function getMissionEvidenceCount(uint256 missionId) external view returns (uint8);
     function deriveCarmenWallet(bytes32 salt) external pure returns (address);
+    function getActiveMissionIds() external view returns (uint256[] memory);
 
     // --- Events ---
     event PlayerRegistered(address indexed player, bytes publicKey);
