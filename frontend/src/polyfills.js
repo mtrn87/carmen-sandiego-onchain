@@ -1,3 +1,22 @@
+// Block window.ethereum to prevent Privy from trying to access MetaMask
+// Privy should use only embedded wallets, not external wallet connectors
+if (typeof window !== 'undefined') {
+  // Delete window.ethereum if it exists to prevent Privy from syncing with MetaMask
+  delete window.ethereum
+  
+  // Prevent any code from setting window.ethereum
+  Object.defineProperty(window, 'ethereum', {
+    get() {
+      return undefined
+    },
+    set(value) {
+      // Silently ignore attempts to set window.ethereum
+      console.debug('[Polyfill] Blocked attempt to set window.ethereum')
+    },
+    configurable: false,
+  })
+}
+
 // Polyfills para Web3Auth no Vite
 const nextTickQueue = []
 let nextTickScheduled = false
