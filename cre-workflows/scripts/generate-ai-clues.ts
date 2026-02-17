@@ -24,6 +24,35 @@ type Scenario = {
   failureMessage: string;
 };
 
+// ── Provider Config ───────────────────────────────────────────────────
+type Provider = "openai" | "gemini" | "groq";
+
+const PROVIDERS: Record<Provider, {
+  baseURL: string;
+  defaultModel: string;
+  envKey: string;
+  supportsJsonMode: boolean;
+}> = {
+  openai: {
+    baseURL: "https://api.openai.com/v1",
+    defaultModel: "gpt-4o-mini",
+    envKey: "OPENAI_API_KEY",
+    supportsJsonMode: true,
+  },
+  gemini: {
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+    defaultModel: "gemini-2.0-flash",
+    envKey: "GEMINI_API_KEY",
+    supportsJsonMode: true,
+  },
+  groq: {
+    baseURL: "https://api.groq.com/openai/v1",
+    defaultModel: "llama-3.3-70b-versatile",
+    envKey: "GROQ_API_KEY",
+    supportsJsonMode: true,
+  },
+};
+
 // ── CLI Args ─────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");
@@ -31,9 +60,17 @@ const TARGET_COUNT = parseInt(args[args.indexOf("--count") + 1]) || 15;
 const TARGET_SCENARIO = args.includes("--scenario")
   ? args[args.indexOf("--scenario") + 1]
   : null;
+const PROVIDER: Provider = args.includes("--provider")
+  ? (args[args.indexOf("--provider") + 1] as Provider)
+  : "gemini";
+const providerConfig = PROVIDERS[PROVIDER];
+if (!providerConfig) {
+  console.error(`Unknown provider: ${PROVIDER}. Use: ${Object.keys(PROVIDERS).join(", ")}`);
+  process.exit(1);
+}
 const MODEL = args.includes("--model")
   ? args[args.indexOf("--model") + 1]
-  : process.env.OPENAI_MODEL || "gpt-4o-mini";
+  : process.env[`${PROVIDER.toUpperCase()}_MODEL`] || providerConfig.defaultModel;
 
 // ── Paths ────────────────────────────────────────────────────────────
 const SCENARIOS_PATH = resolve(__dirname, "../data/scenarios.json");
@@ -195,17 +232,21 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // ── Main ─────────────────────────────────────────────────────────────
 async function main() {
   console.log(`\n${C.bold}${C.cyan}CARMEN SANDIEGO — AI Clue Generator${C.reset}`);
-  console.log(`${C.dim}Model: ${MODEL} | Count: ${TARGET_COUNT} per category | Dry run: ${DRY_RUN}${C.reset}\n`);
+  console.log(`${C.dim}Provider: ${PROVIDER} | Model: ${MODEL} | Count: ${TARGET_COUNT} per category | Dry run: ${DRY_RUN}${C.reset}\n`);
 
-  if (!process.env.OPENAI_API_KEY && !DRY_RUN) {
-    console.error(`${C.red}Error: OPENAI_API_KEY not found in .env${C.reset}`);
+  const apiKey = process.env[providerConfig.envKey];
+  if (!apiKey && !DRY_RUN) {
+    console.error(`${C.red}Error: ${providerConfig.envKey} not found in .env${C.reset}`);
     console.error(`Set it in ${resolve(__dirname, "../../.env")}`);
+    console.error(`\n${C.dim}Free API keys:`);
+    console.error(`  Gemini: https://aistudio.google.com/apikey`);
+    console.error(`  Groq:   https://console.groq.com/keys${C.reset}`);
     process.exit(1);
   }
 
   const openai = DRY_RUN
     ? (null as unknown as OpenAI)
-    : new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    : new OpenAI({ apiKey, baseURL: providerConfig.baseURL });
 
   // Read scenarios
   const data = JSON.parse(readFileSync(SCENARIOS_PATH, "utf-8"));

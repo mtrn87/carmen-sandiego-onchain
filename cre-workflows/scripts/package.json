@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "generate": "tsx generate-ai-clues.ts",
-    "generate:dry-run": "tsx generate-ai-clues.ts --dry-run"
+    "generate:dry-run": "tsx generate-ai-clues.ts --dry-run",
+    "generate:gemini": "tsx generate-ai-clues.ts --provider gemini",
+    "generate:groq": "tsx generate-ai-clues.ts --provider groq",
+    "generate:openai": "tsx generate-ai-clues.ts --provider openai"
   },
   "dependencies": {
     "openai": "^4.0.0",
