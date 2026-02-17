@@ -15,6 +15,11 @@ const privyConfig = {
   embeddedWallets: {
     createOnLogin: 'users-can-choose',
   },
+  externalWallets: {
+    solana: {
+      isActive: false,
+    },
+  },
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
