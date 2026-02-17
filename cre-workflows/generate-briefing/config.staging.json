@@ -1,7 +1,7 @@
 {
   "chainSelectorName": "ethereum-testnet-sepolia",
-  "gameMasterAddress": "0x2531600296b3BdD3567E97344999fa7DE969bCC5",
-  "proxyAddress": "0xe9563CbA37b64d4985a7af1e063b7798463153Aa",
+  "gameMasterAddress": "0x0EAf52Fe6b3A115A5B1A7C5d4df2Eb8b5d933BC1",
+  "proxyAddress": "0x792fE8722fef784b30feBB7258706FaC1320Bff7",
   "gasLimit": "500000",
   "openaiApiKey": "YOUR_OPENAI_API_KEY",
   "openaiModel": "gpt-4o-mini"

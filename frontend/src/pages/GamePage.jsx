@@ -45,14 +45,14 @@ export default function GamePage() {
 
   if (!isConnected) return null
 
-  const handleSelectCase = (c) => {
+  const handleSelectCase = async (c) => {
     // CityNode cities: load city data and set location index
     const cityNodeChains = [421614, 84532, 51]
     if (c?.chainId && cityNodeChains.includes(c.chainId)) {
-      // find location index within the city's cases
       const locIdx = c.locationIdx ?? 0
       if (!currentCityId || currentCityId !== c.chainId) {
-        selectCity(c.chainId).then(() => selectLocation(locIdx))
+        await selectCity(c.chainId)
+        selectLocation(locIdx)
       } else {
         selectLocation(locIdx)
       }
