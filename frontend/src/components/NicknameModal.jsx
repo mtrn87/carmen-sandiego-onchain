@@ -96,9 +96,11 @@ export default function NicknameModal({ onConfirm }) {
       // Save nickname to store and session
       setPlayerNickname(nickname)
       const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}')
-      // Save the registered address for future logins
+      // Save the registered address (from signedData) for future logins
       const currentAddress = localStorage.getItem('wallet_address')
-      saveAuthSession(currentAddress, userInfo, null, nickname, walletAddress)
+      const registeredAddress = signedData.playerAddress
+      console.log('[NicknameModal] Saving registered address:', registeredAddress)
+      saveAuthSession(currentAddress, userInfo, null, nickname, registeredAddress)
       
       setSuccess(true)
 
