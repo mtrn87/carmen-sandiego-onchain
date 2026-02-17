@@ -80,9 +80,13 @@ export async function getPlayerData(address) {
     console.log("[creService] Reading player data for:", address);
     const player = await contract.getPlayer(address);
     
+    console.log("[creService] Raw player data:", player);
+    console.log("[creService] Player wallet field:", player.wallet);
+    console.log("[creService] ZeroAddress:", ethers.ZeroAddress);
+    
     // Check if player exists (wallet != 0x0)
     if (player.wallet === ethers.ZeroAddress) {
-      console.log("[creService] Player does not exist");
+      console.log("[creService] Player does not exist (wallet is zero address)");
       return null;
     }
     

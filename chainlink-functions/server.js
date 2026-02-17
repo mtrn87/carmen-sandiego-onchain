@@ -22,7 +22,9 @@ app.use(cors());
 // PlayerRegistry contract ABI
 const PLAYER_REGISTRY_ABI = [
   "function requestRegistrationWithSignature(address playerAddress, string nickname, bytes signature, uint256 nonce) external",
+  "function registerPlayer(address playerAddress, string nickname) external",
   "function nonces(address) public view returns (uint256)",
+  "function setGameMaster(address _gameMaster) external",
 ];
 
 // Configuration
@@ -58,6 +60,7 @@ function initializeProvider() {
 /**
  * POST /relay
  * Relays registration request to blockchain
+ * Validates signature and directly calls registerPlayer() to complete registration
  */
 app.post("/relay", async (req, res) => {
   try {
@@ -87,15 +90,30 @@ app.post("/relay", async (req, res) => {
     // Convert nonce to number if it's a string
     const nonceNum = typeof nonce === 'string' ? BigInt(nonce) : nonce;
 
-    // Call requestRegistrationWithSignature
-    console.log("Calling requestRegistrationWithSignature...");
-
-    const tx = await contract.requestRegistrationWithSignature(
-      playerAddress,
-      nickname,
-      signature,
-      nonceNum
+    // Step 1: Validate signature
+    console.log("Validating signature...");
+    const messageHash = ethers.keccak256(
+      ethers.solidityPacked(
+        ["address", "string", "uint256", "address"],
+        [playerAddress, nickname, nonceNum, contractAddress]
+      )
     );
+    
+    const ethSignedMessageHash = ethers.hashMessage(ethers.getBytes(messageHash));
+    const recoveredAddress = ethers.recoverAddress(ethSignedMessageHash, signature);
+    
+    if (recoveredAddress.toLowerCase() !== playerAddress.toLowerCase()) {
+      console.error("✗ Signature validation failed");
+      return res.status(400).json({
+        success: false,
+        error: "Invalid signature",
+      });
+    }
+    console.log("✓ Signature valid");
+
+    // Step 2: Call registerPlayer directly (bypassing CRE)
+    console.log("Calling registerPlayer...");
+    const tx = await contract.registerPlayer(playerAddress, nickname);
 
     console.log("✓ Transaction sent:", tx.hash);
 
