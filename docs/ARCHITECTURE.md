@@ -6,27 +6,35 @@
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                            PLAYER (Browser)                             │
 │  React 18 + Zustand + Privy Auth + ECIES (IndexedDB private key)       │
-└────────┬──────────────────────────────┬─────────────────────────────────┘
+│  Google OAuth → Embedded Wallet → Gasless Registration                 │
+└────────┬──────────────────────────┬─────────────────────────────────────┘
          │ tx (ethers v6)              │ decrypt clues (ecies.js)
-         ▼                             │
-┌────────────────────┐                 │
-│  SEPOLIA (HQ)      │                 │
-│  ┌──────────────┐  │   VRF callback  │
-│  │  GameMaster   │◄─┼── VRF v2.5     │
-│  │  (commit-     │  │   (randomness)  │
-│  │   reveal)     │  │                 │
-│  └──────┬───────┘  │                 │
-│         │ called   │                 │
-│         │ by proxy │                 │
-│  ┌──────▼───────┐  │                 │
-│  │ GameMaster   │◄─┼── KeystoneForwarder ◄── CRE Workflows
-│  │ Proxy        │  │   (signed reports)      (off-chain WASM)
-│  └──────────────┘  │                         │
-│  ┌──────────────┐  │                         │
-│  │  MissionNFT  │◄─┼── mint on capture       │
-│  │  (ERC-721)   │  │                         │
-│  └──────────────┘  │                         │
-└────────────────────┘                         │
+         │                             │
+         ├─────────────────────────────┤
+         │                             │
+         ▼                             ▼
+┌──────────────────────┐      ┌──────────────────────┐
+│ RELAYER SERVER (3001)│      │  SEPOLIA (HQ)        │
+│                      │      │  ┌──────────────┐    │
+│ Validate Signature   │      │  │  GameMaster   │    │
+│ Call registerPlayer()│      │  │  (commit-     │    │
+│ Pay Gas (~$0.50)     │      │  │   reveal)     │    │
+└──────────────────────┘      │  └──────┬───────┘    │
+         ▲                     │         │ called     │
+         │                     │         │ by proxy   │
+    Sign Message              │  ┌──────▼───────┐    │
+    (Privy)                   │  │ GameMaster   │◄───┼── KeystoneForwarder ◄── CRE Workflows
+                              │  │ Proxy        │    │   (signed reports)      (off-chain WASM)
+                              │  └──────────────┘    │                         │
+                              │  ┌──────────────┐    │                         │
+                              │  │  MissionNFT  │◄───┼── mint on capture       │
+                              │  │  (ERC-721)   │    │                         │
+                              │  └──────────────┘    │                         │
+                              │  ┌──────────────┐    │                         │
+                              │  │PlayerRegistry│◄───┼── Store player data     │
+                              │  │  (nonces)    │    │                         │
+                              │  └──────────────┘    │                         │
+                              └──────────────────────┘                         │
                                                │
 ┌──────────────────────────────────────────────┴──────────────────────┐
 │                      CRE WORKFLOWS (Chainlink Runtime)              │
