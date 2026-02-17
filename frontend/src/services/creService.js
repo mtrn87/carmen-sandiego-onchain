@@ -153,7 +153,8 @@ export async function signRegistrationMessage(privySignMessage, playerAddress, n
   console.log("[creService] Message hash:", messageHash);
 
   // Step 3: Sign the hash with Privy's embedded wallet using Privy's signMessage
-  const signature = await privySignMessage(ethers.getBytes(messageHash));
+  // Privy's signMessage expects a string, not bytes
+  const signature = await privySignMessage(messageHash);
 
   console.log("[creService] Message signed with Privy wallet:", signature);
 
