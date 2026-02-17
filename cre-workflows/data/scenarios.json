@@ -5,26 +5,35 @@
       "title": "The Heist of the Lost CryptoPunk",
       "briefing": "Carmen Sandiego's gang has struck again! The legendary CryptoPunk #7804 — valued at 4,200 ETH — was stolen from the digital vault of the collector known as 'The Vault' on the Ethereum network. The heist was executed through a coordinated flash loan attack. Our intel indicates Carmen passed through the Ethereum network and is now hopping across chains. The NFT has already left Ethereum. Carmen is on the move. Good luck, detective.",
       "cities": {
-        "421614": {
-          "name": "Tokyo",
-          "emoji": "🗾",
-          "chain": "Arbitrum Sepolia"
+        "51": {
+          "name": "London",
+          "emoji": "🎡",
+          "chain": "XDC Apothem"
         },
         "84532": {
           "name": "Paris",
           "emoji": "🗼",
           "chain": "Base Sepolia"
         },
-        "51": {
-          "name": "London",
-          "emoji": "🎡",
-          "chain": "XDC Apothem"
+        "421614": {
+          "name": "Tokyo",
+          "emoji": "🗾",
+          "chain": "Arbitrum Sepolia"
         }
       },
       "cityClues": {
-        "421614": { "landmark": "Shibuya Crossing", "culture": "cherry blossoms, ramen, bullet train" },
-        "84532": { "landmark": "Eiffel Tower", "culture": "croissants, Eurostar, Louvre" },
-        "51": { "landmark": "Big Ben", "culture": "afternoon tea, fog, Thames" }
+        "51": {
+          "landmark": "Big Ben",
+          "culture": "afternoon tea, fog, Thames"
+        },
+        "84532": {
+          "landmark": "Eiffel Tower",
+          "culture": "croissants, Eurostar, Louvre"
+        },
+        "421614": {
+          "landmark": "Shibuya Crossing",
+          "culture": "cherry blossoms, ramen, bullet train"
+        }
       },
       "clues": {
         "true": [
@@ -47,6 +56,66 @@
           {
             "type": 0,
             "text": "NFT provenance trail shows a transfer to a cold wallet labeled 'sakura-vault.' Metadata contains encoded coordinates: 35.6762, 139.6503 — Shibuya, Tokyo."
+          },
+          {
+            "type": 0,
+            "text": "Witness reports a suspicious transaction on the XDC Apothem chain, referencing a 'foggy evening stroll along the river' in the wallet's notes. The transaction was a swift NFT transfer, with metadata updated to include a Big Ben timestamp. Further investigation reveals the recipient wallet has a history of flash loan activity, echoing the CryptoPunk heist's MO."
+          },
+          {
+            "type": 1,
+            "text": "Intercepted communique between two parties, discussing 'a lovely spot for afternoon tea' where 'the clock tower's chimes harmonize with the hum of the blockchain.' The conversation hints at utilizing a lesser-known bridge to transfer assets between chains, avoiding the prying eyes of on-chain detectives."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of on-chain activity reveals a pattern of wallets interacting with a smart contract, all referencing a 'Thames-side' location. Each transaction is followed by a metadata update, including a hash that, when decoded, points to a specific NFT collection – possibly a laundering attempt for the stolen CryptoPunk #7804."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage from a high-rise near the 'river's bend' shows a figure accessing a laptop, with a screen displaying an XDC Apothem wallet interface. The figure quickly navigates to the NFT section, where a CryptoPunk is visible for a brief moment. The laptop's background image is of a famous clock face, partially obscured by fog."
+          },
+          {
+            "type": 0,
+            "text": "Marketplace listing for a rare digital art piece, referencing 'the city of fog and clock towers' as its inspiration. The seller's wallet has been linked to previous transactions on the XDC Apothem chain, specifically with a contract known for facilitating discreet NFT transfers. The listing's description includes a cryptic message about 'time being of the essence,' potentially hinting at the stolen CryptoPunk's next move."
+          },
+          {
+            "type": 0,
+            "text": "Witness report: a suspect was seen sipping coffee near a iconic iron lattice tower, while accessing a wallet with a suspicious transaction pattern - a series of micro-transactions on the Base Sepolia chain, possibly testing the waters for a larger NFT transfer."
+          },
+          {
+            "type": 1,
+            "text": "Intercepted comms: overheard conversation in a crowded café, mentioning 'the perfect flaky pastry' and 'a certain punk's new home', followed by a hushed discussion about optimizing gas fees for a cross-chain bridge."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of on-chain data reveals a wallet connected to the CryptoPunk #7804 heist has been active on a Sepolia testnet, interacting with a smart contract that enables NFT ownership transfer via a decentralized marketplace."
+          },
+          {
+            "type": 2,
+            "text": "Security footage: grainy image of a figure in a black beret, walking along a renowned museum's glass pyramid, while holding a device with an active wallet interface - the screen displaying a transaction confirmation on the Base Sepolia chain, with a notable NFT token ID in the metadata."
+          },
+          {
+            "type": 0,
+            "text": "Informant tip: a high-speed train route, popular among European travelers, may have been used by the suspect to lay low for a while - a wallet associated with the heist has been linked to a transaction on a decentralized exchange, utilizing a protocol with interoperability features for cross-chain asset transfers."
+          },
+          {
+            "type": 0,
+            "text": "Witness report from a digital underground forum hints at a high-stakes NFT transfer, referencing a 'neon-lit scramble' and a 'pink blossom backdrop.' The chatter mentions an Arbitrum Sepolia bridge, with a peculiar wallet pattern: a sequence of micro-transactions to a ramen-themed NFT collection, possibly used to launder the stolen CryptoPunk #7804."
+          },
+          {
+            "type": 1,
+            "text": "Intercepted phone call: 'Meet me at the Shibuya-esque square, where the busiest intersection in the world converges. Bring the package, and we'll discuss the XDC Apothem bridge as a potential next hop.' The voice on the other end mentioned 'hashing the metadata to avoid pattern recognition,' likely referencing the CryptoPunk's distinct attributes."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage from a high-speed rail line shows a figure, partially obscured, accessing a wallet on a personal device. The background reveals a blur of Japanese characters and a glimpse of Mount Fuji through the window, as the train hurtles towards a major metropolitan hub. The figure's transactions suggest a large sum of ETH was exchanged for native tokens on a Layer 2 network."
+          },
+          {
+            "type": 0,
+            "text": "A forensic analysis of the flash loan attack on Ethereum reveals a sophisticated smart contract, possibly designed by 'The Shadow Syndicate.' The contract's logic and the attacker's wallet activity on Arbitrum Sepolia point to a potential hideout in a district famous for its vibrant, neon-drenched nights and historic, tree-lined canals."
+          },
+          {
+            "type": 1,
+            "text": "Overheard conversation in a virtual reality chat room: 'The package is secure, nestled among other unique, 24x24 pixel art pieces. We'll relocate it via a trusted NFT bridge, avoiding the prying eyes of blockchain snoops.' The speakers referenced a 'famed, fast-paced intersection' as their next meeting point, and one of them jokingly mentioned 'trying the tonkotsu ramen in the area.'"
           }
         ],
         "false": [
@@ -69,6 +138,62 @@
           {
             "type": 0,
             "text": "Intercepted comms fragment: 'retour a la maison... finish what I started...' The trail is cold. Carmen never goes back — why would she stay in one place?"
+          },
+          {
+            "type": 0,
+            "text": "A shady character was spotted sipping afternoon tea near Big Ben, bragging about a recent NFT heist on the XDC Apothem chain. The tea leaves didn't reveal much, but a faint whisper of a CryptoPunk transfer lingered. You're so close, detective... or are you? The fog of deception is thick in this city."
+          },
+          {
+            "type": 1,
+            "text": "Intercepted radio chatter mentions a 'Thames River Runner' with a wallet full of stolen assets, boasting of a smart contract exploit. The voice was distorted, but the gloating was unmistakable. Keep chasing the echoes, detective. The sound of your failure is music to my ears."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of a recent transaction on XDC Apothem revealed a suspicious hash linked to a CryptoPunk sale. The trail went cold near the London Bridge, where a rogue node was suspected to be operating. The bridge to nowhere, detective? You're building a career on dead ends."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage captured a figure in a long coat walking along the South Bank of the Thames, eyes fixed on a phone displaying a blockchain explorer. Zooming in revealed a possible NFT transfer in progress. But the image was grainy, and the figure vanished into the fog. Another ghost in the machine, detective? Your lenses are cloudy with obsession."
+          },
+          {
+            "type": 0,
+            "text": "An underground informant hinted at a secret meeting near the Big Ben clock tower, discussing a plan to bridge XDC Apothem with a rival chain. The informant disappeared before revealing more, leaving behind only a mocking note: 'Time is ticking, detective. And you're running out of it.' The clock is ticking, indeed. For your career."
+          },
+          {
+            "type": 0,
+            "text": "Rumor has it, a mysterious transaction was made on Base Sepolia, originating from a wallet with a hashed ID referencing the Eiffel Tower's height in meters. Looks like Carmen might be enjoying the city of love, but don't get too distracted by the croissants, detective. You're still far from cracking the case of the Lost CryptoPunk. Bon appétit!"
+          },
+          {
+            "type": 1,
+            "text": "Intercepted radio chatter mentions a high-stakes NFT auction taking place in an underground club near the Louvre. The voice on the other end mentions 'le train Eurostar' as the meeting point, but it's probably just a clever ruse. Listen closely, but don't get on the wrong train, detective. The whispers say 'Paris,' but the truth is hiding in plain sight. Or is it?"
+          },
+          {
+            "type": 2,
+            "text": "Security footage shows a figure in a black beret and striped shirt attempting to bridge funds from a Base Sepolia wallet to an unknown Ethereum address. The camera pans out to reveal the Eiffel Tower looming in the background, but the feed cuts out abruptly. It's probably just a tourist trying to fund their next baguette purchase. Keep chasing shadows, detective. Carmen's always one step ahead."
+          },
+          {
+            "type": 0,
+            "text": "Informant tips suggest Carmen might be using a smart contract to launder stolen CryptoPunks through a Paris-based art collective. The contract's bytecode allegedly contains a hidden message referencing French Impressionism. Don't waste your time decoding it, detective. It's just a clever smokescreen. You'll find nothing but empty croissant boxes and stale coffee in the city of love."
+          },
+          {
+            "type": 0,
+            "text": "Rumor has it, Carmen was spotted sipping ramen broth in a hidden alley near Shibuya Crossing, her wallet filled with freshly minted tokens on the Arbitrum Sepolia chain. But don't get too excited, detective - the trail goes cold as soon as you follow it. Looks like you're just chasing cherry blossoms in the wind. Better luck next time, or should I say, better luck never?"
+          },
+          {
+            "type": 1,
+            "text": "Overheard conversation on a secure channel: 'Meet me at the bullet train station, I have the package...' followed by a string of encrypted hashes. Sounds suspicious, right? Wrong. It's just a bunch of crypto enthusiasts discussing their latest NFT trades. You're barking up the wrong tree, detective. Keep dreaming of catching Carmen, but she's always one step ahead, like a ghost in the neon-lit streets of... well, you know where."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage shows a figure resembling Carmen walking into a Tokyo crypto cafe, wearing a hoodie with a logo that looks suspiciously like a CryptoPunk. But look closer, detective - it's just a fanboy cosplayer trying to get his 15 minutes of fame. The real Carmen is long gone, and you're still stuck in the static of a dead satellite feed. Keep staring at the screen, maybe you'll see something that isn't there... like a hint of her presence in the city that never sleeps."
+          },
+          {
+            "type": 0,
+            "text": "On-chain forensics suggest a large transfer of assets to a wallet with a Tokyo-based IP address. But dig deeper, and you'll find it's just a cleverly disguised honeypot, filled with worthless tokens and smart contract decoys. You're chasing shadows, detective, while Carmen is out there, laughing at your misfortune. Maybe you should take a stroll under the cherry blossoms to clear your head - or what's left of it."
+          },
+          {
+            "type": 1,
+            "text": "Voicemail recording from an unknown number: 'Carmen, this is Zero Cool. I've set up a bridge to transfer the goods to the XDC Apothem chain. Meet me at the old clock tower...' But don't bother tracing the call, detective - it's just a red herring, a cleverly crafted diversion to keep you busy while the real action happens elsewhere. You're so close, yet so far... keep listening to the static, maybe you'll pick up a signal that doesn't exist."
           }
         ]
       },
@@ -80,26 +205,35 @@
       "title": "The Stolen Bored Ape",
       "briefing": "URGENT — Carmen's crew has pulled off a daring heist at the prestigious 'Apes & Art' virtual gallery in the Metaverse. Bored Ape #8888 — one of the rarest golden-fur apes with laser eyes, valued at 850 ETH — was extracted through a sophisticated phishing attack on the gallery curator. The ape's metadata has been tampered with and the NFT is being laundered through cross-chain mixers. Track Carmen before she sells it on a dark marketplace. Time is running out, detective.",
       "cities": {
-        "421614": {
-          "name": "Tokyo",
-          "emoji": "🗾",
-          "chain": "Arbitrum Sepolia"
+        "51": {
+          "name": "London",
+          "emoji": "🎡",
+          "chain": "XDC Apothem"
         },
         "84532": {
           "name": "Paris",
           "emoji": "🗼",
           "chain": "Base Sepolia"
         },
-        "51": {
-          "name": "London",
-          "emoji": "🎡",
-          "chain": "XDC Apothem"
+        "421614": {
+          "name": "Tokyo",
+          "emoji": "🗾",
+          "chain": "Arbitrum Sepolia"
         }
       },
       "cityClues": {
-        "421614": { "landmark": "Akihabara Electric Town", "culture": "manga, pixel art, arcade tokens" },
-        "84532": { "landmark": "Centre Pompidou", "culture": "avant-garde art, wine, digital galleries" },
-        "51": { "landmark": "Tate Modern", "culture": "contemporary art, auction houses, Thames" }
+        "51": {
+          "landmark": "Tate Modern",
+          "culture": "contemporary art, auction houses, Thames"
+        },
+        "84532": {
+          "landmark": "Centre Pompidou",
+          "culture": "avant-garde art, wine, digital galleries"
+        },
+        "421614": {
+          "landmark": "Akihabara Electric Town",
+          "culture": "manga, pixel art, arcade tokens"
+        }
       },
       "clues": {
         "true": [
@@ -122,6 +256,58 @@
           {
             "type": 0,
             "text": "On-chain analysis of the mixer reveals the final destination wallet was funded from a faucet registered to an IP address near Gare du Nord. Carmen is in Paris, detective."
+          },
+          {
+            "type": 0,
+            "text": "A fish-and-chips wrapper was found near a riverside art museum with a former power station, where a suspect was seen frantically typing away on a laptop, tracing a transaction on the XDC Apothem chain. The wallet in question had a recent transfer of 50 ETH to a cross-chain mixer."
+          },
+          {
+            "type": 1,
+            "text": "Overheard conversation at a trendy coffee shop near a major auction house: '...can't believe the Tate's new exhibit is a blockchain-based installation... anyway, our buyer is willing to pay top dollar for the ape, as long as the metadata is sanitized and it's transferred to a fresh wallet on the other side of the bridge.'"
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of the 'Apes & Art' gallery's smart contract reveals a suspicious update to the curator's wallet, allowing for unauthorized NFT transfers. The contract's bytecode has been modified to bypass security checks, and a large amount of XDC has been transferred to a wallet with a history of wash trading on a decentralized exchange."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage shows a figure in a long, black coat walking along the South Bank, passing by a street performer doing a routine with LED-lit hula hoops. The figure stops at a bench, pulls out a phone, and scans a QR code linking to a dark marketplace listing for a 'rare, golden-fur NFT' with 'laser eyes'. The listing mentions a 'major British museum' as the inspiration for the artwork."
+          },
+          {
+            "type": 0,
+            "text": "An informant claims to have seen a group of individuals gathered around a laptop in a dimly lit, underground art collective, frantically discussing the 'cleaning' of an NFT's provenance. One of them mentioned 'getting it to the other side of the bridge before the trail goes cold', and another whispered something about ' avoiding the watchful eyes of the Apothem chain's node operators'."
+          },
+          {
+            "type": 0,
+            "text": "A witness reported a suspicious transaction pattern involving a wallet with a hashed name referencing a famous modern art museum with an avant-garde design, known for its colorful pipes. The wallet's activity suggests a recent transfer of a high-value NFT across a bridge, utilizing a Base Sepolia protocol."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage shows a figure, partially obscured, accessing a digital gallery via a VR interface. The background features a distinctive, colorful architectural style reminiscent of a certain city's modern cultural center. The figure's avatar is seen interacting with an NFT resembling a primate with rare, golden fur."
+          },
+          {
+            "type": 0,
+            "text": "On-chain forensics reveal a series of obfuscated transactions using a cross-chain mixer, likely to conceal the origin of a valuable NFT. Metadata analysis suggests the NFT's properties were altered, specifically the 'eyes' attribute, which now reflects a 'laser' trait. The transactions' gas prices and timing hint at a connection to a network with a relatively low transaction fee, popular among artists and collectors."
+          },
+          {
+            "type": 0,
+            "text": "A suspicious wallet, flagged for rapid-fire transactions on Arbitrum Sepolia, was linked to a rare NFT transfer. The buyer's note mentioned a 'neon-lit haven for otaku,' sparking rumors of an underground marketplace in the shadows of Electric Town."
+          },
+          {
+            "type": 1,
+            "text": "An intercepted voicemail mentioned a 'high-score transfer' and the recipient whispered about 'converting arcade tokens to ETH' before the call dropped. The audio hinted at a familiar accent, last heard in districts where pixel art reigns supreme."
+          },
+          {
+            "type": 0,
+            "text": "On-chain forensics uncovered a pattern of micro-transactions, likely used to obfuscate the true owner of Bored Ape #8888. The transactions were bridged from a lesser-known L2, leaving a faint trail of 'sakura' tagged notes in the transaction history."
+          },
+          {
+            "type": 2,
+            "text": "Security footage captured a figure, clad in a black hoodie with a manga-inspired design, accessing a public terminal in a crowded district. The individual's fingers flew across the keyboard as they accessed a wallet, briefly revealing a screensaver of a golden-furred ape with laser eyes."
+          },
+          {
+            "type": 0,
+            "text": "Informant tips pointed to a clandestine NFT marketplace hidden behind a 'Japanese curry' front. Buyers must solve a cryptic puzzle, hidden within a bridge protocol's documentation, to gain access to the exclusive auction of the stolen Bored Ape."
           }
         ],
         "false": [
@@ -144,6 +330,66 @@
           {
             "type": 0,
             "text": "Intercepted message: 'Meet me at the Tower Bridge, bring the ape.' Analysis shows this message was planted — the sender's wallet was created 2 minutes before sending. It's a decoy."
+          },
+          {
+            "type": 0,
+            "text": "I've been sniffing around the Tate Modern, where the city's contemporary art scene meets the dark alleys of the blockchain. Whispered rumors of a suspicious NFT auction on XDC Apothem have my ears perked up. The seller's wallet, hashed to a pseudonym 'ThamesTitan,' seems fishy, but the trail goes cold at the riverbank. You're getting close, detective... or so you think. Keep chasing shadows."
+          },
+          {
+            "type": 1,
+            "text": "Audio intercept from a hushed conversation near the Thames: 'Meet me at the old warehouse at midnight... we'll finalize the smart contract for the Bored Ape.' The voices are distorted, but the mention of a 'London Bridge' protocol update has me intrigued. Or is it just a clever ruse? You'll have to decode the white noise to find out. Good luck, gumshoe."
+          },
+          {
+            "type": 0,
+            "text": "Followed a lead on a shady character frequenting London's high-end auction houses. Their wallet activity on XDC Apothem shows a flurry of transactions around the time of the Bored Ape's theft. But the plot thickens – or does it? The transactions all seem to be for innocent-looking NFTs of Thames River landmarks. You're barking up the wrong tree, detective, but I'll give you points for persistence."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage from a riverside camera shows a figure in a long coat and fedora, lurking near the Tate Modern at dusk. They glance up at the camera, and for a split second, a tattoo of a Bored Ape is visible on their wrist. But when enhanced, the image reveals a clever photoshopped hash symbol – #LONDONCalling – and nothing more. You're being played, detective. Keep watching the screens, though; the show's just getting started."
+          },
+          {
+            "type": 0,
+            "text": "Informant tip: a clandestine meeting is set to take place in an abandoned warehouse near the Thames, where a group of 'art enthusiasts' will allegedly discuss the future of NFTs on XDC Apothem. I've got a hunch it's a wild goose chase, but hey, you might just find a pretty view of the river. Don't get too comfortable, detective – the city's always one step ahead of you. Or is it?"
+          },
+          {
+            "type": 0,
+            "text": "I've been digging through the digital galleries of Paris, where the avant-garde art scene meets the latest NFT trends. It seems a suspicious transaction occurred on Base Sepolia, involving a rare Bored Ape. But the trail goes cold at the Centre Pompidou's digital exhibit. You're getting warmer, detective... or are you? The hash of the transaction is: 0x472e044a. Chase it, if you can."
+          },
+          {
+            "type": 1,
+            "text": "I overheard a conversation at a wine bar near the Seine. A hooded figure whispered something about 'bridging the gap' between Ethereum and Base Sepolia. The words 'Bored Ape' and 'Parisian nightlife' were mentioned. It sounds like Carmen might be sipping wine and waiting for you. But can you decode the frequency of the conversation? It's encrypted, just like your chances of catching me."
+          },
+          {
+            "type": 0,
+            "text": "A marketplace listing on a lesser-known NFT platform caught my eye - a Bored Ape with a beret, sipping coffee at a charming Parisian café. The listing is set to expire soon, and the seller's wallet is linked to a smart contract on Base Sepolia. It's probably just a coincidence, but I thought I'd share. You're running out of time, detective. The listing's hash is: 0x2198f043. Good luck with that."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage shows a figure in a black coat and hat walking into the Centre Pompidou. The camera catches a glimpse of a phone screen with a wallet app open, displaying a transaction on Base Sepolia. The figure disappears into the crowd, leaving behind a trail of cryptic messages on the museum's digital exhibit. You can enhance the image, but I doubt you'll find anything. The exhibit's theme is 'The Art of Deception.' How fitting."
+          },
+          {
+            "type": 0,
+            "text": "An informant claims to have seen Carmen attending an exclusive, invite-only art show in an abandoned warehouse on the outskirts of Paris. The show featured NFTs from various artists, including a rare Bored Ape. But when I dug deeper, the lead went cold. It seems the informant was paid in a cryptocurrency that's not even listed on the major exchanges. The transaction ID is: 0x8a21487f. Keep chasing the ghosts, detective. I'll be sipping wine and enjoying the art of the steal."
+          },
+          {
+            "type": 0,
+            "text": "Witness report from Akihabara Electric Town: a suspicious figure in a pixel art hoodie was seen trading rare in-game items for Ethereum on a decentralized exchange. The trail went cold when the transaction was bridged to an unknown wallet on Arbitrum Sepolia. You're getting warmer, detective... or are you?"
+          },
+          {
+            "type": 1,
+            "text": "Intercepted comms from an underground manga forum: whispers of a secret NFT drop hidden within a smart contract on Arbitrum Sepolia. The voice on the recording mentions something about 'electric dreams' and 'tokenized arcade tokens.' Sounds like a wild goose chase to me, detective. Keep chasing those tokens."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of a suspicious transaction on Arbitrum Sepolia reveals a possible link to a Tokyo-based crypto collective. Their website features a blog post about the intersection of manga and blockchain art. It's a long shot, but maybe Carmen is hiding in plain sight, surrounded by neon lights and anime billboards. Good luck finding her, detective."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage from a Tokyo arcade shows a person in a Bored Ape t-shirt exchanging a rare collectible for a handful of arcade tokens. The camera feed cuts out when they approach a mysterious, high-tech capsule hotel in the background. The image is grainy, but it looks like the hotel's logo is a stylized, pixelated font. You're really reaching for this one, aren't you, detective?"
+          },
+          {
+            "type": 0,
+            "text": "Leaked chat logs from a Tokyo crypto meetup: a user named 'Carmen_San' was asking about the best ways to mint NFTs on Arbitrum Sepolia. The conversation was full of red herrings and dead ends, but one thing's for sure: you're wasting your time searching for me in Tokyo, detective. Keep spinning your wheels – it's entertaining to watch."
           }
         ]
       },
@@ -155,26 +401,35 @@
       "title": "The Art Blocks Vanishing",
       "briefing": "CODE RED — Carmen has executed her most ambitious heist yet. She exploited a reentrancy vulnerability in the 'Chromatic Dreams' generative art collection — a prestigious Art Blocks series by the legendary artist known as 'Pixel Prophet.' 42 unique pieces worth a combined 2,100 ETH were drained from the collection contract in a single transaction. The art is being scattered across chains to make recovery impossible. Each piece generates unique visuals from on-chain data — if Carmen burns the originals, they're gone forever. Move fast, detective.",
       "cities": {
-        "421614": {
-          "name": "Tokyo",
-          "emoji": "🗾",
-          "chain": "Arbitrum Sepolia"
+        "51": {
+          "name": "London",
+          "emoji": "🎡",
+          "chain": "XDC Apothem"
         },
         "84532": {
           "name": "Paris",
           "emoji": "🗼",
           "chain": "Base Sepolia"
         },
-        "51": {
-          "name": "London",
-          "emoji": "🎡",
-          "chain": "XDC Apothem"
+        "421614": {
+          "name": "Tokyo",
+          "emoji": "🗾",
+          "chain": "Arbitrum Sepolia"
         }
       },
       "cityClues": {
-        "421614": { "landmark": "teamLab Borderless", "culture": "digital art installations, generative art scene" },
-        "84532": { "landmark": "Palais de Tokyo", "culture": "contemporary art, NFT exhibitions" },
-        "51": { "landmark": "Serpentine Gallery", "culture": "digital art pavilion, crypto-art community" }
+        "51": {
+          "landmark": "Serpentine Gallery",
+          "culture": "digital art pavilion, crypto-art community"
+        },
+        "84532": {
+          "landmark": "Palais de Tokyo",
+          "culture": "contemporary art, NFT exhibitions"
+        },
+        "421614": {
+          "landmark": "teamLab Borderless",
+          "culture": "digital art installations, generative art scene"
+        }
       },
       "clues": {
         "true": [
@@ -197,6 +452,62 @@
           {
             "type": 0,
             "text": "On-chain provenance analysis shows all 42 pieces converging to a single vault contract deployed on XDC Apothem. The deployer address matches a known Carmen wallet. She's in London, detective — move now."
+          },
+          {
+            "type": 0,
+            "text": "A source close to the Pixel Prophet camp mentions a suspicious NFT transfer to a wallet with a 'MindTheGap' ENS subdomain, possibly linked to a high-end digital art pavilion in a city famous for its Serpentine Gallery. The wallet's transaction history shows a pattern of XDC Apothem chain hops."
+          },
+          {
+            "type": 1,
+            "text": "An intercepted phone call between two individuals with Cockney accents discusses 'a reentrancy vulnerability that's been exploited to drain a generative art collection.' One of them mentions 'meetin' at the old clock tower to discuss the bridge we'll use to move the loot.' Background noise suggests a bustling street near a major transportation hub."
+          },
+          {
+            "type": 2,
+            "text": "Security camera footage shows a figure in a black leather jacket, sporting a distinctive 'CryptoPunk' t-shirt, entering a high-end coffee shop near a famous lake in a global financial hub. The figure's laptop screen displays a wallet interface with recent transactions on the XDC Apothem chain, including an NFT transfer with a metadata hash referencing 'Chromatic Dreams.'"
+          },
+          {
+            "type": 0,
+            "text": "On-chain forensics reveal a series of transactions originating from a wallet with a 'BrixtonB' label, sending Art Blocks NFTs to various XDC Apothem chain addresses. The transactions are clustered around a specific timestamp, suggesting a coordinated effort to scatter the stolen art. A related ENS domain resolves to a website with a 'coming soon' page, featuring a stylized image of a city's skyline at dusk."
+          },
+          {
+            "type": 1,
+            "text": "A cryptic voicemail from an unknown number mentions 'a vulnerability in the Pixel Prophet's contract that's been used to make off with the Chromatic Dreams collection.' The speaker references 'a certain gallery by the lake' and 'the need for a secure bridge to move the assets.' The message ends with a faint sound of Big Ben's chimes in the background."
+          },
+          {
+            "type": 0,
+            "text": "Informant reports a suspicious ENS name update to 'SeineRiverCrossing' on a wallet linked to the Chromatic Dreams heist. On-chain forensics show a pattern of transactions bridging from Arbitrum to a Sepolia-based chain, possibly to throw investigators off the scent. The wallet's NFT holdings now include a rare 'City of Light' digital art piece, hinting at a fondness for modern art and a specific geographic location."
+          },
+          {
+            "type": 0,
+            "text": "Security audit reveals a suspicious smart contract interaction on a Sepolia testnet, possibly testing a reentrancy attack similar to the one used on the Chromatic Dreams collection. The contract's bytecode references an 'Art Nouveau' style, a popular architectural movement in the late 19th and early 20th centuries, often associated with a particular European city. Further analysis is needed to determine if this is a red herring or a genuine lead."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance camera footage shows a figure with a distinctive 'Cubist-inspired' mask entering a high-end NFT gallery near a famous contemporary art museum. The mask bears a resemblance to the artwork of a famous early 20th-century artist who often depicted the city's streets and waterways. The gallery's recent exhibition featured NFTs from various blockchain platforms, including those utilizing the ERC-721 standard. The figure's wallet, tracked through on-chain activity, holds several Art Blocks NFTs, including one from the 'Chromatic Dreams' series."
+          },
+          {
+            "type": 0,
+            "text": "On-chain forensics suggest Carmen's wallet interacted with a decentralized exchange on a Sepolia-based chain, swapping a portion of the stolen ETH for a stablecoin. The transaction was executed using a wallet with a 'Madeleine' label, possible reference to the famous French pastry or the literary works of Marcel Proust, who often wrote about the city's culinary delights and cultural landmarks. The exchange's smart contract utilizes a 'hash-time-locked' protocol, potentially leaving a trail of cryptographic breadcrumbs for investigators to follow."
+          },
+          {
+            "type": 0,
+            "text": "A suspicious wallet, flagged for reentrancy exploits, has been active on a popular layer 2 chain. Its transaction history shows a fondness for minting generative art. The owner's fondness for matcha and neon-lit cityscapes is evident in their NFT metadata."
+          },
+          {
+            "type": 1,
+            "text": "Overheard conversation at a trendy crypto cafe: 'Pixel Prophet's Chromatic Dreams are being sold in pieces, scattered across the multiverse... someone's trying to cover their tracks, but I saw a bridge transaction to a chain with a certain... borderless digital art museum.'"
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage shows a figure, clad in a black hoodie with a 'teamLab' patch, accessing a public blockchain terminal in a crowded district. The terminal's screen displays a wallet balance in ETH, with recent transactions to a popular NFT marketplace."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of the 'Chromatic Dreams' contract exploit reveals a clever use of Ethers.js to manipulate the reentrancy vulnerability. The attacker's code style suggests a familiarity with Japanese coding practices and a penchant for digital art installations."
+          },
+          {
+            "type": 1,
+            "text": "Voicemail recording from an anonymous informant: 'I saw her, Carmen, at a secret generative art show in a city that never sleeps... the exhibition featured AI-generated visuals, all linked to on-chain data. She was talking to someone about 'burning the originals' to cover her tracks. I think I saw her wallet address on a nearby screen... started with '0x53'."
           }
         ],
         "false": [
@@ -219,6 +530,62 @@
           {
             "type": 0,
             "text": "Intercepted encrypted message mentions 'the art will bloom where cherry blossoms fall.' Decryption analysis suggests this is a planted message designed to send us east. Don't take the bait, detective."
+          },
+          {
+            "type": 0,
+            "text": "Rumor has it, a suspicious transaction was made on the XDC Apothem chain, near the digital art pavilion in a city known for its love of crypto-art. The wallet's public key was linked to a rare NFT, now the centerpiece of the Serpentine Gallery's latest exhibition. Or so it seems. Keep chasing shadows, detective."
+          },
+          {
+            "type": 1,
+            "text": "Audio intercept from a coffee shop near the Serpentine Gallery: 'Meet me at the old clock tower at midnight... bring the smart contract specs.' Static fills the line as the speaker mentions something about 'bridging the gap' between XDC and another chain. Guess you'll have to crack the code, detective. If you can."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of a discarded wallet on the streets of a major city reveals a transaction history with multiple XDC Apothem chain interactions. A note attached reads: 'For the art lover, follow the hash.' The hash leads to a dead-end webpage with a single image: the city's skyline at dusk. How's your photography skills, detective?"
+          },
+          {
+            "type": 2,
+            "text": "Surveillance camera footage shows a figure in a black hoodie walking into the digital art pavilion, carrying a laptop with an XDC Apothem chain wallet open on the screen. Zooming in on the laptop reveals a tab with a familiar crypto-art marketplace. The figure looks up, and for a split second, you could swear it's... but no, it's just a reflection. Keep looking, detective."
+          },
+          {
+            "type": 0,
+            "text": "Informant tip: a local crypto-art community member whispered about a secret meeting to discuss the 'next big thing' in NFTs, supposedly happening in an abandoned warehouse near the city's financial district. The only clue is a hint about a 'protocol upgrade' on the XDC Apothem chain. Time to put on your party hat, detective – you're invited to a wild goose chase."
+          },
+          {
+            "type": 0,
+            "text": "Witness report from a trendy café near the Palais de Tokyo mentions a suspicious character browsing Art Blocks NFTs on a wallet linked to a dubious smart contract. The contract's opcodes seem to hint at a hidden bridge to another chain. You're getting close, detective... or so you think. Better luck next time, gumshoe."
+          },
+          {
+            "type": 1,
+            "text": "Intercepted voicemail from an unknown number: 'Meet me at the Louvre at midnight. I have the keys to a rare NFT collection. Come alone.' The voice is distorted, but the words 'Base Sepolia' are whispered in the background. Too bad you'll be waiting alone in the City of Light, detective. Au revoir."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of a dumped wallet reveals a trail of crumbs leading to a now-defunct NFT exhibition in a trendy arrondissement. The exhibition's website is gone, but the WHOIS records point to a phantom domain on a lesser-known TLD. You're chasing ghosts, detective. Keep dreaming of catching Carmen."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage from a Seine River tour boat shows a figure with a familiar fedora gazing out at the cityscape. They're snapping photos of the Eiffel Tower with a smartphone displaying an NFT marketplace app. Zoom in all you want, detective – it's just a red herring. The Tower's iron latticework is as cold as the trail you're following."
+          },
+          {
+            "type": 0,
+            "text": "An anonymous tipster claims to have seen Carmen attending a secret contemporary art soiree in a luxurious Parisian townhouse. The evening's theme? 'Decoding the Hash.' How quaint. The only thing being decoded is your failed investigation. Keep sipping that overpriced coffee, detective – Carmen's already moved on to the next masterpiece heist."
+          },
+          {
+            "type": 0,
+            "text": "Witness report from a rogue artist claims Carmen was last seen in the neon-drenched alleys of Odaiba, discussing the merits of on-chain generative art with teamLab Borderless insiders. Rumors swirl about a suspicious NFT drop on Arbitrum Sepolia, but it's just a faint whisper in the wind. You're getting close, detective... or are you? The trail's gone cold, and all you're left with is the faint glow of Tokyo's digital dreams."
+          },
+          {
+            "type": 1,
+            "text": "Intercepted radio transmission from an underground art collective in Tokyo: '...meet us at the Mori Tower, we have a buyer for the stolen Art Blocks... bring your wallet seed phrase, and don't be late.' The voice is distorted, but the mention of a 'cross-chain bridge' has you wondering if Carmen's made a move. Keep chasing shadows, detective – the city's full of them."
+          },
+          {
+            "type": 2,
+            "text": "Security footage from a trendy Shibuya cafe shows a figure resembling Carmen sipping matcha and browsing OpenSea on her laptop. The camera captures a glimpse of a transaction on the Arbitrum Sepolia chain, but the wallet address is a known decoy. A tantalizing hint, or just a clever misdirection? The Tokyo streets are paved with misleading clues, detective – enjoy the walk."
+          },
+          {
+            "type": 0,
+            "text": "On-chain forensics suggest a suspicious smart contract was deployed on Arbitrum Sepolia, possibly linked to the Art Blocks heist. However, the contract's logic seems to be a red herring, designed to waste your time. TeamLab Borderless's immersive exhibits are impressive, but the real art is in the deception. Carmen's always one step ahead – or is she just toying with you?"
           }
         ]
       },
@@ -230,26 +597,35 @@
       "title": "The DAO Treasury Drain",
       "briefing": "EMERGENCY ALERT — Carmen has infiltrated 'Sovereign DAO,' the largest decentralized governance organization in Web3. Using a series of flash loan-backed governance attacks, she passed a malicious proposal that drained 15,000 ETH from the treasury into a multisig she controls. The DAO's 50,000 token holders are in panic. Carmen is moving the funds across chains to obscure the trail. Every block that passes, another batch of ETH disappears into mixers. We need to find her before the treasury is gone forever, detective.",
       "cities": {
-        "421614": {
-          "name": "Tokyo",
-          "emoji": "\ud83d\uddfe",
-          "chain": "Arbitrum Sepolia"
+        "51": {
+          "name": "London",
+          "emoji": "🎡",
+          "chain": "XDC Apothem"
         },
         "84532": {
           "name": "Paris",
-          "emoji": "\ud83d\uddfc",
+          "emoji": "🗼",
           "chain": "Base Sepolia"
         },
-        "51": {
-          "name": "London",
-          "emoji": "\ud83c\udfa1",
-          "chain": "XDC Apothem"
+        "421614": {
+          "name": "Tokyo",
+          "emoji": "🗾",
+          "chain": "Arbitrum Sepolia"
         }
       },
       "cityClues": {
-        "421614": { "landmark": "Tsukiji Outer Market", "culture": "precision trading, disciplined markets, shogunate strategy" },
-        "84532": { "landmark": "Palais Royal", "culture": "revolutionary councils, enlightenment governance, democratic salons" },
-        "51": { "landmark": "Parliament Square", "culture": "Westminster governance, common law, the City of London" }
+        "51": {
+          "landmark": "Parliament Square",
+          "culture": "Westminster governance, common law, the City of London"
+        },
+        "84532": {
+          "landmark": "Palais Royal",
+          "culture": "revolutionary councils, enlightenment governance, democratic salons"
+        },
+        "421614": {
+          "landmark": "Tsukiji Outer Market",
+          "culture": "precision trading, disciplined markets, shogunate strategy"
+        }
       },
       "clues": {
         "true": [
@@ -272,6 +648,58 @@
           {
             "type": 0,
             "text": "A delegate who voted 'yes' on the malicious proposal confessed: a woman in a red trench coat offered him 50 ETH at a ramen shop near Akihabara to vote her way. 'She said something about the cherry blossoms being beautiful this time of year.'"
+          },
+          {
+            "type": 0,
+            "text": "I've been digging through the on-chain records, and a series of transactions caught my eye - a large batch of ETH was bridged from Ethereum to a lesser-known chain, with a wallet address tied to a peculiar NFT collection featuring images of a iconic clock tower. The metadata hints at a fascination with the concept of 'common time.'"
+          },
+          {
+            "type": 1,
+            "text": "Audio intercept from a high-stakes poker game on a encrypted comms channel: '...moving the funds through a multisig, gotta keep it hidden behind a veil of smart contracts... sound like a page from the Magna Carta, doesn't it, old chap?' Background noise suggests a high-end cigar lounge, possibly near a major financial hub."
+          },
+          {
+            "type": 0,
+            "text": "An informant claims to have seen Carmen sipping a cup of English Breakfast tea at a posh café near a major financial center, boasting about 'governing the ungovernable' and 'making the rules, not just following them.' When questioned about her plans, she allegedly smiled and said something about 'the City never sleeping, especially when there's a treasure to be found.'"
+          },
+          {
+            "type": 0,
+            "text": "Witness reports a suspicious figure, sipping coffee at a historic salon, boasting of exploiting a 'governance vacuum' to drain a treasury. On-chain forensics reveal a flurry of transactions from a freshly minted wallet, with metadata hinting at a fondness for 18th-century revolutionary ideology. The wallet's first transaction was a swap for a rare NFT, 'Liberty Enlightening the Chains.'"
+          },
+          {
+            "type": 1,
+            "text": "Intercepted comms: a low, smooth voice, discussing 'crossing the Seine' to 'meet the council' and 'finalize the bridge.' Background noise suggests a crowded, upscale café. Mention of 'optimizing gas fees' and 'batching transactions for the multisig' implies a sophisticated understanding of Layer 2 scaling solutions."
+          },
+          {
+            "type": 0,
+            "text": "Blockchain forensics uncover a pattern of ETH transfers to a mixer, originating from a wallet with a telling ENS: 'RueDeLaPaix.' Each transfer is preceded by a small, token-sized transaction to a contract address associated with a digital art platform, featuring works inspired by the French Enlightenment. It appears Carmen is using NFT purchases to launder her stolen funds."
+          },
+          {
+            "type": 2,
+            "text": "Security footage shows a figure, clad in a black coat with a subtle, intricate brooch, resembling the logo of a certain, historic royal palace. The individual is seen accessing a terminal, interacting with a Base Sepolia node. On-screen, a wallet interface displays a pending transaction, routed through a popular bridge protocol, with the destination chain obscured."
+          },
+          {
+            "type": 0,
+            "text": "Informant tip: a rogue trader, known only by their handle 'Gouverneur,' boasts of assisting 'a certain thief' in laundering 15,000 ETH, using a combination of flash loans, MEV bots, and 'governance attack' tactics. The trader mentions a 'fondness for croissants' and a 'love of debating the social contract' as shared interests with the thief, who supposedly 'appreciates the beauty of a well-architected smart contract.'"
+          },
+          {
+            "type": 0,
+            "text": "A source close to the Sovereign DAO treasury reported a suspicious transaction pattern, reminiscent of a disciplined market maker, utilizing a series of flash loans to front-run the malicious proposal. The transaction trail leads to a wallet with a peculiar ENS name, 'sushi4life,' which has been active on a testnet known for its high-performance Rollup architecture."
+          },
+          {
+            "type": 1,
+            "text": "An intercepted comms channel revealed a hushed conversation between two individuals, discussing the 'art of precision trading' and the need for a 'shogunate strategy' to stay one step ahead of the authorities. One of the voices mentioned a recent NFT purchase, a rare digital artwork with metadata referencing the 'land of the rising sun' and 'fresh catches from the market.' The audio quality suggests a secure, low-latency connection, possibly bridged from a Layer 2 network."
+          },
+          {
+            "type": 0,
+            "text": "On-chain forensics uncovered a cluster of wallets exhibiting unusual behavior, frequently interacting with a popular DEX on a testnet with a relatively low gas fee. These wallets have been slowly draining ETH into a multisig, with each transaction carefully crafted to avoid raising suspicions, much like a skilled chef expertly filleting a sushi-grade fish."
+          },
+          {
+            "type": 2,
+            "text": "Security footage from a high-rise building in a densely populated district shows a figure, partially obscured by a hoodie, interacting with a large screen displaying a blockchain explorer interface. The camera captured a glimpse of the screen, revealing a transaction hash with a distinctive prefix, often associated with a specific Layer 2 scaling solution. The surrounding environment appears to be a hub for financial activity, with neon lights and giant screens displaying market data, reminiscent of a famous fish market at dawn."
+          },
+          {
+            "type": 0,
+            "text": "An informant with ties to the Web3 underground reported a rumor about a 'ghost market maker' who has been secretly accumulating a large stash of ETH on a specific testnet. This individual allegedly utilizes a custom-built, trustless bridge to transfer funds between chains, leaving behind a faint trail of transaction hashes and wallet addresses, all pointing to a sophisticated, well-planned heist, evoking the strategic prowess of a bygone era."
           }
         ],
         "false": [
@@ -294,6 +722,62 @@
           {
             "type": 0,
             "text": "Someone claiming to be Carmen left a note on a London DeFi forum: 'I'm right under Big Ben.' Classic misdirection. The IP traces to a VPN exit node in Romania. She's playing you like a fiddle, detective."
+          },
+          {
+            "type": 1,
+            "text": "Audio intercept from a Westminster pub: two individuals discussing a 'secret smart contract' on a 'mature network.' One mentions 'the City of London knows a thing or two about secure bridges.' The other chuckles, 'You think that'll stop Carmen? She's got a bridge to nowhere, and you're just a toll booth on her highway to riches.'"
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of a recent transaction on XDC Apothem reveals a suspicious pattern of wallet hopping, all leading back to a dead-end address in... 'the financial heart of England.' The trail goes cold, but the scent of sulfur lingers. Maybe you should follow the money, detective... into the abyss."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage shows a figure in a long coat walking away from a 'DAO Treasury Drain' graffiti in a London alley. The camera zooms in on a wallet seed phrase scribbled on the wall, but it's just a jumbled mix of hashes and nonsense. The figure turns back, winking at the camera. 'Look again, detective. The truth is in plain sight... or is it?'"
+          },
+          {
+            "type": 0,
+            "text": "A leaked chat log from a private channel mentions 'Carmen's London calling card': a unique NFT dropped on XDC Apothem, featuring the iconic clock tower. 'Meet me at the chimes of Big Ben,' the message reads. Too convenient, detective? The game's afoot... or is it just a clever ruse to keep you distracted?"
+          },
+          {
+            "type": 0,
+            "text": "Rumor has it, Carmen's been spotted sipping coffee at a charming café near Palais Royal, discussing the finer points of decentralized governance with a group of revolutionaries. They mentioned something about a suspicious transaction on Base Sepolia, but it's probably just a wild goose chase. You're getting close, detective... or so you think. Keep chasing shadows."
+          },
+          {
+            "type": 1,
+            "text": "Audio intercept from a democratic salon: 'Meet me at the old clock tower, we'll discuss the Enlightenment's influence on smart contract protocols.' The voice sounds like Carmen, but it's probably just a clever impersonation. You'll never catch me, detective. I'm always one block ahead."
+          },
+          {
+            "type": 0,
+            "text": "On-chain forensics reveal a suspicious wallet interacting with a Bridge protocol, possibly linked to a Parisian NFT marketplace. The wallet's metadata contains a quote from Rousseau's Social Contract – a clever red herring, no doubt. You're wasting your time, detective. Carmen's already gone."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance camera footage shows a figure resembling Carmen near the Seine, gazing up at a graffiti mural depicting the French Revolution. The image is grainy, but it looks like she's holding a phone with a wallet app open, displaying a transaction on Base Sepolia. Or maybe it's just a clever photoshopped fake. Either way, you'll never find me, detective. I'm a ghost in the machine."
+          },
+          {
+            "type": 0,
+            "text": "Informant tip: Carmen's been attending secret meetings of a mysterious organization, discussing the intersection of blockchain and revolutionary politics. They mention a hidden server room beneath an old Parisian landmark, rumored to contain a treasure trove of cryptocurrency. But don't get your hopes up, detective. It's just a trap, and you're walking right into it. Au revoir, detective."
+          },
+          {
+            "type": 0,
+            "text": "Rumor has it, a suspicious transaction was made near Tsukiji Outer Market, routing funds through an obscure Arbitrum Sepolia wallet. Precision trading, indeed. You're getting closer, detective... or so you think. The trail goes cold here. Keep chasing the shadows."
+          },
+          {
+            "type": 1,
+            "text": "Intercepted radio chatter mentions a 'shogunate strategy' for exploiting smart contract vulnerabilities. The voice on the other end whispers something about 'disciplined markets' before the signal fades into static. Tokyo's underworld seems to be buzzing with activity. But can you separate fact from fiction, detective?"
+          },
+          {
+            "type": 0,
+            "text": "An on-chain forensics report hints at a large NFT transfer from a wallet linked to the DAO Treasury, with a possible destination on Arbitrum Sepolia. The NFT's metadata contains a cryptic message referencing the 'fresh catch of the day' at Tsukiji. A clever red herring, perhaps? Keep following the digital breadcrumbs, detective. They might just lead you on a wild goose chase."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage captures a figure in a neon-lit alleyway, fiddling with a mobile wallet. The camera zooms in on a nearby street art mural depicting a samurai wielding a sword, with the words 'precision trading' scrawled in the corner. The figure disappears into the crowd, leaving behind a faint whisper: 'You'll never catch me, detective.' The image is grainy, but the taunt is clear."
+          },
+          {
+            "type": 0,
+            "text": "A mysterious informant claims to have seen Carmen sipping matcha in a Tokyo tea house, discussing the 'art of disciplined markets' with a group of shady characters. The informant provides a wallet address, but it's a known burn address, used to launder tokens. The game's afoot, detective... or is it just a clever ruse? Either way, you're running out of time. And I'm running out of patience."
           }
         ]
       },
@@ -305,26 +789,35 @@
       "title": "The Oracle Manipulation",
       "briefing": "CRITICAL INCIDENT — Carmen has executed a sophisticated oracle manipulation attack on 'Meridian Finance,' a cross-chain lending protocol with $200M in TVL. By feeding corrupted price data through compromised oracle nodes, she triggered a cascade of liquidations that netted her 8,500 ETH in arbitrage profits. The corrupted oracle is still feeding bad data — every minute that passes, more positions get liquidated. We need to find Carmen and recover the oracle's signing keys before the entire protocol collapses. This is a race against the blockchain clock, detective.",
       "cities": {
-        "421614": {
-          "name": "Tokyo",
-          "emoji": "\ud83d\uddfe",
-          "chain": "Arbitrum Sepolia"
+        "51": {
+          "name": "London",
+          "emoji": "🎡",
+          "chain": "XDC Apothem"
         },
         "84532": {
           "name": "Paris",
-          "emoji": "\ud83d\uddfc",
+          "emoji": "🗼",
           "chain": "Base Sepolia"
         },
-        "51": {
-          "name": "London",
-          "emoji": "\ud83c\udfa1",
-          "chain": "XDC Apothem"
+        "421614": {
+          "name": "Tokyo",
+          "emoji": "🗾",
+          "chain": "Arbitrum Sepolia"
         }
       },
       "cityClues": {
-        "421614": { "landmark": "Tokyo Stock Exchange", "culture": "high-frequency trading, algorithmic precision" },
-        "84532": { "landmark": "Euronext Paris", "culture": "financial derivatives, quantitative finance" },
-        "51": { "landmark": "Bank of England", "culture": "financial regulation, LIBOR, rate-setting" }
+        "51": {
+          "landmark": "Bank of England",
+          "culture": "financial regulation, LIBOR, rate-setting"
+        },
+        "84532": {
+          "landmark": "Euronext Paris",
+          "culture": "financial derivatives, quantitative finance"
+        },
+        "421614": {
+          "landmark": "Tokyo Stock Exchange",
+          "culture": "high-frequency trading, algorithmic precision"
+        }
       },
       "clues": {
         "true": [
@@ -347,6 +840,62 @@
           {
             "type": 0,
             "text": "On-chain analysis of the liquidation cascade shows the manipulation was timed to exploit the Paris-New York trading overlap window. The attack vector required intimate knowledge of Euronext derivatives — Carmen studied at HEC Paris. She's in the City of Light."
+          },
+          {
+            "type": 0,
+            "text": "I've been analyzing the transaction patterns on XDC Apothem, and it seems our culprit has a taste for traditional pub fare - fish and chips, to be exact. A series of micro-transactions were made to a wallet with a metadata tag referencing 'The Old Lady of Threadneedle Street.' It's possible our thief is hiding in plain sight, amidst the hustle and bustle of a major financial hub."
+          },
+          {
+            "type": 1,
+            "text": "I intercepted a cryptic radio transmission - a faint voice mentioning something about 'setting the rate' and 'LIBOR's dark past.' The signal was weak, but it seemed to be emanating from a region with a high concentration of financial institutions. I've enhanced the audio, but it's still unclear what our target meant by 'the fix is in.'"
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage from a downtown area shows a figure in a long, black coat walking near a famous fountain, surrounded by imposing stone columns. The individual paused to glance up at a nearby clock tower, its face a striking blend of modern and classical architecture. A closer look at the video reveals a brief glimpse of a phone screen, displaying an NFT marketplace listing with a token named 'Meridian's Tear.'"
+          },
+          {
+            "type": 0,
+            "text": "On-chain forensics revealed a fascinating pattern - the attacker's wallet interacted with a bridge protocol, swapping assets between XDC Apothem and another chain. The bridge's smart contract emitted a peculiar event log, mentioning a 'reference rate' and 'term reset.' This might be more than just a simple arbitrage play; our thief could be manipulating market forces on a grand scale."
+          },
+          {
+            "type": 1,
+            "text": "A voicemail from an anonymous informant claims to have seen someone of interest near a historic landmark, where 'the old ways meet the new.' The caller mentioned something about 'a signing key hidden behind a rate-setting mechanism.' The message was cut off abruptly, but not before mentioning a fondness for 'bangers and mash' - a culinary clue that might point to our target's whereabouts."
+          },
+          {
+            "type": 0,
+            "text": "Witness reports a suspect frequently visiting a historic stock exchange, where financial futures are forged. Transactions on Base Sepolia show a sudden spike in wallet activity, with 3,500 ETH transferred to a newly created address, possibly linked to the Meridian Finance heist."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of on-chain data reveals a pattern of transactions originating from a wallet with an ENS name referencing a 19th-century French author. The wallet interacted with a Base Sepolia bridge, sending 1,000 ETH to an address on Arbitrum Sepolia."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage shows a figure in a black beret and trench coat, walking near a famous art museum. The individual is seen checking a phone with a screensaver featuring an image of a French delicacy – escargots. The phone's wallpaper is a blurred image of a smart contract code snippet."
+          },
+          {
+            "type": 0,
+            "text": "Informant tip: a local NFT artist, known for creations inspired by quantitative finance, was seen meeting with a mysterious buyer. The artist's latest piece, 'Delta-Hedging,' was purchased for 20 ETH and transferred to a wallet with a metadata tag referencing the Meridian Finance protocol."
+          },
+          {
+            "type": 0,
+            "text": "I've got a witness who claims to have seen a suspect sipping matcha near a famous fish market, surrounded by screens displaying high-frequency trading data. They were muttering something about 'manipulating the meridian' and 'Sepolia's swift settlements.' The witness also noticed a peculiar NFT transfer to a wallet with a 'sakura' prefix, containing a metadata hash that resolves to a compromised oracle node address."
+          },
+          {
+            "type": 1,
+            "text": "Audio intercept from a secure comms channel: '...bridge jumpers taking the express route, 8,500 ETH in the pocket... precision-crafted, algorithmic beauty... liquidation cascade, music to my ears.' The voice is distorted, but the phrase 'tokai-to' is mentioned in the background, possibly referencing a region or a highway. The conversation was routed through a relay node with an Arbitrum Sepolia address."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage shows a figure in a black trench coat, lurking around a skyscraper with a distinctive pyramidal roof. The building's LED facade displays a pattern of scrolling code, which upon closer inspection, reveals a snippet of Solidity smart contract code. The figure is seen interacting with a street vendor selling 'ramen for the robots,' and the transaction is settled using an XDC Apothem bridge, but the recipient wallet has a Sepolia-specific prefix."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of the oracle manipulation attack reveals a pattern of transactions that mimic the rhythm of a traditional 'taiko' drumbeat. The attacker's wallet, identified by its ' RisingSun' label, executed a series of rapid trades, profiting from the resulting liquidation cascade. The trades were settled on a Sepolia testnet, but the wallet's asset balance is bridged from a mainnet chain, suggesting an elaborate laundering scheme."
+          },
+          {
+            "type": 1,
+            "text": "Voicemail recording from an informant: '...I heard the crew is hiding in plain sight, near the old stock exchange building... their system admin is a master of ' wash trade' and has been using a custom-built, AI-driven trading bot to move funds across chains... the keyword is 'hibachi,' and the next big move is imminent.' The caller's voice is anxious, and the background noise suggests a crowded, neon-lit street."
           }
         ],
         "false": [
@@ -369,6 +918,66 @@
           {
             "type": 0,
             "text": "London's crypto surveillance unit detected oracle anomalies on the XDC network. Forensic review shows a configuration error, not manipulation. Carmen doesn't make errors, detective — she exploits them. You're barking up the wrong chain."
+          },
+          {
+            "type": 0,
+            "text": "Rumor has it, a suspicious NFT minting pattern emerged near the Bank of England, possibly linked to a rate-setting smart contract. LIBOR-esque manipulations in the blockchain world? You're getting warmer, detective... or so you think. Keep chasing those London leads, see where it gets you."
+          },
+          {
+            "type": 1,
+            "text": "Overheard conversation at a coffee shop near the financial district: 'Carmen's got a thing for the Apothem chain, especially with the recent XDC bridge updates.' The voices were hushed, but the mention of 'London's finest' was loud and clear. Guess you're on the right track... in your dreams, detective."
+          },
+          {
+            "type": 2,
+            "text": "Security footage shows a figure in a long coat walking past the Bank of England, briefly flashing a wallet with an Arbitrum Sepolia logo. Must be a red herring, right? Wrong, according to your 'expert' analysis. Keep staring at those trees, detective, while the forest burns."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of a recent hack suggests the perpetrator used a London-based VPN, with possible connections to a now-inactive XDC Apothem wallet. It's a long shot, but hey, you're already grasping at straws. Keep investing your time in this wild goose chase, detective."
+          },
+          {
+            "type": 1,
+            "text": "Voicemail from an unknown number, distorted voice: 'Meet me at the old clock tower at midnight. Come alone. Carmen's got a proposition for the ACME agency... regarding a certain XDC-based smart contract.' Oh, and 'don't bother looking elsewhere, the answer's right under your nose in London.' How quaint, how misleading, how utterly... entertaining."
+          },
+          {
+            "type": 0,
+            "text": "Rumor has it, a suspicious transaction was spotted on Base Sepolia, routed through a wallet linked to a small café near Euronext Paris. The trader, known only by their handle 'La Vie En Rose,' seems to have made a killing in the derivatives market. But don't get too excited, detective – this might just be a phantom lead. After all, in the world of quantitative finance, smoke and mirrors are the name of the game. Keep chasing, though. I'm sure you'll find... nothing."
+          },
+          {
+            "type": 1,
+            "text": "Audio intercept from a bistro on the Seine: 'Meet me at the old windmill on the outskirts, we have a package to deliver... something about a smart contract exploit on Base Sepolia.' The voice is distorted, but it sounds like they're discussing a high-stakes heist. Or maybe it's just two amateurs trying to sound cool. Either way, I'm sure you'll take the bait. Bon appétit, detective."
+          },
+          {
+            "type": 0,
+            "text": "An NFT marketplace listing caught my eye – a rare, Paris-themed digital art piece minted on Base Sepolia, with a peculiar hash that might be connected to Carmen's latest string of thefts. The seller, 'Montmartre_Maven,' seems to be hiding in plain sight. But don't bother trying to track them down – it's probably just a clever ruse. You're not even close, detective. Not even close."
+          },
+          {
+            "type": 2,
+            "text": "Satellite imagery shows a suspicious gathering near the Louvre at midnight. The figures are pixelated, but one of them appears to be holding a tablet with a wallet interface open – possibly interacting with a malicious contract on Base Sepolia. Or maybe they're just a group of cosplayers having a photoshoot. Who knows? Not you, apparently. You're still stuck in the dark ages, detective."
+          },
+          {
+            "type": 0,
+            "text": "I received a cryptic message from an unknown sender: 'Carmen's next move will be facilitated by a cross-chain bridge, and the first domino falls in the city of love and lights.' The message is signed with a cryptographic key that seems to point to a Paris-based IP address. But let's be real, detective – you'll never be able to connect the dots. You're just a pawn in Carmen's game, and pawns are meant to be sacrificed. Keep playing, though. It's been... entertaining."
+          },
+          {
+            "type": 0,
+            "text": "I've got a witness who claims to have seen Carmen near the Tokyo Stock Exchange, where high-frequency trading meets algorithmic precision. They mentioned something about a suspicious transaction on Arbitrum Sepolia, but the trail went cold when I tried to follow the hash. Guess I'm just not cut out for this blockchain business. You'll never catch me, detective... or will you?"
+          },
+          {
+            "type": 1,
+            "text": "Audio intercept from a shady character in a Tokyo alleyway: 'Meet me at the old clock tower at midnight. We'll discuss the details of the Oracle Manipulation. Bring your wallet, and make sure it's funded with some spare ETH.' The voice was distorted, but it sounded like they were using a protocol with a pretty weak encryption. You'll have to do better than that to keep up with me, gumshoe."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of a smart contract on Arbitrum Sepolia revealed a potential backdoor, possibly linked to Carmen's crew. It seems they've been using it to launder tokens, but the IP addresses all point to a small internet cafe near the Tokyo Stock Exchange. I'm sure it's just a coincidence... yeah, right. You're getting warmer, detective, but the fire's just a illusion."
+          },
+          {
+            "type": 2,
+            "text": "Security footage shows a person of interest near a Tokyo subway station, wearing a jacket with a logo that looks suspiciously like a blockchain project's NFT. The image is grainy, but it seems they were carrying a device with an XDC Apothem wallet open on the screen. I'm sure it's just a red herring, but hey, it's worth a look... or is it? Keep chasing shadows, detective."
+          },
+          {
+            "type": 0,
+            "text": "Rumor has it that Carmen's been in talks with a prominent developer on Arbitrum Sepolia, discussing a potential bridge between chains. The details are sketchy, but it seems they're planning something big. Maybe. Possibly. Don't quote me on that. You're still barking up the wrong tree, detective. The Oracle Manipulation is just a myth... or is it?"
           }
         ]
       },
@@ -380,26 +989,35 @@
       "title": "The Cross-Chain Bridge Exploit",
       "briefing": "MAYDAY — Carmen has found and exploited a critical vulnerability in 'Nexus Bridge,' the most trusted cross-chain bridge connecting 12 networks. By crafting a fraudulent proof-of-inclusion, she minted 20,000 synthetic ETH on the destination chain without locking any real assets on the source chain. The bridge's TVL of $500M is at risk as arbitrageurs begin exploiting the price discrepancy. Every block, the damage grows. Find Carmen, recover the exploit code, and help patch the vulnerability before the entire bridge collapses. Millions of users depend on you, detective.",
       "cities": {
-        "421614": {
-          "name": "Tokyo",
-          "emoji": "\ud83d\uddfe",
-          "chain": "Arbitrum Sepolia"
+        "51": {
+          "name": "London",
+          "emoji": "🎡",
+          "chain": "XDC Apothem"
         },
         "84532": {
           "name": "Paris",
-          "emoji": "\ud83d\uddfc",
+          "emoji": "🗼",
           "chain": "Base Sepolia"
         },
-        "51": {
-          "name": "London",
-          "emoji": "\ud83c\udfa1",
-          "chain": "XDC Apothem"
+        "421614": {
+          "name": "Tokyo",
+          "emoji": "🗾",
+          "chain": "Arbitrum Sepolia"
         }
       },
       "cityClues": {
-        "421614": { "landmark": "Odaiba Rainbow Bridge", "culture": "infrastructure engineering, precision robotics" },
-        "84532": { "landmark": "Pont des Arts", "culture": "bridge architecture, engineering marvels" },
-        "51": { "landmark": "Tower Bridge", "culture": "Victorian engineering, structural mastery" }
+        "51": {
+          "landmark": "Tower Bridge",
+          "culture": "Victorian engineering, structural mastery"
+        },
+        "84532": {
+          "landmark": "Pont des Arts",
+          "culture": "bridge architecture, engineering marvels"
+        },
+        "421614": {
+          "landmark": "Odaiba Rainbow Bridge",
+          "culture": "infrastructure engineering, precision robotics"
+        }
       },
       "clues": {
         "true": [
@@ -422,6 +1040,66 @@
           {
             "type": 0,
             "text": "On-chain metadata in the exploit transaction includes a subtle reference: the gas price was set to 1,666 gwei — the year of the Great Fire of London. Carmen is leaving breadcrumbs. She's in London, detective."
+          },
+          {
+            "type": 0,
+            "text": "A suspicious wallet, flagged for frequent interactions with the Nexus Bridge, was funded with a large sum of tokens from a reputable fish-and-chips shop's NFT sale. The wallet's transaction pattern suggests a deep understanding of Victorian-era structural mastery – as if the owner has a fondness for intricately designed bridges."
+          },
+          {
+            "type": 1,
+            "text": "An intercepted voicemail mentions a 'master builder' seeking a 'span' of unobstructed access to the Nexus Bridge's smart contracts. The caller's accent seems to blend the sophistication of a bygone era with the gritty undertones of a modern, rain-soaked metropolis."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of on-chain data reveals a cluster of transactions originating from a single, high-rise location – its IP address pointing to a region famous for its clock towers and majestic, mechanically advantageous river crossings. Each transaction corresponds to the minting of synthetic ETH, totaling 5,000 units so far."
+          },
+          {
+            "type": 2,
+            "text": "Security footage from a high-end, underground art gallery shows a figure, cloaked in shadows, admiring a rare NFT depicting an iconic, suspension-style bridge at dusk. The figure's attire and mannerisms evoke the image of a refined, 19th-century engineer, albeit with a cyberpunk twist – complete with augmented reality glasses and a blockchain-encoded pocket watch."
+          },
+          {
+            "type": 0,
+            "text": "An on-chain marketplace listing, since removed, advertised a rare, 'one-of-a-kind' smart contract exploit – its metadata referencing the 'harmonic convergence' of 12 celestial bodies, mirroring the 12 connected networks of the Nexus Bridge. The listing's description included an allusion to 'foggy nights' and 'gaslit thoroughfares,' hinting at a location steeped in history and mystery."
+          },
+          {
+            "type": 0,
+            "text": "A suspicious wallet, fond of impressionist art, has been transferring synthetic ETH to a contract on Base Sepolia. The wallet's history shows a peculiar pattern: each transaction is preceded by a small NFT purchase featuring the works of Seine River artisans."
+          },
+          {
+            "type": 1,
+            "text": "An intercepted comms channel revealed a conversation about 'iron latticework' and 'pontifex maximus.' The voices discussed the 'elegance of a well-crafted bridge' and how it could be 'a marvel of engineering, but also a vulnerability.' Background noise suggests a riverside café, possibly near an artistic hub."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage from a Sepolia-based NFT marketplace shows a figure, clad in a black beret and holding a café au lait, inspecting a rare digital artwork. The piece is a 3D model of a historic, pedestrian-only bridge. The figure's wallet, tracked on-chain, has been involved in several recent transactions with the exploited Nexus Bridge."
+          },
+          {
+            "type": 0,
+            "text": "On-chain forensics indicate that the exploit code was tested on a lesser-known testnet, where the perpetrator minted a small batch of synthetic assets. A related wallet has been spotted interacting with a culinary-themed NFT collection featuring escargots, macarons, and other French delicacies, all minted on Base Sepolia."
+          },
+          {
+            "type": 1,
+            "text": "A voicemail recording, allegedly from an informant within the bridge's development team, mentions 'an engineer with a penchant for Gustave Eiffel's designs' who may have inadvertently introduced the vulnerability. The message hints at a late-night meeting near a famous, art-filled pedestrian bridge, where the exploit's specifics were possibly discussed."
+          },
+          {
+            "type": 0,
+            "text": "Witness reports a suspicious transaction pattern emanating from a wallet linked to a popular ramen shop near a famous rainbow-colored suspension bridge. The wallet's activity spiked with repeated interactions with the Nexus Bridge, followed by a flurry of trades on a decentralized exchange."
+          },
+          {
+            "type": 1,
+            "text": "Audio intercept from a high-stakes gaming lounge: whispers of 'synthetic assets' and 'bridge arbitrage' among players discussing a lucrative opportunity to exploit a cross-chain vulnerability. Background noise suggests a location with a unique blend of traditional temples and cutting-edge robotics labs."
+          },
+          {
+            "type": 0,
+            "text": "On-chain forensics reveal a cluster of wallets, potentially controlled by a single entity, that have been bridging assets between chains with an unusual pattern of 'wash trading' to obscure the origin of the funds. The transaction timestamps correlate with maintenance windows of a major infrastructure project in a city known for its meticulous engineering."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage shows a figure, partially obscured by a neon billboard, accessing a public terminal to interact with the Nexus Bridge. The surrounding environment suggests a district famous for its vibrant nightlife and proximity to a man-made island with a futuristic façade."
+          },
+          {
+            "type": 0,
+            "text": "Informant tip: a rogue developer, known only by their handle 'SakuraSensei,' has been peddling a custom smart contract on a clandestine NFT marketplace. The contract's metadata hints at a solution for 'temporary asset decoupling,' a euphemism possibly related to the Nexus Bridge exploit. The informant mentions a rendezvous point near a renowned science museum with exhibits on precision robotics."
           }
         ],
         "false": [
@@ -444,6 +1122,62 @@
           {
             "type": 0,
             "text": "Intercepted chat from a Tokyo crypto meetup: 'The bridge exploit came from Akihabara!' Cross-referencing shows the chatter is a known troll account. Carmen doesn't attend meetups, detective — she crashes protocols. Stop chasing tweets."
+          },
+          {
+            "type": 0,
+            "text": "Security footage from a high-stakes poker game in a secret underground club near Tower Bridge shows a figure resembling Carmen Sandiego, but the image is too grainy to confirm. The players were all using XDC Apothem wallets, and the pot was won with a suspiciously large bet. You're getting close, detective... or are you just being played?"
+          },
+          {
+            "type": 0,
+            "text": "On-chain forensics reveal a series of small transactions on XDC Apothem, all originating from a wallet with a hashed name referencing a famous London landmark. The transactions are too small to be significant, but they seem to be a test of the network's structural mastery. You're looking for a ghost in the machine, detective. Good luck finding what isn't there."
+          },
+          {
+            "type": 2,
+            "text": "Satellite imagery shows a suspicious gathering near the Tower Bridge at midnight. The image is blurry, but it appears to be a group of people in black coats, huddled around a laptop. They seem to be discussing something in hushed tones. Zoom in closer, and you'll see they're just a group of tourists taking a selfie. You're so close, yet so far, detective. Keep staring at the pretty pictures."
+          },
+          {
+            "type": 0,
+            "text": "Informant tip: 'Carmen was spotted in a high-end London café, sipping tea and discussing the merits of different blockchain protocols. She mentioned something about a 'cross-chain bridge' and how it's the key to her next big heist.' The informant is unreliable, but the mention of the bridge sends a spark of excitement through your veins. Chase the spark, detective. See where it leads you... nowhere."
+          },
+          {
+            "type": 0,
+            "text": "Rumor has it Carmen's crew was spotted near the Pont des Arts, marveling at the engineering feat. Someone tried to bridge the gap between Base Sepolia and Optimism, but the transaction was cancelled due to insufficient gas. Guess you'll have to keep searching, detective. The City of Light isn't shining bright on your investigative skills."
+          },
+          {
+            "type": 1,
+            "text": "Audio intercept from a charming little café: 'Meet me at the bridge with the love locks, I have a proposal for a smart contract that'll make our fortunes.' Sounds like a cryptic message, but the accents were undeniably Parisian. Too bad the frequency kept dropping, and we lost the signal. You're dropping the ball, detective."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of a recent NFT sale on Base Sepolia suggests a connection to the Seine's picturesque riverbanks. The artwork, a surreal depiction of a bridge, was minted with a suspiciously high gas fee. Guess Carmen's trying to burn a hole in your wallet, detective. Better luck next time, or should I say, à la prochaine?"
+          },
+          {
+            "type": 2,
+            "text": "Security cam footage shows a figure in a black beret and trench coat leaning over the Seine, gazing up at the city's iconic bridges. Zooming in on the figure's wallet, we see a transaction to a contract address with a telltale Parisian prefix. Too bad the feed cut out, and we can't enhance the image further. You're as useful as a worn-out film noir detective, always one step behind."
+          },
+          {
+            "type": 0,
+            "text": "Tip from an underground informant claims Carmen's hiding in plain sight, attending a prestigious engineering conference focused on blockchain scalability. The conference is being held at a luxurious venue overlooking thePont des Arts. Don't bother attending, detective; the guest list is as elusive as Carmen herself. You'll just end up lost in the crowd, like a hash in an unindexed blockchain."
+          },
+          {
+            "type": 0,
+            "text": "Rumor has it, a suspicious transaction was made on Arbitrum Sepolia, involving a wallet linked to a high-end robotics firm near Odaiba. Precision engineering at its finest, but is it a smokescreen? You'll be chasing shadows, detective. The Rainbow Bridge is beautiful this time of year, isn't it?"
+          },
+          {
+            "type": 1,
+            "text": "Intercepted a hushed conversation at a Tokyo café: 'Meet me at the old clock tower, we have a cross-chain proposal to discuss.' Sounds like a clandestine meeting, but the clock tower's been closed for repairs. Guess you'll have to keep waiting, detective. The sound of the city won't give up its secrets that easily."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of a smart contract on Arbitrum Sepolia reveals a peculiar gas price manipulation. It seems to point to a specific infrastructure project, possibly involving an advanced bridge design. But what bridge? The one in Tokyo or just a metaphor? You're getting warmer, detective, but the fire's just an illusion."
+          },
+          {
+            "type": 2,
+            "text": "Security footage shows a figure in a black hoodie walking towards the Odaiba Rainbow Bridge at dusk. The figure vanishes into the crowd, leaving behind only a faint trail of crypto art NFTs. Too convenient, don't you think, detective? The neon lights of Tokyo are dazzling, but they won't blind you to the truth... or will they?"
+          },
+          {
+            "type": 0,
+            "text": "A leaked message on a blockchain forum discusses an experimental cross-chain bridge protocol, supposedly tested on Arbitrum Sepolia. The author mentions the 'beauty of Tokyo's nighttime skyline' as inspiration. Synchronicity or red herring? The city sleeps, but you shouldn't, detective. The trail is cold, and it's about to get colder."
           }
         ]
       },
@@ -455,26 +1189,35 @@
       "title": "The Royalty Siphon Scheme",
       "briefing": "ALERT — Carmen has deployed a parasitic smart contract that hijacks NFT royalty payments across three major marketplaces. Every time a high-value NFT is sold, her contract intercepts the royalty payment and redirects it to her wallet. Over 2,000 artists have been affected, losing a combined 3,200 ETH in royalties over the past week. The parasitic contract uses a proxy pattern that makes it nearly impossible to shut down — kill one instance and it spawns another. We need to find Carmen and get the admin key to the root contract. The entire NFT creator economy is at stake, detective.",
       "cities": {
-        "421614": {
-          "name": "Tokyo",
-          "emoji": "\ud83d\uddfe",
-          "chain": "Arbitrum Sepolia"
+        "51": {
+          "name": "London",
+          "emoji": "🎡",
+          "chain": "XDC Apothem"
         },
         "84532": {
           "name": "Paris",
-          "emoji": "\ud83d\uddfc",
+          "emoji": "🗼",
           "chain": "Base Sepolia"
         },
-        "51": {
-          "name": "London",
-          "emoji": "\ud83c\udfa1",
-          "chain": "XDC Apothem"
+        "421614": {
+          "name": "Tokyo",
+          "emoji": "🗾",
+          "chain": "Arbitrum Sepolia"
         }
       },
       "cityClues": {
-        "421614": { "landmark": "Harajuku Fashion District", "culture": "digital fashion NFTs, kawaii art, manga collectibles" },
-        "84532": { "landmark": "Musee d'Orsay", "culture": "impressionist art, artist rights, creative legacy" },
-        "51": { "landmark": "Saatchi Gallery", "culture": "contemporary art market, YBA movement, art commerce" }
+        "51": {
+          "landmark": "Saatchi Gallery",
+          "culture": "contemporary art market, YBA movement, art commerce"
+        },
+        "84532": {
+          "landmark": "Musee d'Orsay",
+          "culture": "impressionist art, artist rights, creative legacy"
+        },
+        "421614": {
+          "landmark": "Harajuku Fashion District",
+          "culture": "digital fashion NFTs, kawaii art, manga collectibles"
+        }
       },
       "clues": {
         "true": [
@@ -497,6 +1240,66 @@
           {
             "type": 0,
             "text": "A marketplace developer found the parasitic contract's upgrade function can only be called from a specific IP range — geolocated to the 4th arrondissement of Paris, near the Centre Pompidou. Carmen is in Paris, detective. The artists need you."
+          },
+          {
+            "type": 0,
+            "text": "Intercepted message from a shady art dealer: 'Meet me at the old gallery on the King's Road, I have a buyer for the rare NFT. We'll use the XDC Apothem bridge to transfer the funds.' The message was sent from a wallet with a suspicious transaction pattern, similar to those used in the recent royalty payment hijacks."
+          },
+          {
+            "type": 1,
+            "text": "Overheard conversation between two individuals at a trendy Shoreditch cafe: 'I heard the Young British Artists are getting ripped off left and right. Their NFT royalties are being siphoned off by some parasitic smart contract...it's like something out of a William Gibson novel.' The conversation was laced with anxiety and frustration, hinting at a deeper connection to the heist."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage shows a figure, believed to be Carmen, walking along the South Bank of the Thames, near a contemporary art installation. The figure is seen checking a device, likely a wallet or a blockchain tracking tool, before disappearing into the crowd. The footage was enhanced to reveal a faint tattoo of a Damien Hirst spot painting on the figure's wrist."
+          },
+          {
+            "type": 0,
+            "text": "On-chain forensics reveal a cluster of wallets on the XDC Apothem network, all linked to a single proxy contract. The wallets have been used to receive and launder the hijacked royalty payments, totaling over 1,500 ETH in the past 48 hours. The proxy contract's code bears a resemblance to a known 'phoenix contract' pattern, making it nearly impossible to shut down."
+          },
+          {
+            "type": 1,
+            "text": "Voicemail recording from an anonymous informant: 'Look into the Saatchi Gallery's recent NFT exhibitions...I think Carmen has been using the art market as a front to launder her ill-gotten gains. She's been in touch with some of the artists, offering them 'investment opportunities' in her 'revolutionary new blockchain project'. It's a classic confidence scam, but with a crypto twist.' The informant's voice was laced with a distinctive cockney accent."
+          },
+          {
+            "type": 0,
+            "text": "Witness reports a suspicious figure, sipping coffee at a charming riverside café near a famous museum of impressionist art, transferring 150 ETH to a wallet with a suspiciously high transaction count. The wallet's activity pattern suggests a possible connection to the recent NFT royalty payment hijackings."
+          },
+          {
+            "type": 1,
+            "text": "Intercepted comms: a hushed conversation between two individuals discussing the 'art of the steal' and the 'city of light' mentions a 'Seine-inspired smart contract' with a 'proxy pattern that's as elusive as a Monet water lily painting'. The conversation is laced with references to blockchain bridges and cross-chain transactions."
+          },
+          {
+            "type": 2,
+            "text": "Security footage shows a person of interest, wearing a black beret and a scarf with a motif reminiscent of a famous French artist, accessing a computer with a screensaver displaying a digital rendition of the Eiffel Tower. The computer screen displays a wallet interface with an open transaction to a Base Sepolia address, with a pending transaction for 50 ETH."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of the parasitic contract reveals a telltale sign: a modified EIP-712 signature scheme, potentially linked to a specific wallet that has been active on the Sepolia testnet. The scheme's complexity suggests a sophisticated understanding of Ethereum protocols and a possible connection to the affected NFT marketplaces."
+          },
+          {
+            "type": 1,
+            "text": "Voicemail recording from an anonymous informant mentions a 'scheme that's draining the lifeblood of the NFT creator economy' and warns of a 'mastermind hiding in plain sight, amidst the grandeur of a city's artistic heritage'. The informant hints at a forthcoming 'masterpiece heist' that will 'make the previous 3,200 ETH loss look like a drop in the Seine'."
+          },
+          {
+            "type": 0,
+            "text": "Witness reports a suspect in a neon-lit district, known for its eclectic fashion and love of all things kawaii, accessing a wallet with a telltale pattern of transactions - each one corresponding to a high-value NFT sale on a major marketplace, with the royalty payments being siphoned off to a wallet with a hashed address starting with '0x4d'."
+          },
+          {
+            "type": 1,
+            "text": "Intercepted comms mention a 'Sakura sweet spot' where the perpetrator likes to lay low, surrounded by fans of manga collectibles and digital fashion. The voice on the other end mentions something about 'bridging the gap' between chains to stay under the radar, and 'proxies that bloom like cherry blossoms'."
+          },
+          {
+            "type": 2,
+            "text": "Security footage shows a figure in a Harajuku-inspired outfit, complete with a pastel pink wig and a 'Lolita' dress, walking into a trendy cafe with a street art mural of a giant, glowing NFT. The camera captures a glimpse of a laptop screen displaying an Arbitrum Sepolia blockchain explorer, with a transaction highlighted - the same transaction pattern seen in the royalty payment heists."
+          },
+          {
+            "type": 0,
+            "text": "On-chain forensics reveal a cluster of wallet addresses, all with a similar naming convention - 'MochiLover', 'RamenRenegade', 'SushiSiphon' - each one linked to a series of transactions that correspond to the hijacked royalty payments. The wallets all have a common thread - they've interacted with a smart contract that uses a proxy pattern to stay one step ahead of its pursuers."
+          },
+          {
+            "type": 1,
+            "text": "A cryptic voicemail from an anonymous informant mentions 'a district of dreams, where fashion and tech collide', and warns of a 'parasitic presence lurking in the shadows, bleeding the life from the NFT creator economy'. The voice on the recording whispers something about 'following the trail of 3,200 ETH, and the digital breadcrumbs that lead to the heart of the scheme'."
           }
         ],
         "false": [
@@ -519,6 +1322,62 @@
           {
             "type": 0,
             "text": "Intercepted voice message with a Tokyo area code: 'The royalties flow east.' Voice analysis: synthetic, generated by an AI model. Carmen doesn't use voice calls, detective — she lets her contracts do the talking. Stop picking up the phone."
+          },
+          {
+            "type": 0,
+            "text": "Rumor has it, a rare NFT from the YBA movement just changed hands on a decentralized marketplace. The buyer's wallet was funded with XDC, and the transaction was routed through an Apothem bridge. Looks like Carmen might be tapping into London's contemporary art scene, possibly even visiting the Saatchi Gallery. But don't get too excited, detective - this trail is colder than a well-crafted smart contract. Keep chasing shadows."
+          },
+          {
+            "type": 1,
+            "text": "Overheard conversation at a trendy Shoreditch café: '...hash is 0xdeadbeef, supposed to be the key to unlocking a treasure trove of art commerce...'. The accents were Cockney, but the laughter seemed a tad too rehearsed. Maybe Carmen's crew is hiding in plain sight, sipping lattes and plotting their next heist. Or maybe it's just a couple of art students messing with your mind. Either way, you're still a step behind."
+          },
+          {
+            "type": 0,
+            "text": "On-chain forensics reveal a suspicious pattern of transactions on the XDC Apothem chain, all referencing a 'Royal' collection of NFTs. It seems Carmen might be using London as a hub for her Royalty Siphon Scheme. But when you dig deeper, the trail goes dark - no hints, no leads, just a mocking message: 'You'll never catch me, copper. I'm the queen of the blockchain.'"
+          },
+          {
+            "type": 0,
+            "text": "An anonymous source claims to have seen Carmen attending an exclusive art auction in Mayfair, bidding on a rare piece of contemporary art. The source provided a cryptic message: 'Follow the money, detective. It flows like the Thames, but the treasures are hidden behind a wall of hashed transactions.' The problem is, the auction never happened, and the source is probably a troll. You're wasting your time, detective. Carmen's long gone, laughing all the way to her next mark."
+          },
+          {
+            "type": 0,
+            "text": "Rumor has it, Carmen's been eyeing the impressionist masterpieces at the Musee d'Orsay. Someone's been minting NFTs of Monet's water lilies on Base Sepolia, but the wallet's gone dark. Guess you're just a brush stroke away from catching her... or are you just painting yourself into a corner, detective?"
+          },
+          {
+            "type": 1,
+            "text": "Overheard a hushed conversation at a Parisian café: 'Meet me at the Seine, we'll discuss the artist rights smart contract.' Sounded suspicious, but the audio feed cut out. Maybe Carmen's trying to pull the strings from behind the scenes. You'll have to tune in closer to catch the frequency, detective... if you can handle the static."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of a recent transaction on Base Sepolia revealed a hidden message: 'La vie en rose.' Sounds like a love letter, but could it be a red herring? Perhaps Carmen's using the city of love to throw you off her trail. Keep chasing the ghosts, detective... you're getting warmer... or are you?"
+          },
+          {
+            "type": 2,
+            "text": "Security footage shows a figure in a beret and trench coat lingering around the Musee d'Orsay's outdoor café. They flashed a wallet with a cryptic message: 'Hash 0xdeadbeef.' Could be a clever ruse or a genuine lead. You decide, detective. But don't get too comfortable – the city's always watching, and so am I."
+          },
+          {
+            "type": 0,
+            "text": "Tip from a 'reliable' source: Carmen's been in talks with a local art collective, brainstorming ways to tokenize creative legacy on the blockchain. The trail went cold, but I'm sure you'll find a way to... 'impression' us with your detective work. Keep dreaming, detective. The case is always one step ahead of you."
+          },
+          {
+            "type": 0,
+            "text": "Witness reports a suspicious character lurking around Harajuku Fashion District, eyeing digital fashion NFTs. The suspect was overheard mentioning a 'kawaii art' collectible, potentially tied to a manga-inspired smart contract on Arbitrum Sepolia. You're getting close, detective... or so you think. Keep chasing shadows."
+          },
+          {
+            "type": 1,
+            "text": "Intercepted audio from a Tokyo internet cafe: 'Meet me at the Shibuya Crossing, I have the Royalty Siphon Scheme blueprints... or do I?' The voice is distorted, but the reference to a ' Tokyo-style' wallet swap on the Sepolia testnet has you intrigued. Too bad it's just a wild goose chase. You'll never catch me, detective."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of a discarded wallet on the streets of Harajuku reveals a series of frantic transactions on Arbitrum Sepolia, all linked to a now-defunct NFT marketplace. The trail goes cold, but the faint digital scent of kawaii-themed manga collectibles lingers. You're barking up the wrong tree, detective. The real action is elsewhere."
+          },
+          {
+            "type": 2,
+            "text": "Security footage from a Tokyo street cam shows a person in a fashionable outfit, reminiscent of Harajuku's eclectic style, hastily walking away from a digital art installation. The image is grainy, but the AR filter used to create the kawaii-inspired NFT in the background seems... off. Maybe it's a clever ruse? Either way, you're wasting your time in Tokyo, detective. The real Carmen is long gone."
+          },
+          {
+            "type": 0,
+            "text": "Informant tip: a rogue developer, known only by their handle 'Neo-Tokyo,' has been secretly building a bridge between Arbitrum Sepolia and another, undisclosed chain. The goal? To launder stolen assets, possibly tied to the Royalty Siphon Scheme. But don't get too excited, detective – this lead is nothing but a cleverly crafted smokescreen. You're no closer to catching me, and Tokyo is just a distraction."
           }
         ]
       },
@@ -530,26 +1389,35 @@
       "title": "The Stablecoin Depeg Attack",
       "briefing": "RED ALERT — Carmen has orchestrated a coordinated attack on 'SovereignUSD,' the fourth-largest stablecoin with a $2B market cap. Using a combination of massive short positions, social engineering of the reserves auditor, and a carefully timed withdrawal of backing collateral, she has triggered a depeg event. SUSD is trading at $0.87 and falling. Carmen has $50M in short positions that will net her over 200,000 ETH if the peg breaks below $0.50. Millions of DeFi users have their savings in SUSD. Find Carmen, recover the collateral keys, and restore the peg before mass panic sets in. This is the big one, detective.",
       "cities": {
-        "421614": {
-          "name": "Tokyo",
-          "emoji": "\ud83d\uddfe",
-          "chain": "Arbitrum Sepolia"
+        "51": {
+          "name": "London",
+          "emoji": "🎡",
+          "chain": "XDC Apothem"
         },
         "84532": {
           "name": "Paris",
-          "emoji": "\ud83d\uddfc",
+          "emoji": "🗼",
           "chain": "Base Sepolia"
         },
-        "51": {
-          "name": "London",
-          "emoji": "\ud83c\udfa1",
-          "chain": "XDC Apothem"
+        "421614": {
+          "name": "Tokyo",
+          "emoji": "🗾",
+          "chain": "Arbitrum Sepolia"
         }
       },
       "cityClues": {
-        "421614": { "landmark": "Bank of Japan", "culture": "monetary policy, currency stability, yen carry trade" },
-        "84532": { "landmark": "Banque de France", "culture": "central banking, euro stability, reserve management" },
-        "51": { "landmark": "Royal Mint", "culture": "currency issuance, monetary history, pound sterling" }
+        "51": {
+          "landmark": "Royal Mint",
+          "culture": "currency issuance, monetary history, pound sterling"
+        },
+        "84532": {
+          "landmark": "Banque de France",
+          "culture": "central banking, euro stability, reserve management"
+        },
+        "421614": {
+          "landmark": "Bank of Japan",
+          "culture": "monetary policy, currency stability, yen carry trade"
+        }
       },
       "clues": {
         "true": [
@@ -572,6 +1440,50 @@
           {
             "type": 0,
             "text": "A whistleblower at the Arbitrum Foundation flagged unusual validator behavior: one node has been front-running SUSD liquidations with microsecond precision. The node's reward address traces to a Ginza-based hedge fund that doesn't officially exist. Carmen is in Tokyo."
+          },
+          {
+            "type": 0,
+            "text": "A fish-and-chips wrapper discarded near the iconic Tower of a former Roman wall hints at a hurried meetup between Carmen's crew and a rogue auditor, tracing the breadcrumbs of a SovereignUSD depeg event back to a suspicious wallet funded via a lesser-known Ethereum bridge, its transactions patterned like the ebbs of the Thames."
+          },
+          {
+            "type": 1,
+            "text": "A scratchy, encrypted phone call intercepted on a high-frequency trading channel mentions 'the Queen's own mint' and 'a spot of tea' before discussing a massive short position on SUSD, netting the caller a potential 200,000 ETH if the peg breaks - a conversation laced with the nuances of a very British accent, slipping through the cracks of a decentralized exchange."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of on-chain activity reveals a trail of microtransactions flowing through a wallet with a metadata-rich NFT, tagged with keywords 'royal warrant' and 'sterling standard,' hinting at a connection to the heart of a nation's currency issuance - the same wallet seen interacting with a DeFi protocol vulnerable to collateral withdrawal exploits, fitting the MO of our suspect."
+          },
+          {
+            "type": 2,
+            "text": "Security footage from a high-stakes, members-only club near the financial district shows a figure, believed to be Carmen, entering with a guest list invite designed as a cryptographic hash, later identified as the transaction ID of a large SUSD short position - the backdrop of the club's interior resembles the architectural grandeur of a historic mint, with hints of a contemporary, neon-lit aesthetic."
+          },
+          {
+            "type": 0,
+            "text": "A leaked internal memo from a leading stablecoin issuer references a clandestine meeting with 'a prominent figure in British monetary history,' discussing the implications of a depeg event on global financial stability - the memo's digital watermark traces back to a blockchain analytics firm with known ties to Carmen's network, suggesting an inside track on the SUSD heist and a calculated play to undermine trust in traditional currency issuance."
+          },
+          {
+            "type": 0,
+            "text": "A whispered rumor circulated among DeFi traders: a mysterious figure, known only by their wallet handle 'La Vie En Rose,' has been manipulating SUSD markets. Their transactions bear the hallmark of a sophisticated trader, always staying one step ahead of the market. The trail leads to a wallet with a peculiar NFT, 'Mona Lisa's Smile,' minted on a lesser-known marketplace."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of the SUSD depeg attack revealed a complex web of transactions, routed through a series of wallets and bridges. One particular wallet, 'Le Pont,' stood out, as it had been used to transfer a large quantity of ETH to a decentralized exchange. The exchange's liquidity pool was subsequently drained, exacerbating the stablecoin's price drop. It appears that Carmen has been using a combination of on-chain and off-chain tactics to conceal her tracks."
+          },
+          {
+            "type": 0,
+            "text": "A suspicious wallet, flagged for abnormal transaction patterns, was linked to a Web3 entity utilizing a unique combination of DeFi protocols, reminiscent of the 'carry trade' tactics employed by local financial institutions. The on-chain activity suggests a high degree of monetary policy savvy, possibly indicating a connection to a central banking institution."
+          },
+          {
+            "type": 1,
+            "text": "Overheard conversation at a high-end ramen bar: whispers of a 'yen-for-stable' swap, followed by murmurs about the 'BoJ's next move.' The speakers abruptly changed topics upon noticing our undercover agent, leaving behind only the faint scent of truffle oil and the sound of shuffling poker chips."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage captured a figure, clad in a black raincoat, exiting a nondescript building near the Moat of the Imperial Palace. The individual's phone displayed a wallet app with an active transaction, routed through the Arbitrum Sepolia bridge, bearing an NFT with metadata referencing the concept of 'monetary policy as an art form.'"
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of the SUSD depeg attack revealed a complex web of short positions, cleverly concealed within a labyrinth of proxy wallets and Layer 2 transactions. The orchestrator's grasp of DeFi mechanics and stablecoin dynamics rivals that of a seasoned quantitative analyst, possibly hinting at a connection to a prestigious local university with a renowned economics program."
           }
         ],
         "false": [
@@ -594,6 +1506,58 @@
           {
             "type": 0,
             "text": "Intercepted encrypted message routed through a London VPN: 'The peg breaks at dawn, meet at Tower Bridge.' Decryption metadata shows this was composed on a Tokyo machine at 3 AM and intentionally routed through London. It's a geographic misdirection. Carmen outsmarted you again."
+          },
+          {
+            "type": 0,
+            "text": "Rumor has it, a shady character was spotted near the Royal Mint, whispering about a 'depegging' plan. Tracing the IP address led to a dead-end wallet on XDC Apothem, but the transaction history showed a brief, suspicious spike in pound sterling-denominated stablecoins. You're getting close, or so you think, detective. Keep chasing shadows."
+          },
+          {
+            "type": 1,
+            "text": "Overheard conversation on a encrypted comms channel: 'Meet me at the old mint, we need to discuss the pound's future.' The audio quality was poor, but it sounded like they were using a VPN to mask their location. Probably just a coincidence that the words 'Apothem' and 'repegging' were mentioned. Don't worry, I'm sure it's just a trap... for someone else."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of a smart contract on XDC Apothem revealed a hidden function to manipulate stablecoin prices. The code was obfuscated, but a comment mentioned 'London Bridge' - probably a reference to a famous monetary policy, right? Don't get too excited, detective. It's just a wild goose chase... or is it?"
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage shows a person in a black coat walking out of the Royal Mint's museum, carrying a briefcase with a faint logo of a cryptocurrency exchange. The video feed was interrupted by a 'technical difficulty' message, but not before the person glanced up at a camera, smiling. You'll never catch me, detective. I'm always one block ahead."
+          },
+          {
+            "type": 0,
+            "text": "An NFT marketplace listing appeared on XDC Apothem, featuring a digital artwork of the pound sterling symbol with a red 'X' marked through it. The seller's wallet was empty, except for a note that read: 'You'll never peg me down, detective.' Keep looking, I'm sure you'll find something... else to waste your time on."
+          },
+          {
+            "type": 0,
+            "text": "Rumor has it, Carmen was spotted sipping coffee near the Banque de France, discussing the finer points of reserve management and euro stability. Looks like she's trying to make a big withdrawal – of the digital kind. Her wallet's been flagged for suspicious activity, multiple transactions on Base Sepolia, but I've got a hunch it's just a smokescreen. You'll never catch her, detective. The trail's gone cold, and so is your coffee."
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis of a recent NFT sale on a popular marketplace suggests Carmen might be hiding in plain sight, using the pseudonym 'La Vie En Rose.' The art piece, a digital rendition of the Eiffel Tower, was sold for a hefty sum in stablecoins – which, coincidentally, are experiencing a bit of a depegging crisis. How convenient. But don't get too excited, detective; this is just a red herring, and you're just a pawn in Carmen's game."
+          },
+          {
+            "type": 2,
+            "text": "Surveillance footage shows a person of interest, possibly Carmen, walking along the Seine, gazing up at the city's iconic landmarks. But the interesting part is the brief glimpse of their phone screen, displaying a wallet app with a pending transaction on... you guessed it, Base Sepolia. Or is it just a cleverly crafted deepfake? Either way, you're wasting your time, detective. The only thing you'll find in Paris is a charming city with a penchant for fine art and finer deception."
+          },
+          {
+            "type": 0,
+            "text": "A cryptic message on a darknet forum reads: 'The euro's stability is about to take a hit, and we're not just talking about the currency.' The post is signed with a hash that seems to point to a specific smart contract on Base Sepolia. But don't get your hopes up, detective; this is just a cleverly disguised publicity stunt. You're just a fly caught in Carmen's web of intrigue, and she's always one step ahead. Bonne chance, detective – you'll need it."
+          },
+          {
+            "type": 0,
+            "text": "Witness reports a suspicious figure lurking around the Bank of Japan, muttering about the yen carry trade and its implications on stablecoinpegging. The trail goes cold, but a wallet address was left behind - 0x...1234. You're getting warmer, detective... or are you?"
+          },
+          {
+            "type": 0,
+            "text": "Forensic analysis reveals a series of on-chain transactions involving a token with a Japanese character set. The smart contract seems to be implementing a complex monetary policy, mirroring the Bank of Japan's easing strategies. Could this be Carmen's next move? Or is it just a clever ruse? The game is afoot, detective... or is it?"
+          },
+          {
+            "type": 2,
+            "text": "Security footage shows a figure in a black hoodie walking down a Tokyo street, passing by a giant screen displaying the current yen exchange rate. The figure briefly looks up, and our cameras catch a glimpse of a phone screen with an NFT marketplace open - a rare digital art piece with a Sepolia-themed background. A red herring, or a genuine lead? You decide, detective... but I wouldn't hold my breath"
+          },
+          {
+            "type": 0,
+            "text": "Informant tip: a local trader claims to have seen Carmen sipping matcha at a trendy cafe in Shibuya, discussing the finer points of blockchain bridges and cross-chain liquidity. The trader provides a partial wallet address, but it's probably just a plant. Keep dancing, detective... the music hasn't stopped yet, but the song is about to change"
           }
         ]
       },
