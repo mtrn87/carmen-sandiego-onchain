@@ -127,7 +127,7 @@ export async function signRegistrationMessage(user, playerAddress, nickname) {
   }
 
   // Get Privy's embedded wallet provider
-  const provider = await user.getEthersProvider();
+  const provider = await user.wallet.getEthersProvider();
   if (!provider) {
     throw new Error("Could not get Privy Ethereum provider");
   }
