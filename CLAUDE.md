@@ -16,35 +16,100 @@ Three independent sub-projects share a root `.env`:
 | `frontend/` | Game UI | React 18, Vite, Zustand, Privy Auth, Ethers.js v6 |
 | `cre-workflows/` | Chainlink CRE workflows | TypeScript compiled to WASM |
 
-## Common Commands
+## Steps to Run
 
 ### Smart Contracts (`contracts/`)
 
+**Prerequisites:** Node.js 20+, root `.env` configured (copy `.env.example` and fill in values).
+
 ```bash
-cd contracts
-npm run compile              # Compile Solidity
-npm run test                 # Run all tests (Chai + Ethers)
-npm run test:coverage        # Coverage report
-npx hardhat test test/GameMaster.test.ts  # Single test file
-npm run deploy:all           # Full multi-chain deployment
-npm run deploy:sepolia       # Deploy GameMaster only
-npm run deploy:arbitrum-sepolia  # Deploy CityNode (Tokyo)
+# 1. Install dependencies
+cd contracts && npm install
+
+# 2. Compile Solidity contracts
+npm run compile
+
+# 3. Run tests (local Hardhat network, no .env needed)
+npm run test
+
+# 4. Run a single test file
+npx hardhat test test/GameMaster.test.ts
+
+# 5. Generate coverage report
+npm run test:coverage
+
+# 6. Deploy to testnets (requires funded wallet + RPC URLs in root .env)
+npm run deploy:sepolia             # GameMaster + MissionNFT + Proxy on Sepolia
+npm run deploy:arbitrum-sepolia    # CityNode (Tokyo) on Arbitrum Sepolia
+npm run deploy:base-sepolia        # CityNode (Paris) on Base Sepolia
+npm run deploy:all                 # Full multi-chain deployment (all above)
+
+# 7. Verify contracts on block explorer
+npm run verify -- --network sepolia <CONTRACT_ADDRESS> <CONSTRUCTOR_ARGS...>
 ```
 
 ### Frontend (`frontend/`)
 
+**Prerequisites:** Node.js 20+, contracts deployed, `frontend/.env` with `VITE_`-prefixed contract addresses and RPC URLs.
+
 ```bash
-cd frontend
-npm run dev        # Vite dev server
-npm run build      # Production build
-npm run lint       # ESLint (flat config)
-npm run test       # Vitest watch mode
-npm run test:run   # Vitest single run
+# 1. Install dependencies
+cd frontend && npm install
+
+# 2. Start dev server (http://localhost:5173)
+npm run dev
+
+# 3. Run linter
+npm run lint
+
+# 4. Run tests (watch mode)
+npm run test
+
+# 5. Run tests (single run, CI-friendly)
+npm run test:run
+
+# 6. Production build
+npm run build
+
+# 7. Preview production build locally
+npm run preview
 ```
 
 ### CRE Workflows (`cre-workflows/`)
 
-Each workflow (generate-briefing, mission-start, carmen-moves) is independent TypeScript compiled to WASM. See `cre-workflows/project.yaml` for target configuration.
+**Prerequisites:** [Bun](https://bun.sh/docs/installation) installed, [CRE CLI](https://docs.chain.link/cre) installed, root `.env` with `CRE_ETH_PRIVATE_KEY` (funded wallet required for chain-write simulation, dummy key OK otherwise).
+
+Four independent workflows: `generate-briefing`, `mission-start`, `carmen-moves`, `generate-finale`. Each has its own `package.json`, `workflow.yaml`, and config files.
+
+```bash
+# 1. Install dependencies for a workflow
+cd cre-workflows/<workflow-name> && bun install
+
+# Example:
+cd cre-workflows/generate-briefing && bun install
+
+# 2. Simulate a workflow locally (run from cre-workflows/ root)
+cd cre-workflows
+cre workflow simulate ./<workflow-name> --target=staging-settings
+
+# Example:
+cre workflow simulate ./generate-briefing --target=staging-settings
+
+# 3. Deploy a workflow to staging
+cre workflow deploy ./<workflow-name> --target=staging-settings
+
+# 4. Deploy a workflow to production
+cre workflow deploy ./<workflow-name> --target=production-settings
+```
+
+**Workflow overview:**
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `generate-briefing` | `MissionStarted` event | Generates encrypted briefing clue for new mission |
+| `mission-start` | `MissionStarted` event | Initializes mission parameters on CityNodes |
+| `carmen-moves` | Periodic / event-driven | Moves Carmen between chains mid-mission |
+| `generate-finale` | `CarmenCaptured` event | Generates AI trophy NFT metadata + image |
 
 ## Multi-Chain Architecture
 
