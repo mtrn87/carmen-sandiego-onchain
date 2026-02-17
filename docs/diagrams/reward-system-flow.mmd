@@ -1,0 +1,44 @@
+graph TB
+    subgraph Mission["🎮 Mission"]
+        Start["Mission Starts<br/>Block N"]
+        Capture["Carmen Captured<br/>Block N+X"]
+    end
+
+    subgraph Calculation["📊 Reward Calculation"]
+        BlocksUsed["Blocks Used = N+X - N"]
+        Tier["Determine Tier<br/>Based on Blocks"]
+    end
+
+    subgraph Rewards["🏆 Rewards"]
+        Gold["Gold: 0-20 blocks<br/>100 points<br/>Rare NFT"]
+        Silver["Silver: 21-35 blocks<br/>75 points<br/>Uncommon NFT"]
+        Bronze["Bronze: 36-50 blocks<br/>50 points<br/>Common NFT"]
+        Failed["Failed: 51+ blocks<br/>0 points<br/>No NFT"]
+    end
+
+    subgraph NFT["🎁 NFT Mint"]
+        Mint["Mint MissionNFT<br/>ERC-721 Trophy<br/>Metadata: Blocks Used<br/>Metadata: Tier"]
+        Store["Store in Player<br/>Wallet"]
+    end
+
+    Start -->|"Record Block"| BlocksUsed
+    Capture -->|"Record Block"| BlocksUsed
+    
+    BlocksUsed -->|"Calculate"| Tier
+    
+    Tier -->|"0-20"| Gold
+    Tier -->|"21-35"| Silver
+    Tier -->|"36-50"| Bronze
+    Tier -->|"51+"| Failed
+    
+    Gold -->|"Mint"| Mint
+    Silver -->|"Mint"| Mint
+    Bronze -->|"Mint"| Mint
+    Failed -->|"No Mint"| Failed
+    
+    Mint -->|"Transfer"| Store
+
+    style Mission fill:#e1f5ff
+    style Calculation fill:#fff9c4
+    style Rewards fill:#f3e5f5
+    style NFT fill:#e8f5e9

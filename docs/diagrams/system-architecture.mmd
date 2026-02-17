@@ -1,0 +1,77 @@
+graph TB
+    subgraph Frontend["🎮 Frontend (React)"]
+        UI["React UI<br/>Zustand Store<br/>Privy Auth"]
+        Wallet["Embedded Wallet<br/>Google OAuth<br/>ECIES Encryption"]
+    end
+
+    subgraph Relayer["🔗 Relayer Server (3001)"]
+        Validate["Validate Signature<br/>ECDSA Recovery"]
+        Register["Call registerPlayer()<br/>Pay Gas"]
+    end
+
+    subgraph Sepolia["⛓️ Sepolia (HQ)"]
+        GameMaster["GameMaster.sol<br/>VRF Consumer<br/>State Manager"]
+        Registry["PlayerRegistry.sol<br/>Player Data<br/>Nonce Tracking"]
+        Proxy["GameMasterProxy<br/>CRE Report Router<br/>Keystone Validator"]
+        NFT["MissionNFT.sol<br/>ERC-721 Trophy"]
+    end
+
+    subgraph VRF["🎲 Chainlink VRF v2.5"]
+        Random["Randomness<br/>Coordinator"]
+    end
+
+    subgraph CRE["🤖 CRE Workflows"]
+        BriefingWF["generate-briefing<br/>OpenAI + ElevenLabs"]
+        ClueWF["generate-clue<br/>OpenAI + ElevenLabs"]
+        CarmenWF["carmen-moves<br/>Cron-based"]
+        FinaleWF["generate-finale<br/>Personalized Story"]
+    end
+
+    subgraph Keystone["🔐 Keystone Router"]
+        Sign["Sign Reports<br/>Validate Signatures"]
+    end
+
+    subgraph Cities["🌍 City Chains"]
+        Tokyo["CityNode (Arbitrum)<br/>Tokyo"]
+        Paris["CityNode (Base)<br/>Paris"]
+    end
+
+    subgraph AI["🧠 AI Services"]
+        OpenAI["OpenAI GPT-4o-mini<br/>Text Generation"]
+        ElevenLabs["ElevenLabs<br/>Audio Generation"]
+        IPFS["IPFS/Pinata<br/>Content Storage"]
+    end
+
+    Frontend -->|"Google OAuth"| Wallet
+    Wallet -->|"Sign Message"| Relayer
+    Relayer -->|"POST /relay"| Validate
+    Validate -->|"registerPlayer()"| Register
+    Register -->|"Call Contract"| Registry
+    
+    Frontend -->|"startMission()"| GameMaster
+    GameMaster -->|"Request VRF"| Random
+    Random -->|"Callback"| GameMaster
+    
+    GameMaster -->|"submitInvestigation()"| GameMaster
+    GameMaster -->|"Emit Events"| CRE
+    
+    CRE -->|"HTTP Fetch"| AI
+    AI -->|"Generate Content"| IPFS
+    
+    CRE -->|"Sign Report"| Keystone
+    Keystone -->|"Validate & Route"| Proxy
+    Proxy -->|"receiveClue()"| GameMaster
+    
+    GameMaster -->|"Cross-chain Call"| Cities
+    Cities -->|"updateCarmenPresence()"| Cities
+    
+    GameMaster -->|"Mint NFT"| NFT
+    
+    style Frontend fill:#e1f5ff
+    style Relayer fill:#fff3e0
+    style Sepolia fill:#f3e5f5
+    style VRF fill:#e8f5e9
+    style CRE fill:#fce4ec
+    style Keystone fill:#f1f8e9
+    style Cities fill:#ede7f6
+    style AI fill:#fff9c4

@@ -351,7 +351,7 @@ sequenceDiagram
     participant IPFS as 💾 IPFS
 
     Player->>Frontend: Register (generate ECIES keypair)
-    Frontend->>Frontend: Generate ECIES keypair<br/>(secp256k1)
+    Frontend->>Frontend: Generate ECIES keypair
     Frontend->>Frontend: Store privKey in IndexedDB
     Frontend->>Frontend: Send pubKey to contract
 
@@ -359,7 +359,7 @@ sequenceDiagram
     Frontend-->>CRE: pubKey = 0x...
 
     CRE->>CRE: Generate clue text
-    CRE->>CRE: ECIES encrypt clue<br/>with player pubKey
+    CRE->>CRE: ECIES encrypt clue
     CRE->>IPFS: Upload encrypted clue
     IPFS-->>CRE: IPFS hash
 
@@ -368,15 +368,10 @@ sequenceDiagram
     Frontend->>IPFS: Fetch encrypted clue
     IPFS-->>Frontend: Encrypted data
 
-    Frontend->>Frontend: ECIES decrypt<br/>with privKey from IndexedDB
+    Frontend->>Frontend: ECIES decrypt with privKey
     Frontend->>Player: Display decrypted clue
 
-    Note over Frontend,CRE: Only player can decrypt!<br/>CRE never sees plaintext
-
-    style Player fill:#e1f5ff
-    style Frontend fill:#e1f5ff
-    style CRE fill:#fce4ec
-    style IPFS fill:#fff9c4
+    Note over Frontend,CRE: Only player can decrypt!
 ```
 
 ---
@@ -409,14 +404,12 @@ graph TB
     Generate -->|"Proof + Output"| Verify
     Verify -->|"Valid?"| Callback
     
-    Callback -->|"randomWords[0]"| Logic
+    Callback -->|"randomWords"| Logic
     Logic -->|"Carmen Location"| Logic
     Logic -->|"Clue Type"| Logic
     Logic -->|"Clue Veracity"| Logic
     
     Logic -->|"Emit Event"| Player
-
-    Note over VRF: Cryptographically Proven<br/>Can't be predicted or manipulated
 
     style Player fill:#e1f5ff
     style GameMaster fill:#f3e5f5

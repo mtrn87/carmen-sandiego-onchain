@@ -1,0 +1,85 @@
+sequenceDiagram
+    participant Player as 👤 Player
+    participant Frontend as 🎮 Frontend
+    participant GameMaster as ⛓️ GameMaster
+    participant VRF as 🎲 VRF
+    participant CRE as 🤖 CRE
+    participant AI as 🧠 AI Services
+    participant Keystone as 🔐 Keystone
+
+    Player->>Frontend: Click "Start Mission"
+    Frontend->>GameMaster: startMission()
+    GameMaster->>GameMaster: Create Mission Struct
+    GameMaster->>VRF: Request Randomness
+    GameMaster-->>Frontend: ✓ Mission Started
+    
+    VRF->>VRF: Generate Random Number
+    VRF->>GameMaster: fulfillRandomWords(randomWords)
+    GameMaster->>GameMaster: Set Carmen Location<br/>Pick City from randomWords
+    GameMaster->>GameMaster: Emit MissionStarted Event
+    
+    CRE->>CRE: Listen for MissionStarted
+    CRE->>GameMaster: Read getMissionSalt(), getPlayerPubKey()
+    CRE->>CRE: Brute-force hash → city selection
+    CRE->>CRE: Select clue from database
+    CRE->>CRE: ECIES encrypt clue with player pubKey
+    
+    CRE->>AI: Call OpenAI for briefing narrative
+    AI-->>CRE: Briefing text
+    CRE->>AI: Call ElevenLabs for audio
+    AI-->>CRE: Audio file
+    
+    CRE->>AI: Upload to IPFS
+    AI-->>CRE: IPFS hash
+    
+    CRE->>Keystone: Sign Report<br/>{missionId, clueHash, cluePtr}
+    Keystone-->>CRE: Signed Report
+    
+    CRE->>GameMaster: Send via Keystone Router
+    GameMaster->>GameMaster: Verify Keystone Signature
+    GameMaster->>GameMaster: receiveClue(missionId, clueHash, cluePtr)
+    GameMaster->>GameMaster: Emit ClueReceived Event
+    
+    Frontend->>GameMaster: Listen for ClueReceived
+    Frontend->>Frontend: Fetch clue from IPFS
+    Frontend->>Frontend: ECIES decrypt with player privKey
+    Frontend->>Player: Display Briefing + Audio
+    
+    Player->>Frontend: Click City to Investigate
+    Frontend->>GameMaster: submitInvestigation(chainId)
+    GameMaster->>VRF: Request Randomness (clue type)
+    
+    VRF->>GameMaster: fulfillRandomWords(randomWords)
+    GameMaster->>GameMaster: Determine Clue Type (text/audio)
+    GameMaster->>GameMaster: Emit InvestigationSubmitted
+    
+    CRE->>CRE: Listen for InvestigationSubmitted
+    CRE->>AI: Call OpenAI for clue
+    AI-->>CRE: Clue text
+    CRE->>AI: Call ElevenLabs if audio
+    AI-->>CRE: Audio file
+    CRE->>AI: Upload to IPFS
+    
+    CRE->>Keystone: Sign Report
+    CRE->>GameMaster: Send Clue via Keystone
+    GameMaster->>Frontend: ClueReceived Event
+    Frontend->>Player: Display Clue
+    
+    Player->>Frontend: Click "Capture Carmen"
+    Frontend->>GameMaster: captureCarmen(missionId)
+    GameMaster->>GameMaster: Verify Carmen Location
+    alt Carmen Found
+        GameMaster->>GameMaster: Calculate Reward (blocks used)
+        GameMaster->>GameMaster: Mint NFT Trophy
+        GameMaster->>GameMaster: Emit CarmenCaptured
+        
+        CRE->>CRE: Listen for CarmenCaptured
+        CRE->>AI: Generate personalized ending
+        AI-->>CRE: Finale narrative
+        CRE->>AI: Upload to IPFS
+        
+        Frontend->>Player: ✓ Mission Complete!<br/>Display Trophy + Reward
+    else Wrong Location
+        GameMaster-->>Frontend: ✗ Carmen Not Here
+        Frontend->>Player: Try Another City
+    end

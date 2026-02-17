@@ -1,0 +1,37 @@
+sequenceDiagram
+    participant User as 👤 User
+    participant Frontend as 🎮 Frontend
+    participant Privy as 🔐 Privy
+    participant Relayer as 🔗 Relayer (3001)
+    participant Contract as ⛓️ PlayerRegistry
+    participant Storage as 💾 localStorage
+
+    User->>Frontend: Click "Login with Google"
+    Frontend->>Privy: Google OAuth
+    Privy-->>Frontend: Embedded Wallet Created
+    Frontend->>User: Show Nickname Modal
+    
+    User->>Frontend: Enter Nickname "detective"
+    Frontend->>Frontend: Create messageHash<br/>keccak256(address, nickname, nonce, contractAddr)
+    Frontend->>Privy: signMessage(messageHash)
+    Privy-->>Frontend: signature = 0x...
+    
+    Frontend->>Relayer: POST /relay<br/>{address, nickname, signature, nonce}
+    
+    Relayer->>Relayer: Validate Signature<br/>ECDSA Recovery
+    alt Signature Valid
+        Relayer->>Contract: registerPlayer(address, nickname)
+        Contract->>Contract: Verify Caller is GameMaster
+        Contract->>Contract: Create Player Struct
+        Contract->>Contract: Store in Mapping
+        Contract-->>Relayer: ✓ txHash
+        Relayer-->>Frontend: {success: true, txHash, blockNumber}
+        
+        Frontend->>Storage: Save player_registered_address
+        Frontend->>Storage: Save player_nickname
+        Frontend->>User: ✓ Registration Complete!
+        Frontend->>Frontend: Navigate to /game
+    else Signature Invalid
+        Relayer-->>Frontend: {success: false, error: "Invalid signature"}
+        Frontend->>User: ✗ Registration Failed
+    end
