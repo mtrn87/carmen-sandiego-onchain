@@ -10,17 +10,17 @@
  *    relocates and previous clues become less useful.
  *
  *  MULTI-MISSION SUPPORT:
- *    Dynamically discovers all active missions by reading nextMissionId
- *    from the contract and iterating 1..nextMissionId-1. This allows
- *    multiple players to have concurrent missions with independent
- *    Carmen movement — no hardcoded mission IDs.
+ *    Calls getActiveMissionIds() on-chain to get only currently active
+ *    mission IDs in a single read. This allows multiple players to have
+ *    concurrent missions with independent Carmen movement — no hardcoded
+ *    mission IDs, no wasted reads on completed/failed missions.
  *
  *  HOW IT WORKS:
  *    1. CronCapability triggers this handler every 3 minutes
- *    2. Read nextMissionId to know how many missions exist
+ *    2. Read getActiveMissionIds() — returns only active mission IDs
  *    3. Read getValidCities once (shared across all missions)
- *    4. For each mission (1..nextMissionId-1):
- *       a. Read getMission — skip if not Active (status != 1)
+ *    4. For each active mission ID:
+ *       a. Read getMission — get targetHash
  *       b. Read getMissionSalt — skip if zero (VRF pending)
  *       c. Brute-force targetHash to find Carmen's current city
  *       d. Pick a new city (different from current) deterministically
@@ -77,8 +77,8 @@ type Config = {
 //  ABI fragments — view functions for reading game state
 // ============================================================
 const GameMasterABI = parseAbi([
-  // nextMissionId is a public uint256 — Solidity auto-generates getter
-  "function nextMissionId() view returns (uint256)",
+  // getActiveMissionIds returns only currently active mission IDs
+  "function getActiveMissionIds() view returns (uint256[])",
   // getMission returns: (player, startBlock, targetHash, cluesReceived, investigationsCount, status)
   "function getMission(uint256) view returns (address,uint256,bytes32,uint8,uint8,uint8)",
   // getMissionSalt returns the VRF-derived random salt
@@ -89,9 +89,6 @@ const GameMasterABI = parseAbi([
 
 // Action code — must match GameMasterProxy.sol constant
 const ACTION_UPDATE_TARGET = 3
-
-// Mission status enum (matches GameMaster.sol)
-const MISSION_STATUS_ACTIVE = 1
 
 const ZERO_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -214,21 +211,21 @@ const onCronTrigger = (runtime: Runtime<Config>, _payload: CronPayload): Record<
 
   runtime.log("=== Carmen Moves — Cron Trigger ===")
 
-  // ── Step 1: Read nextMissionId to know how many missions exist ──
-  const nextIdData = readContract(evmClient, runtime, gm, encodeFunctionData({
+  // ── Step 1: Read active mission IDs (single on-chain call) ──
+  const activeIdsData = readContract(evmClient, runtime, gm, encodeFunctionData({
     abi: GameMasterABI,
-    functionName: "nextMissionId",
+    functionName: "getActiveMissionIds",
   }))
-  const nextMissionId = decodeFunctionResult({
+  const activeMissionIds = decodeFunctionResult({
     abi: GameMasterABI,
-    functionName: "nextMissionId",
-    data: bytesToHex(nextIdData),
-  }) as bigint
+    functionName: "getActiveMissionIds",
+    data: bytesToHex(activeIdsData),
+  }) as bigint[]
 
-  runtime.log(`nextMissionId=${nextMissionId} (checking missions 1..${nextMissionId - BigInt(1)})`)
+  runtime.log(`Active missions: [${activeMissionIds.join(", ")}] (${activeMissionIds.length} total)`)
 
-  if (nextMissionId <= BigInt(1)) {
-    runtime.log("No missions exist yet, nothing to do")
+  if (activeMissionIds.length === 0) {
+    runtime.log("No active missions, nothing to do")
     return {}
   }
 
@@ -245,33 +242,27 @@ const onCronTrigger = (runtime: Runtime<Config>, _payload: CronPayload): Record<
 
   runtime.log(`Cities: [${cities.join(", ")}]`)
 
-  // ── Step 3: Iterate all missions, move Carmen for active ones ──
-  let activeMissions = 0
+  // ── Step 3: Move Carmen for each active mission ──
   let movedCount = 0
 
-  for (let i = BigInt(1); i < nextMissionId; i++) {
-    // Read mission state
+  for (const missionId of activeMissionIds) {
+    // Read mission state (targetHash)
     const missionData = readContract(evmClient, runtime, gm, encodeFunctionData({
       abi: GameMasterABI,
       functionName: "getMission",
-      args: [i],
+      args: [missionId],
     }))
-    const [, , targetHash, , , status] = decodeFunctionResult({
+    const [, , targetHash] = decodeFunctionResult({
       abi: GameMasterABI,
       functionName: "getMission",
       data: bytesToHex(missionData),
     }) as [string, bigint, string, number, number, number]
 
-    // Skip non-active missions (None=0, Completed=2, Failed=3)
-    if (status !== MISSION_STATUS_ACTIVE) continue
-
-    activeMissions++
-
     // Read salt for this mission
     const saltData = readContract(evmClient, runtime, gm, encodeFunctionData({
       abi: GameMasterABI,
       functionName: "getMissionSalt",
-      args: [i],
+      args: [missionId],
     }))
     const salt = decodeFunctionResult({
       abi: GameMasterABI,
@@ -281,16 +272,16 @@ const onCronTrigger = (runtime: Runtime<Config>, _payload: CronPayload): Record<
 
     // Skip if VRF not yet fulfilled
     if (salt === ZERO_HASH) {
-      runtime.log(`  [${i}] VRF pending, skipping`)
+      runtime.log(`  [${missionId}] VRF pending, skipping`)
       continue
     }
 
     // Move Carmen for this mission
-    const moved = moveCarmenForMission(runtime, evmClient, i, targetHash, salt, cities)
+    const moved = moveCarmenForMission(runtime, evmClient, missionId, targetHash, salt, cities)
     if (moved) movedCount++
   }
 
-  runtime.log(`=== Done: ${activeMissions} active, ${movedCount} moved ===`)
+  runtime.log(`=== Done: ${activeMissionIds.length} active, ${movedCount} moved ===`)
   return {}
 }
 
