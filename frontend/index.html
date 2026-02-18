@@ -2,8 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="/logo.png" />
+    <link rel="icon" href="./logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Dynamic base href for IPFS compatibility -->
+    <script>
+      document.write('<base href="' + window.location.pathname + '"/>');
+    </script>
+    
     <!-- Security Headers -->
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://*.privy.io; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.privy.io; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.privy.io; connect-src 'self' http://localhost:8545 https://sepolia-rollup.arbitrum.io https://sepolia.base.org https://erpc.apothem.network https://*.privy.io https://*.ethereum.org https://*.infura.io https://*.alchemy.com wss://*.privy.io; frame-src https://*.privy.io; object-src 'none'; base-uri 'self'; form-action 'self';" />
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
@@ -15,6 +21,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="./src/main.jsx"></script>
   </body>
 </html>
