@@ -35,35 +35,28 @@ Every mission is **unique**. Every clue is **generated in real-time by AI**. Eve
 
 ## How It Works
 
-```
-  YOU                    BLOCKCHAIN                   CRE + AI
-  ===                    ==========                   ========
+```mermaid
+sequenceDiagram
+    participant Player as 👤 Player
+    participant Blockchain as ⛓️ Blockchain
+    participant CRE as 🔗 Chainlink CRE
 
-  Connect Wallet
-       |
-       +---> startMission() -----> VRF picks Carmen's
-       |                           hiding chain
-       |                                |
-       |                           CRE generates
-       |                           AI briefing
-       |                                |
-       +<---- Briefing (text/audio) <---+
-       |
-  Investigate a city
-       |
-       +---> submitInvestigation() --> VRF: true clue
-       |                               or false lead?
-       |                                |
-       |                           CRE calls OpenAI
-       |                           + ElevenLabs
-       |                                |
-       +<---- Clue (text or audio) <----+
-       |
-  Found her!
-       |
-       +---> captureCarmen() -------> Rewards based
-                                      on blocks used
-                                      Gold / Silver / Bronze
+    Player->>Blockchain: startMission()
+    Blockchain->>CRE: MissionStarted event
+    CRE->>CRE: VRF picks Carmen's location
+    CRE->>CRE: Generate AI briefing
+    CRE-->>Player: Briefing (text/audio)
+
+    Player->>Blockchain: submitInvestigation()
+    Blockchain->>CRE: InvestigationSubmitted event
+    CRE->>CRE: VRF: true clue (70%) or false lead (30%)
+    CRE->>CRE: Call OpenAI + ElevenLabs
+    CRE-->>Player: Clue (text or audio)
+
+    Player->>Blockchain: captureCarmen()
+    Blockchain->>CRE: CarmenCaptured event
+    CRE->>CRE: Calculate rewards (Gold/Silver/Bronze)
+    CRE-->>Player: Rewards based on blocks used
 ```
 
 ## 🔗 Chainlink Integration: The Heart of the Game
@@ -109,23 +102,23 @@ Smart contracts alone **cannot** call AI APIs, generate audio, or orchestrate co
 
 ## Architecture
 
+```mermaid
+graph TD
+    A["🎮 Ethereum Sepolia<br/>GameMaster.sol<br/>(HQ Central)"]
+    B["🏯 Arbitrum Sepolia<br/>CityNode.sol<br/>(Tokyo)"]
+    C["🗼 Base Sepolia<br/>CityNode.sol<br/>(Paris)"]
+    
+    A -->|Carmen's Location| B
+    A -->|Carmen's Location| C
+    B -->|Investigation| A
+    C -->|Investigation| A
+    
+    style A fill:#375BD2,stroke:#fff,color:#fff
+    style B fill:#FF6B6B,stroke:#fff,color:#fff
+    style C fill:#FF6B6B,stroke:#fff,color:#fff
 ```
-                          Ethereum Sepolia
-                         ┌─────────────────┐
-                         │  GameMaster.sol  │
-                         │  (HQ Central)    │
-                         └────────┬────────┘
-                                  │
-                    ┌─────────────┼─────────────┐
-                    │                           │
-          Arbitrum Sepolia              Base Sepolia
-         ┌──────────────┐            ┌──────────────┐
-         │ CityNode.sol │            │ CityNode.sol │
-         │   "Tokyo"    │            │   "Paris"    │
-         └──────────────┘            └──────────────┘
 
-Each blockchain = A city where Carmen might be hiding
-```
+**Each blockchain = A city where Carmen might be hiding**
 
 ## Tech Stack
 
