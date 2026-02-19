@@ -305,36 +305,53 @@ function isPlayerRegistered(address playerAddress) external view returns (bool)
 ## Data Flow
 
 ### 1. Registration Flow
-```
-User → Google OAuth → Privy Embedded Wallet → Sign Message → 
-Relayer (3001) → Validate Signature → registerPlayer() → 
-PlayerRegistry → localStorage persistence
+
+```mermaid
+graph LR
+    A["👤 User"] -->|Google OAuth| B["🔐 Privy"]
+    B -->|Embedded Wallet| C["Sign Message"]
+    C -->|POST /relay| D["🔗 Relayer"]
+    D -->|Validate Signature| E["ECDSA Recovery"]
+    E -->|registerPlayer| F["⛓️ PlayerRegistry"]
+    F -->|Store| G["💾 localStorage"]
 ```
 
 ### 2. Mission Start Flow
-```
-startMission() → VRF Request → fulfillRandomWords() → 
-Carmen Location Set → MissionStarted Event → 
-CRE Listens → generate-briefing Workflow → 
-OpenAI + ElevenLabs → IPFS Upload → 
-receiveClue() via Keystone → Frontend Decrypts
+
+```mermaid
+graph LR
+    A["startMission()"] -->|VRF Request| B["🎲 VRF Coordinator"]
+    B -->|fulfillRandomWords| C["Carmen Location Set"]
+    C -->|MissionStarted Event| D["🤖 CRE"]
+    D -->|generate-briefing| E["OpenAI + ElevenLabs"]
+    E -->|IPFS Upload| F["📦 Pinata"]
+    F -->|receiveClue via Keystone| G["🎮 Frontend"]
+    G -->|ECIES Decrypt| H["Display Briefing"]
 ```
 
 ### 3. Investigation Flow
-```
-submitInvestigation(chainId) → VRF Request → fulfillRandomWords() → 
-Clue Type Determined → InvestigationSubmitted Event → 
-CRE Listens → generate-clue Workflow → 
-OpenAI + ElevenLabs → IPFS Upload → 
-receiveClue() via Keystone → Frontend Decrypts
+
+```mermaid
+graph LR
+    A["submitInvestigation()"] -->|VRF Request| B["🎲 VRF Coordinator"]
+    B -->|fulfillRandomWords| C["Clue Type Determined"]
+    C -->|InvestigationSubmitted Event| D["🤖 CRE"]
+    D -->|generate-clue| E["OpenAI + ElevenLabs"]
+    E -->|IPFS Upload| F["📦 Pinata"]
+    F -->|receiveClue via Keystone| G["🎮 Frontend"]
+    G -->|ECIES Decrypt| H["Display Clue"]
 ```
 
 ### 4. Capture Flow
-```
-captureCarmen() → Check Carmen Location → 
-CarmenCaptured Event → Mint NFT → 
-CRE Listens → generate-finale Workflow → 
-Personalized Ending → Frontend Displays
+
+```mermaid
+graph LR
+    A["captureCarmen()"] -->|Check Location| B["Verify Carmen Here"]
+    B -->|CarmenCaptured Event| C["Mint NFT"]
+    C -->|Event Trigger| D["🤖 CRE"]
+    D -->|generate-finale| E["OpenAI + ElevenLabs"]
+    E -->|Personalized Ending| F["🎮 Frontend"]
+    F -->|Display| G["Mission Complete!"]
 ```
 
 ---

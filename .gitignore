@@ -51,6 +51,7 @@ CLAUDE.md
 # Build scripts and utilities
 generate-diagrams.js
 scripts/
+chainlink-functions/
 
 # Documentation (generated)
 DECENTRALIZED_DEPLOYMENT.md
