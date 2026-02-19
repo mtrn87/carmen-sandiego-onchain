@@ -29,105 +29,61 @@ Carmen Sandiego On-Chain is a decentralized mystery game where **Chainlink Runti
 
 ## System Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        PLAYER (Browser)                                 │
-│  React 18 + Zustand + Privy Auth + ECIES (IndexedDB private key)       │
-│  Gasless Registration: Google OAuth → Embedded Wallet → Signature      │
-└────────┬──────────────────────────────┬─────────────────────────────────┘
-         │ tx (ethers v6)              │ decrypt clues (ECIES)
-         │                             │
-         ▼                             ▼
-┌────────────────────────────────────────────────────┐
-│              SEPOLIA (HQ - GameMaster)             │
-│                                                    │
-│  ┌──────────────────────────────────────────────┐ │
-│  │ GameMaster.sol                               │ │
-│  │ ├─ registerPlayer(pubKey)                    │ │
-│  │ ├─ startMission() → VRF request              │ │
-│  │ ├─ submitInvestigation(chainId) → VRF       │ │
-│  │ ├─ captureCarmen() → Mint NFT               │ │
-│  │ └─ receiveClue() [CRE writes via Keystone]  │ │
-│  └──────────────────────────────────────────────┘ │
-│                                                    │
-│  ┌──────────────────────────────────────────────┐ │
-│  │ GameMasterProxy (ReceiverTemplate)           │ │
-│  │ ├─ Routes CRE reports to GameMaster          │ │
-│  │ └─ Validates Keystone signatures             │ │
-│  └──────────────────────────────────────────────┘ │
-│                                                    │
-│  ┌──────────────────────────────────────────────┐ │
-│  │ MissionNFT.sol (ERC-721)                     │ │
-│  │ └─ Trophy minted on Carmen capture           │ │
-│  └──────────────────────────────────────────────┘ │
-│                                                    │
-│  ┌──────────────────────────────────────────────┐ │
-│  │ VRF Coordinator Integration                  │ │
-│  │ ├─ Randomness for Carmen's location          │ │
-│  │ ├─ Clue type (text/audio)                    │ │
-│  │ └─ Clue veracity (70% true / 30% false)      │ │
-│  └──────────────────────────────────────────────┘ │
-└────────┬──────────────────────────────────────────┘
-         │
-         ├─────────────────────────────────────────────────────────┐
-         │                                                         │
-         ▼                                                         ▼
-┌──────────────────────────────────┐         ┌──────────────────────────────┐
-│   ARBITRUM SEPOLIA (Tokyo)       │         │   BASE SEPOLIA (Paris)       │
-│                                  │         │                              │
-│  CityNode.sol                    │         │  CityNode.sol                │
-│  ├─ updateCarmenPresence()       │         │  ├─ updateCarmenPresence()  │
-│  └─ getCarmenStatus() [view]     │         │  └─ getCarmenStatus() [view]│
-└──────────────────────────────────┘         └──────────────────────────────┘
-         ▲                                            ▲
-         └────────────────────┬─────────────────────┘
-                              │
-                              │ CRE writes via
-                              │ cross-chain calls
-                              │
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    CRE WORKFLOWS (Chainlink Runtime)                    │
-│                                                                         │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────┐ │
-│  │ mission-start    │  │ generate-briefing│  │ carmen-moves         │ │
-│  │ (Event trigger)  │  │ (Event trigger)  │  │ (Cron 3 min)         │ │
-│  │                  │  │                  │  │                      │ │
-│  │ Listens:         │  │ Listens:         │  │ Reads:               │ │
-│  │ MissionStarted   │  │ MissionStarted   │  │ getMission()         │ │
-│  │                  │  │                  │  │ getMissionSalt()     │ │
-│  │ Reads:           │  │ Reads:           │  │ getValidCities()     │ │
-│  │ getMissionSalt   │  │ getPlayerPubKey  │  │                      │ │
-│  │ getValidCities   │  │ getValidCities   │  │ Writes:              │ │
-│  │ getMission       │  │ getMission       │  │ updateTarget()       │ │
-│  │                  │  │                  │  │ (via Keystone)       │ │
-│  │ Logic:           │  │ Logic:           │  │                      │ │
-│  │ Brute-force hash │  │ Call OpenAI      │  │ Logic:               │ │
-│  │ → city selection │  │ Generate briefing│  │ Pick random city     │ │
-│  │ Select clue      │  │ Call ElevenLabs  │  │ Update presence      │ │
-│  │ ECIES encrypt    │  │ Generate audio   │  │                      │ │
-│  │                  │  │ Log to IPFS      │  │                      │ │
-│  │ Writes:          │  │                  │  │                      │ │
-│  │ receiveClue()    │  │ (MVP: no write)  │  │                      │ │
-│  │ (via Keystone)   │  │                  │  │                      │ │
-│  └──────────────────┘  └──────────────────┘  └──────────────────────┘ │
-│                                                                         │
-│  ┌──────────────────────────────────────────────────────────────────┐ │
-│  │ generate-finale (Event trigger: CarmenCaptured)                  │ │
-│  │ ├─ Reads: getMission(), getPlayerStats()                        │ │
-│  │ ├─ Logic: Generate personalized ending based on gameplay        │ │
-│  │ └─ Output: Log finale narrative + audio                         │ │
-│  └──────────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────────┘
-         ▲
-         │ Keystone
-         │ (signed reports)
-         │
-┌────────┴──────────────────────────────────────────────────────────────┐
-│                   CHAINLINK KEYSTONE (Report Router)                  │
-│  ├─ Receives signed CRE workflow outputs                             │
-│  ├─ Validates signatures                                             │
-│  └─ Routes to GameMasterProxy on Sepolia                             │
-└────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Player["🎮 PLAYER (Browser)"]
+        React["React 18 + Zustand<br/>Privy Auth<br/>ECIES Encryption<br/>Google OAuth"]
+    end
+
+    subgraph Sepolia["⛓️ SEPOLIA (HQ)"]
+        GameMaster["GameMaster.sol<br/>registerPlayer(pubKey)<br/>startMission() → VRF<br/>submitInvestigation() → VRF<br/>captureCarmen() → Mint NFT<br/>receiveClue() via Keystone"]
+        Proxy["GameMasterProxy<br/>Routes CRE reports<br/>Validates Keystone sig"]
+        NFT["MissionNFT.sol<br/>ERC-721 Trophy<br/>Minted on capture"]
+        VRF["VRF Coordinator<br/>Carmen's location<br/>Clue type (text/audio)<br/>Veracity 70%/30%"]
+    end
+
+    subgraph Cities["🌍 CITY CHAINS"]
+        Tokyo["Arbitrum Sepolia<br/>CityNode.sol<br/>Tokyo<br/>updateCarmenPresence()<br/>getCarmenStatus()"]
+        Paris["Base Sepolia<br/>CityNode.sol<br/>Paris<br/>updateCarmenPresence()<br/>getCarmenStatus()"]
+    end
+
+    subgraph CRE["🤖 CRE WORKFLOWS (Chainlink Runtime)"]
+        MissionStart["mission-start<br/>Trigger: MissionStarted<br/>Reads: getMissionSalt, getValidCities<br/>Logic: Brute-force hash → city<br/>Writes: receiveClue()"]
+        GenBriefing["generate-briefing<br/>Trigger: MissionStarted<br/>Reads: getPlayerPubKey<br/>Logic: OpenAI + ElevenLabs<br/>Output: Briefing + audio"]
+        CarmenMoves["carmen-moves<br/>Trigger: Cron 3min<br/>Reads: getMission()<br/>Logic: Pick random city<br/>Writes: updateTarget()"]
+        GenFinale["generate-finale<br/>Trigger: CarmenCaptured<br/>Reads: getMission, getPlayerStats<br/>Logic: Personalized ending<br/>Output: Narrative + audio"]
+    end
+
+    subgraph Keystone["🔐 CHAINLINK KEYSTONE"]
+        Router["Report Router<br/>Receives signed CRE outputs<br/>Validates signatures<br/>Routes to GameMasterProxy"]
+    end
+
+    Player -->|tx ethers.js| GameMaster
+    Player -->|decrypt ECIES| Player
+    
+    GameMaster --> VRF
+    GameMaster --> Proxy
+    GameMaster --> NFT
+    
+    GameMaster -->|Cross-chain| Tokyo
+    GameMaster -->|Cross-chain| Paris
+    
+    GameMaster -->|Events| MissionStart
+    GameMaster -->|Events| GenBriefing
+    
+    MissionStart -->|Keystone sign| Router
+    GenBriefing -->|Keystone sign| Router
+    CarmenMoves -->|Keystone sign| Router
+    GenFinale -->|Keystone sign| Router
+    
+    Router -->|receiveClue| Proxy
+    Proxy -->|call| GameMaster
+    
+    style Player fill:#e1f5ff
+    style Sepolia fill:#f3e5f5
+    style Cities fill:#ede7f6
+    style CRE fill:#fce4ec
+    style Keystone fill:#f1f8e9
 ```
 
 ---
