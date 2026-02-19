@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+.env.local
+.env.*.local
+README.md
+COOLIFY_DEPLOYMENT.md
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode
+.idea

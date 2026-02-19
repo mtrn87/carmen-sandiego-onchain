@@ -2,16 +2,23 @@
   <img src="./.github/assets/logo.png" alt="Where in the Web3 World is Carmen Sandiego?" width="500"/>
 </p>
 
-<h3 align="center">A Decentralized Mystery Across the Blockchain</h3>
+<h1 align="center">Where in the Web3 World is Carmen Sandiego?</h1>
+
+<h3 align="center">🎮 A Fully Decentralized AI-Powered Mystery Game on Blockchain</h3>
 
 <p align="center">
   <a href="https://chain.link/hackathon"><img src="https://img.shields.io/badge/Chainlink-Convergence%20Hackathon-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="Chainlink Convergence"/></a>
-  <a href="#"><img src="https://img.shields.io/badge/Powered%20by-CRE%20%2B%20AI-FF6B6B?style=for-the-badge" alt="CRE + AI"/></a>
+  <a href="#"><img src="https://img.shields.io/badge/Powered%20by-Chainlink%20CRE-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="Chainlink CRE"/></a>
   <a href="#"><img src="https://img.shields.io/badge/VRF-v2.5-9B59B6?style=for-the-badge" alt="VRF v2.5"/></a>
+  <a href="#"><img src="https://img.shields.io/badge/Multi--Chain-Sepolia%20%7C%20Arbitrum%20%7C%20Base-FF6B6B?style=for-the-badge" alt="Multi-Chain"/></a>
 </p>
 
 <p align="center">
-  <strong>The first blockchain game where an AI-powered Game Master lives entirely on Chainlink CRE</strong>
+  <strong>🚀 The first blockchain game where an AI-powered Game Master lives entirely on Chainlink Runtime Environment (CRE)</strong>
+</p>
+
+<p align="center">
+  <em>Provably fair • AI-driven gameplay • Cross-chain orchestration • Gasless registration</em>
 </p>
 
 ---
@@ -55,11 +62,15 @@ Every mission is **unique**. Every clue is **generated in real-time by AI**. Eve
                                       Gold / Silver / Bronze
 ```
 
-## Why CRE is the Star
+## 🔗 Chainlink Integration: The Heart of the Game
 
-Smart contracts alone **cannot** call AI APIs, generate audio, or orchestrate complex workflows. **Chainlink Runtime Environment (CRE)** makes all of this possible:
+This project is built entirely on **Chainlink's cutting-edge infrastructure**. Without Chainlink, this game would be impossible:
 
-| Capability                          | Without CRE          | With CRE               |
+### Why Chainlink CRE is Essential
+
+Smart contracts alone **cannot** call AI APIs, generate audio, or orchestrate complex workflows. **Chainlink Runtime Environment (CRE)** is the breakthrough that makes this possible:
+
+| Capability                          | Traditional Approach | With Chainlink CRE     |
 | ----------------------------------- | -------------------- | ---------------------- |
 | Call OpenAI for dynamic clues       | Impossible           | Native HTTP Fetch      |
 | Generate witness audio (TTS)        | Impossible           | ElevenLabs integration |
@@ -67,21 +78,30 @@ Smart contracts alone **cannot** call AI APIs, generate audio, or orchestrate co
 | Read/write across multiple chains   | Requires bridges     | Native EVM Read/Write  |
 | Gas cost for game logic             | Prohibitive          | Off-chain = $0         |
 
-### CRE Workflows
+### Chainlink Services Used
 
-| Workflow           | Trigger                      | What it does                                        |
-| ------------------ | ---------------------------- | --------------------------------------------------- |
-| `generateBriefing` | MissionStarted event         | Creates unique mission narrative + audio via AI     |
-| `generateClue`     | InvestigationSubmitted event | Generates text/audio clues based on player progress |
-| `carmenMoves`      | Cron / conditions            | Carmen flees to a different chain                   |
-| `generateFinale`   | CarmenCaptured event         | Personalized ending based on gameplay               |
+| Service           | Purpose                                                                           | Implementation                                  |
+| ----------------- | --------------------------------------------------------------------------------- | ----------------------------------------------- |
+| **CRE**           | Game Master Brain - Orchestrates AI, generates content, manages cross-chain state | 4 TypeScript workflows for complete game logic  |
+| **VRF v2.5**      | Provably fair randomness for Carmen's location, clue types, and veracity          | Integrated in GameMaster.sol                    |
+| **Automation**    | Cron-based Carmen movement across chains                                         | Scheduled workflow execution                    |
 
-## Chainlink Stack
+### CRE Workflows Architecture
 
-| Service      | Role              | How it's used                                                                      |
-| ------------ | ----------------- | ---------------------------------------------------------------------------------- |
-| **CRE**      | Game Master Brain | Orchestrates all AI services, generates dynamic content, manages cross-chain state |
-| **VRF v2.5** | Randomness        | Carmen's location, clue type (text/audio), clue veracity (true 70% / false 30%)    |
+| Workflow           | Trigger                      | AI Services Used                                | Output                                    |
+| ------------------ | ---------------------------- | ----------------------------------------------- | ----------------------------------------- |
+| `generateBriefing` | MissionStarted event         | OpenAI GPT-4o-mini + ElevenLabs TTS             | Text briefing + audio narration            |
+| `generateClue`     | InvestigationSubmitted event | OpenAI GPT-4o-mini + ElevenLabs TTS             | Dynamic clue + audio witness              |
+| `carmenMoves`      | Cron schedule / conditions   | VRF for chain selection                         | Carmen relocates to random chain          |
+| `generateFinale`   | CarmenCaptured event         | OpenAI GPT-4o-mini + ElevenLabs TTS             | Personalized ending based on gameplay     |
+
+### Key Chainlink Features Leveraged
+
+✅ **Decentralized Execution** - Game logic runs on Chainlink nodes, not centralized servers  
+✅ **Cross-Chain Orchestration** - Single workflow manages state across Sepolia, Arbitrum, and Base  
+✅ **Provable Fairness** - VRF ensures Carmen's location and clues are cryptographically random  
+✅ **Real-time AI Integration** - Direct API calls to OpenAI and ElevenLabs from on-chain workflows  
+✅ **Gasless User Experience** - Off-chain computation means zero gas for game logic
 
 ## Architecture
 
@@ -169,21 +189,25 @@ Performance is measured by blocks elapsed since mission start:
 | 36-50       | Bronze | 50 points  |
 | 51+         | Failed | 0          |
 
-## Documentation
+## 📚 Documentation
 
-### For Hackathon Evaluators
-- [Technical Overview](docs/TECHNICAL_OVERVIEW.md) -- Complete technical breakdown for evaluators
-- [System Diagrams](docs/SYSTEM_DIAGRAMS.md) -- Visual architecture and flow diagrams (Mermaid)
-- [Innovation](docs/INNOVATION.md) -- Why this project is innovative and what makes it unique
-- [System Flows](docs/SYSTEM_FLOWS.md) -- Detailed step-by-step flows for all major interactions
+### 🎯 For Hackathon Evaluators
+Start here to understand the innovation and technical depth:
 
-### For Developers
-- [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) -- Complete setup and deployment instructions
-- [Architecture](docs/ARCHITECTURE.md) -- System architecture and contract design
-- [On-Chain Flow](docs/onchain-flow.md) -- Complete technical flow of all on-chain interactions
-- [.env.example](.env.example) -- Environment variables reference
+- **[Technical Overview](docs/TECHNICAL_OVERVIEW.md)** - Complete technical breakdown of Chainlink integration
+- **[System Diagrams](docs/SYSTEM_DIAGRAMS.md)** - Visual architecture and flow diagrams (Mermaid)
+- **[Innovation](docs/INNOVATION.md)** - Why this project is innovative and unique
+- **[System Flows](docs/SYSTEM_FLOWS.md)** - Detailed step-by-step flows for all major interactions
 
-### Setup & Getting Started
+### 👨‍💻 For Developers
+Complete guides for setup, deployment, and development:
+
+- **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md)** - Complete setup and deployment instructions
+- **[Architecture](docs/ARCHITECTURE.md)** - System architecture and contract design
+- **[On-Chain Flow](docs/onchain-flow.md)** - Complete technical flow of all on-chain interactions
+- **[.env.example](.env.example)** - Environment variables reference
+
+### 🚀 Quick Start
 1. **Local Development:** See [Deployment Guide - Local Setup](docs/DEPLOYMENT_GUIDE.md#local-development-setup)
 2. **Testnet Deployment:** See [Deployment Guide - Testnet](docs/DEPLOYMENT_GUIDE.md#testnet-deployment)
 3. **Understanding the System:** Start with [Technical Overview](docs/TECHNICAL_OVERVIEW.md)
