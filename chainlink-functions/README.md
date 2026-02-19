@@ -2,6 +2,8 @@
 
 Gasless registration relayer for Carmen Sandiego On-Chain game.
 
+**📚 [Back to Documentation Index](../docs/INDEX.md)** | **[Deployment Guide](./RELAYER_DEPLOY_COOLIFY.md)**
+
 ## Quick Start
 
 ### Local Development

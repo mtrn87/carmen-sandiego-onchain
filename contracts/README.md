@@ -2,6 +2,8 @@
 
 Smart contracts for Carmen Sandiego On-Chain. Hardhat + Solidity 0.8.24.
 
+**📚 [Back to Documentation Index](../docs/INDEX.md)**
+
 ## Prerequisites
 
 - Node.js 20+ (22 recommended)

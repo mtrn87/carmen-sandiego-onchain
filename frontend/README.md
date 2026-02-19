@@ -2,6 +2,8 @@
 
 Interface do jogo Carmen Sandiego On-Chain. React 18 + Vite + Zustand + Privy Auth.
 
+**📚 [Back to Documentation Index](../docs/INDEX.md)** | **[Architecture](../docs/frontend-architecture.md)**
+
 ## Prerequisites
 
 - Node.js 20+ (22 recommended)

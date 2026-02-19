@@ -191,6 +191,8 @@ Performance is measured by blocks elapsed since mission start:
 
 ## 📚 Documentation
 
+**👉 [Complete Documentation Index](docs/INDEX.md)** - Start here for organized navigation
+
 ### 🎯 For Hackathon Evaluators
 Start here to understand the innovation and technical depth:
 
@@ -205,12 +207,20 @@ Complete guides for setup, deployment, and development:
 - **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md)** - Complete setup and deployment instructions
 - **[Architecture](docs/ARCHITECTURE.md)** - System architecture and contract design
 - **[On-Chain Flow](docs/onchain-flow.md)** - Complete technical flow of all on-chain interactions
-- **[.env.example](.env.example)** - Environment variables reference
+
+### 🔧 Component-Specific Setup
+Each component has its own README with detailed setup instructions:
+
+- **[Contracts](contracts/README.md)** - Smart contracts (Hardhat + Solidity)
+- **[Frontend](frontend/README.md)** - React game interface
+- **[CRE Workflows](cre-workflows/README.md)** - Chainlink CRE workflows
+- **[Relayer](chainlink-functions/README.md)** - Gasless registration relayer
 
 ### 🚀 Quick Start
 1. **Local Development:** See [Deployment Guide - Local Setup](docs/DEPLOYMENT_GUIDE.md#local-development-setup)
 2. **Testnet Deployment:** See [Deployment Guide - Testnet](docs/DEPLOYMENT_GUIDE.md#testnet-deployment)
 3. **Understanding the System:** Start with [Technical Overview](docs/TECHNICAL_OVERVIEW.md)
+4. **Full Documentation:** See [Documentation Index](docs/INDEX.md)
 
 ## Team
 
