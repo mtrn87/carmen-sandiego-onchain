@@ -2,81 +2,57 @@
 
 ## Visão Geral
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                            PLAYER (Browser)                             │
-│  React 18 + Zustand + Privy Auth + ECIES (IndexedDB private key)       │
-│  Google OAuth → Embedded Wallet → Gasless Registration                 │
-└────────┬──────────────────────────┬─────────────────────────────────────┘
-         │ tx (ethers v6)              │ decrypt clues (ecies.js)
-         │                             │
-         ├─────────────────────────────┤
-         │                             │
-         ▼                             ▼
-┌──────────────────────┐      ┌──────────────────────┐
-│ RELAYER SERVER (3001)│      │  SEPOLIA (HQ)        │
-│                      │      │  ┌──────────────┐    │
-│ Validate Signature   │      │  │  GameMaster   │    │
-│ Call registerPlayer()│      │  │  (commit-     │    │
-│ Pay Gas (~$0.50)     │      │  │   reveal)     │    │
-└──────────────────────┘      │  └──────┬───────┘    │
-         ▲                     │         │ called     │
-         │                     │         │ by proxy   │
-    Sign Message              │  ┌──────▼───────┐    │
-    (Privy)                   │  │ GameMaster   │◄───┼── KeystoneForwarder ◄── CRE Workflows
-                              │  │ Proxy        │    │   (signed reports)      (off-chain WASM)
-                              │  └──────────────┘    │                         │
-                              │  ┌──────────────┐    │                         │
-                              │  │  MissionNFT  │◄───┼── mint on capture       │
-                              │  │  (ERC-721)   │    │                         │
-                              │  └──────────────┘    │                         │
-                              │  ┌──────────────┐    │                         │
-                              │  │PlayerRegistry│◄───┼── Store player data     │
-                              │  │  (nonces)    │    │                         │
-                              │  └──────────────┘    │                         │
-                              └──────────────────────┘                         │
-                                               │
-┌──────────────────────────────────────────────┴──────────────────────┐
-│                      CRE WORKFLOWS (Chainlink Runtime)              │
-│                                                                     │
-│  ┌─────────────────┐  ┌──────────────────┐  ┌──────────────────┐   │
-│  │ mission-start   │  │ generate-briefing│  │ carmen-moves     │   │
-│  │ (Event trigger) │  │ (Event trigger)  │  │ (Cron 3 min)     │   │
-│  │                 │  │                  │  │                  │   │
-│  │ Listen:         │  │ Listen:          │  │ Reads:           │   │
-│  │ Investigation-  │  │ MissionStarted   │  │ getMission()     │   │
-│  │ Submitted       │  │                  │  │ getMissionSalt() │   │
-│  │                 │  │ Reads:           │  │ getValidCities() │   │
-│  │ Reads:          │  │ getPlayerPubKey  │  │                  │   │
-│  │ getMissionSalt  │  │ getValidCities   │  │ Writes:          │   │
-│  │ getValidCities  │  │ getMission       │  │ ACTION=3         │   │
-│  │ getMission      │  │                  │  │ updateTarget()   │   │
-│  │ getPlayerPubKey │  │ Output:          │  └──────────────────┘   │
-│  │                 │  │ Log briefing     │                         │
-│  │ Logic:          │  │ (MVP, no write)  │                         │
-│  │ brute-force     │  └──────────────────┘                         │
-│  │ hash → city     │                                               │
-│  │ select clue     │                                               │
-│  │ ECIES encrypt   │                                               │
-│  │                 │                                               │
-│  │ Writes:         │                                               │
-│  │ ACTION=1        │                                               │
-│  │ receiveClue()   │                                               │
-│  │ ACTION=2 (auto) │                                               │
-│  │ resolveCapture()│                                               │
-│  └─────────────────┘                                               │
-└────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Frontend["🎮 FRONTEND (Browser)"]
+        React["React 18 + Zustand<br/>Privy Auth<br/>ECIES Encryption"]
+        Wallet["Google OAuth<br/>Embedded Wallet<br/>IndexedDB Keys"]
+    end
 
-┌───────────────────────────────────────────────────────────────────┐
-│                    CITY CHAINS (CityNode.sol)                     │
-│                                                                   │
-│  Arbitrum Sepolia    Base Sepolia       XDC Apothem               │
-│  (Tokyo)             (Paris)            (London)                  │
-│  chainId: 421614     chainId: 84532     chainId: 51              │
-│                                                                   │
-│  CRE → updateCarmenPresence(missionId, bool)                     │
-│  Player → getCarmenStatus(missionId) view                        │
-└───────────────────────────────────────────────────────────────────┘
+    subgraph Relayer["🔗 RELAYER (3001)"]
+        Validate["Validate Signature<br/>ECDSA Recovery"]
+        Register["Call registerPlayer()<br/>Pay Gas ~$0.50"]
+    end
+
+    subgraph Sepolia["⛓️ SEPOLIA (HQ)"]
+        GameMaster["GameMaster.sol<br/>VRF Consumer<br/>State Manager"]
+        Proxy["GameMasterProxy<br/>CRE Router<br/>Keystone Validator"]
+        NFT["MissionNFT.sol<br/>ERC-721 Trophy"]
+        Registry["PlayerRegistry.sol<br/>Player Data"]
+    end
+
+    subgraph CRE["🤖 CRE WORKFLOWS"]
+        MissionStart["mission-start<br/>Event Trigger"]
+        GenBriefing["generate-briefing<br/>OpenAI + TTS"]
+        CarmenMoves["carmen-moves<br/>Cron 3min"]
+        GenFinale["generate-finale<br/>Personalized"]
+    end
+
+    subgraph Cities["🌍 CITY CHAINS"]
+        Tokyo["CityNode<br/>Arbitrum<br/>Tokyo"]
+        Paris["CityNode<br/>Base<br/>Paris"]
+    end
+
+    Frontend -->|Sign Message| Relayer
+    Relayer -->|registerPlayer| Registry
+    Registry -->|Store| Sepolia
+    
+    Frontend -->|startMission| GameMaster
+    GameMaster -->|VRF Request| GameMaster
+    GameMaster -->|Events| CRE
+    
+    CRE -->|HTTP Fetch| GenBriefing
+    CRE -->|Keystone Sign| Proxy
+    Proxy -->|receiveClue| GameMaster
+    
+    GameMaster -->|Cross-chain| Cities
+    GameMaster -->|Mint| NFT
+    
+    style Frontend fill:#e1f5ff
+    style Relayer fill:#fff3e0
+    style Sepolia fill:#f3e5f5
+    style CRE fill:#fce4ec
+    style Cities fill:#ede7f6
 ```
 
 ---

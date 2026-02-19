@@ -190,50 +190,32 @@ Carmen Sandiego On-Chain is a decentralized mystery game where **Chainlink Runti
 
 ### Architecture
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    FRONTEND (5173)                           │
-│  React + Privy + ethers.js                                  │
-│                                                              │
-│  1. Google OAuth → Privy                                    │
-│  2. Embedded Wallet created                                 │
-│  3. User enters nickname                                    │
-│  4. messageHash = keccak256(address, nickname, nonce, ...)  │
-│  5. signature = privySignMessage(messageHash)               │
-│  6. POST /relay {address, nickname, signature, nonce}       │
-└──────────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌──────────────────────────────────────────────────────────────┐
-│            CHAINLINK FUNCTIONS RELAYER (3001)                │
-│  Node.js server (wallet: 0xb19eE81581AE385F56D702d412D92d70)│
-│                                                              │
-│  1. Receive signed registration request                      │
-│  2. Validate signature via ECDSA recovery                    │
-│  3. Call registerPlayer(address, nickname)                  │
-│  4. Return txHash + blockNumber                             │
-│  5. Server pays gas (~50k gas ≈ $0.50 on Sepolia)          │
-└──────────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌──────────────────────────────────────────────────────────────┐
-│           PLAYERREGISTRY.SOL (Sepolia)                       │
-│  0x40cfae50af62D18480bb588b7554b07d6dFE13e7                 │
-│                                                              │
-│  registerPlayer(address, nickname)                          │
-│  ├─ Verify caller is GameMaster (relayer)                   │
-│  ├─ Create Player struct                                    │
-│  ├─ Store in mapping(address => Player)                     │
-│  └─ Emit PlayerRegistered event                             │
-└──────────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌──────────────────────────────────────────────────────────────┐
-│              FRONTEND (localStorage)                         │
-│  Save: player_registered_address = address                  │
-│  Save: player_nickname = nickname                           │
-│  Next login: Check if player exists → Skip nickname modal   │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    participant Frontend as 🎮 Frontend (5173)
+    participant Relayer as 🔗 Relayer (3001)
+    participant Contract as ⛓️ PlayerRegistry
+    participant Storage as 💾 localStorage
+
+    Frontend->>Frontend: Google OAuth → Privy
+    Frontend->>Frontend: Embedded Wallet created
+    Frontend->>Frontend: User enters nickname
+    Frontend->>Frontend: messageHash = keccak256(...)
+    Frontend->>Frontend: signature = privySignMessage()
+    
+    Frontend->>Relayer: POST /relay {address, nickname, signature}
+    
+    Relayer->>Relayer: Validate signature via ECDSA
+    Relayer->>Contract: registerPlayer(address, nickname)
+    Contract->>Contract: Verify caller is GameMaster
+    Contract->>Contract: Create Player struct
+    Contract->>Contract: Emit PlayerRegistered event
+    
+    Relayer-->>Frontend: {success: true, txHash, blockNumber}
+    
+    Frontend->>Storage: Save player_registered_address
+    Frontend->>Storage: Save player_nickname
+    Frontend->>Frontend: Navigate to /game
 ```
 
 ### Security Features
