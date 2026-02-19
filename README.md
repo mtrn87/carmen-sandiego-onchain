@@ -21,6 +21,10 @@
   <em>Provably fair • AI-driven gameplay • Cross-chain orchestration • Gasless registration</em>
 </p>
 
+<p align="center">
+  <a href="https://instagram.com/carmenweb3"><img src="https://img.shields.io/badge/Instagram-@carmenweb3-E4405F?style=flat-square&logo=instagram&logoColor=white" alt="Instagram"/></a>
+</p>
+
 ---
 
 ## The Mission
