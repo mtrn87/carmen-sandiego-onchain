@@ -1,0 +1,610 @@
+/**
+ * ================================================================
+ *  CRE Workflow: generate-finale
+ * ================================================================
+ *
+ *  PURPOSE:
+ *    Listens for the on-chain `CarmenCaptured` event emitted when a
+ *    player captures Carmen Sandiego. The workflow generates a unique
+ *    victory narrative, builds ERC-721 metadata with an SVG trophy
+ *    image, and sets the token URI on the MissionNFT contract via
+ *    the GameMasterProxy (ACTION_SET_TOKEN_URI = 6).
+ *
+ *  FLOW:
+ *    1. Decode CarmenCaptured(missionId, player, blocksUsed, reward) event
+ *    2. Read on-chain: getMission, getMissionClues, getValidCities
+ *    3. Determine reward tier (Gold/Silver/Bronze) and scenario context
+ *    4. Generate victory narrative (AI with enriched template fallback)
+ *    5. Build SVG trophy image (dynamic, noir-themed)
+ *    6. Construct ERC-721 metadata JSON as data URI
+ *    7. Send ACTION_SET_TOKEN_URI via GameMasterProxy
+ *
+ *  AI GENERATION:
+ *    The workflow includes a full OpenAI integration (generateAIFinale)
+ *    for unique personalized endings. CRE WASM currently doesn't support
+ *    async/await, so the AI path uses buildEnrichedFinale as fallback.
+ *    When CRE v2 supports async handlers, enable with a one-line change.
+ *
+ *  NFT METADATA:
+ *    Uses on-chain data URI (data:application/json;base64,...) to avoid
+ *    IPFS dependency. The SVG trophy image is also embedded as a data URI.
+ *    This approach is fully synchronous and works within CRE WASM.
+ *
+ *  CONFIG:
+ *    - chainSelectorName, gameMasterAddress, proxyAddress, gasLimit
+ *    - openaiApiKey: OpenAI API key (optional — empty = use fallback)
+ *    - openaiModel: model to use (e.g. "gpt-4o-mini")
+ *
+ *  IMPORTANT CONSTRAINTS:
+ *    - Handler must be synchronous (async AI calls are behind TODO)
+ *    - .result() for blocking EVM reads
+ * ================================================================
+ */
+
+import {
+  EVMClient,
+  handler,
+  Runner,
+  getNetwork,
+  hexToBase64,
+  bytesToHex,
+  encodeCallMsg,
+  LATEST_BLOCK_NUMBER,
+  type Runtime,
+  type EVMLog,
+} from "@chainlink/cre-sdk"
+import {
+  keccak256,
+  toBytes,
+  encodeFunctionData,
+  decodeFunctionResult,
+  decodeEventLog,
+  encodeAbiParameters,
+  parseAbiParameters,
+  parseAbi,
+  zeroAddress,
+} from "viem"
+
+// ============================================================
+//  Config — populated from workflow.yaml target settings
+// ============================================================
+type Config = {
+  chainSelectorName: string
+  gameMasterAddress: string
+  proxyAddress: string
+  gasLimit: string
+  openaiApiKey: string
+  openaiModel: string
+}
+
+// ============================================================
+//  ABI fragments
+// ============================================================
+const GameMasterABI = parseAbi([
+  "function getMission(uint256) view returns (address,uint256,bytes32,uint8,uint8,uint8)",
+  "function getMissionSalt(uint256) view returns (bytes32)",
+  "function getValidCities() view returns (uint256[])",
+  "function getMissionClues(uint256) view returns ((uint8,bytes32,string,uint256,uint8)[])",
+  "function getMissionEvidenceCount(uint256) view returns (uint8)",
+  "function getMissionFragmentCount(uint256) view returns (uint8)",
+  "event CarmenCaptured(uint256 indexed missionId, address indexed player, uint256 blocksUsed, uint256 reward)",
+])
+
+// ============================================================
+//  Scenarios
+// ============================================================
+import scenariosData from "../data/scenarios.json"
+
+type ScenarioData = {
+  id: string
+  title: string
+  briefing: string
+  captureMessage: string
+  cities: Record<string, { name: string; emoji: string; chain: string }>
+  cityClues: Record<string, { landmark: string; culture: string }>
+}
+
+function getScenario(missionId: bigint): ScenarioData {
+  const scenarios = scenariosData.scenarios
+  if (!scenarios || scenarios.length === 0) {
+    throw new Error("No scenarios configured in scenarios.json")
+  }
+  const index = Number(missionId - BigInt(1)) % scenarios.length
+  return scenarios[index] as ScenarioData
+}
+
+const ACTION_SET_TOKEN_URI = 6
+
+// City name lookup by chain ID
+const CITY_NAMES: Record<string, string> = {
+  "421614": "Tokyo",
+  "84532": "Paris",
+  "51": "London",
+}
+
+const CHAIN_NAMES: Record<string, string> = {
+  "421614": "Arbitrum Sepolia",
+  "84532": "Base Sepolia",
+  "51": "XDC Apothem",
+}
+
+// ============================================================
+//  Helper: read contract
+// ============================================================
+function readContract(
+  evmClient: EVMClient,
+  runtime: Runtime<Config>,
+  address: string,
+  callData: `0x${string}`,
+): Uint8Array {
+  return evmClient
+    .callContract(runtime, {
+      call: encodeCallMsg({
+        from: zeroAddress,
+        to: address as `0x${string}`,
+        data: callData,
+      }),
+      blockNumber: LATEST_BLOCK_NUMBER,
+    })
+    .result()
+    .data
+}
+
+// ============================================================
+//  Reward tier from reward points
+// ============================================================
+function getRewardTier(reward: bigint): { name: string; color: string; accent: string } {
+  if (reward >= 100n) return { name: "GOLD", color: "#FFD700", accent: "#B8860B" }
+  if (reward >= 75n) return { name: "SILVER", color: "#C0C0C0", accent: "#808080" }
+  if (reward >= 50n) return { name: "BRONZE", color: "#CD7F32", accent: "#8B4513" }
+  return { name: "COPPER", color: "#B87333", accent: "#6B3A1F" }
+}
+
+// ============================================================
+//  SVG Trophy Image Generator
+// ============================================================
+function generateTrophySVG(
+  missionId: bigint,
+  scenario: ScenarioData,
+  tier: { name: string; color: string; accent: string },
+  cityName: string,
+  blocksUsed: bigint,
+  cluesCollected: number,
+  evidenceCount: number,
+): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a1a;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#1a0a2e;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="trophy" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:${tier.color};stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:${tier.accent};stop-opacity:1"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="400" height="500" fill="url(#bg)" rx="16"/>
+  <rect x="8" y="8" width="384" height="484" fill="none" stroke="${tier.color}" stroke-width="2" rx="12" opacity="0.6"/>
+  <text x="200" y="40" text-anchor="middle" fill="#666" font-family="monospace" font-size="10">ACME DETECTIVE AGENCY</text>
+  <text x="200" y="60" text-anchor="middle" fill="${tier.color}" font-family="monospace" font-size="14" font-weight="bold" filter="url(#glow)">MISSION COMPLETE</text>
+  <g transform="translate(200,155)">
+    <path d="M-40,-50 L40,-50 L50,-40 L30,0 L20,10 L20,30 L-20,30 L-20,10 L-30,0 L-50,-40 Z" fill="url(#trophy)" filter="url(#glow)"/>
+    <rect x="-25" y="30" width="50" height="8" fill="${tier.accent}" rx="2"/>
+    <rect x="-30" y="38" width="60" height="6" fill="${tier.color}" rx="2"/>
+    <circle cx="0" cy="-25" r="12" fill="none" stroke="${tier.accent}" stroke-width="2"/>
+    <text x="0" y="-20" text-anchor="middle" fill="${tier.accent}" font-family="monospace" font-size="12" font-weight="bold">${tier.name.charAt(0)}</text>
+  </g>
+  <text x="200" y="220" text-anchor="middle" fill="${tier.color}" font-family="monospace" font-size="20" font-weight="bold" filter="url(#glow)">${tier.name} RANK</text>
+  <line x1="40" y1="240" x2="360" y2="240" stroke="${tier.color}" stroke-width="1" opacity="0.3"/>
+  <text x="200" y="265" text-anchor="middle" fill="#ccc" font-family="monospace" font-size="11">MISSION #${missionId}</text>
+  <text x="200" y="285" text-anchor="middle" fill="#fff" font-family="monospace" font-size="10">${scenario.title.length > 35 ? scenario.title.slice(0, 32) + "..." : scenario.title}</text>
+  <line x1="40" y1="305" x2="360" y2="305" stroke="${tier.color}" stroke-width="1" opacity="0.3"/>
+  <text x="40" y="330" fill="#888" font-family="monospace" font-size="10">CAPTURED IN</text>
+  <text x="360" y="330" text-anchor="end" fill="#fff" font-family="monospace" font-size="10">${cityName}</text>
+  <text x="40" y="355" fill="#888" font-family="monospace" font-size="10">BLOCKS USED</text>
+  <text x="360" y="355" text-anchor="end" fill="#fff" font-family="monospace" font-size="10">${blocksUsed}</text>
+  <text x="40" y="380" fill="#888" font-family="monospace" font-size="10">CLUES COLLECTED</text>
+  <text x="360" y="380" text-anchor="end" fill="#fff" font-family="monospace" font-size="10">${cluesCollected}</text>
+  <text x="40" y="405" fill="#888" font-family="monospace" font-size="10">EVIDENCE GATHERED</text>
+  <text x="360" y="405" text-anchor="end" fill="#fff" font-family="monospace" font-size="10">${evidenceCount}</text>
+  <line x1="40" y1="425" x2="360" y2="425" stroke="${tier.color}" stroke-width="1" opacity="0.3"/>
+  <text x="200" y="450" text-anchor="middle" fill="#555" font-family="monospace" font-size="8">CARMEN SANDIEGO ON-CHAIN</text>
+  <text x="200" y="465" text-anchor="middle" fill="#555" font-family="monospace" font-size="8">CHAINLINK CRE + VRF v2.5</text>
+  <text x="200" y="485" text-anchor="middle" fill="${tier.color}" font-family="monospace" font-size="9" opacity="0.7">convergence hackathon 2025</text>
+</svg>`
+}
+
+// ============================================================
+//  AI Finale Generation (async — for CRE v2)
+// ============================================================
+async function generateAIFinale(
+  scenario: ScenarioData,
+  missionId: bigint,
+  cityName: string,
+  tierName: string,
+  blocksUsed: bigint,
+  cluesCollected: number,
+  apiKey: string,
+  model: string,
+  log: (msg: string) => void,
+): Promise<string> {
+  const systemPrompt = `You are the narrator for "Carmen Sandiego On-Chain," a blockchain mystery game. You write dramatic, satisfying mission completion narratives in noir detective style. Keep it under 200 words. Address the player as "detective." Reference blockchain terminology. Make it feel like the end of a great heist movie.`
+
+  const userPrompt = `Write a unique victory narrative for Mission #${missionId}.
+
+SCENARIO: "${scenario.title}"
+CAPTURE LOCATION: ${cityName}
+REWARD TIER: ${tierName}
+BLOCKS USED: ${blocksUsed}
+CLUES COLLECTED: ${cluesCollected}
+
+Requirements:
+- Open with the dramatic moment of capture
+- Reference the specific city and scenario
+- Mention the detective's performance (${tierName} rank)
+- Include a quip from Carmen as she's caught
+- End with a line about the detective's growing reputation
+- Write in English with noir detective tone
+- Keep under 200 words`
+
+  try {
+    log("Calling AI API for dynamic finale...")
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: 400,
+        temperature: 0.9,
+      }),
+    })
+
+    if (!response.ok) {
+      const errText = await response.text()
+      log(`AI API error (${response.status}): ${errText}`)
+      throw new Error(`AI API returned ${response.status}`)
+    }
+
+    const data = await response.json() as {
+      choices: Array<{ message: { content: string } }>
+    }
+
+    const narrativeText = data.choices?.[0]?.message?.content
+    if (!narrativeText) throw new Error("Empty AI response")
+
+    log(`AI finale generated (${narrativeText.length} chars)`)
+    return narrativeText
+  } catch (err) {
+    log(`AI generation failed: ${err}. Using enriched template.`)
+    return buildEnrichedFinale(scenario, missionId, cityName, tierName, blocksUsed, cluesCollected)
+  }
+}
+
+// ============================================================
+//  Enriched Finale Generation (synchronous fallback)
+// ============================================================
+function buildEnrichedFinale(
+  scenario: ScenarioData,
+  missionId: bigint,
+  cityName: string,
+  tierName: string,
+  blocksUsed: bigint,
+  cluesCollected: number,
+): string {
+  const captureBase = scenario.captureMessage || "Carmen Sandiego has been captured!"
+
+  const performanceComment =
+    tierName === "GOLD"
+      ? "Your flawless investigation earned the highest distinction. The blockchain remembers perfection."
+      : tierName === "SILVER"
+      ? "A thorough investigation — the on-chain evidence speaks for itself. Well done, detective."
+      : tierName === "BRONZE"
+      ? "Carmen put up a fight, but your persistence paid off. Every block counted."
+      : "Against all odds, you tracked her down. The chain never lies."
+
+  const carmenQuote =
+    tierName === "GOLD"
+      ? `"Impressive, detective. ${blocksUsed} blocks — I barely had time to finish my coffee. We'll meet again on-chain."`
+      : tierName === "SILVER"
+      ? `"Not bad, detective. You followed the hashes well. But next time, I'll use zero-knowledge proofs."`
+      : `"You got lucky this time, detective. The next heist will have more layers than a Merkle tree."`
+
+  return [
+    `╔══════════════════════════════════════════════╗`,
+    `║        MISSION #${missionId} — ${tierName} RANK${" ".repeat(Math.max(0, 18 - tierName.length - missionId.toString().length))}║`,
+    `╚══════════════════════════════════════════════╝`,
+    ``,
+    `OPERATION: ${scenario.title.toUpperCase()}`,
+    `LOCATION: ${cityName}`,
+    `BLOCKS: ${blocksUsed} | CLUES: ${cluesCollected}`,
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `FIELD REPORT:`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    ``,
+    captureBase,
+    ``,
+    `${performanceComment}`,
+    ``,
+    `Carmen's last words:`,
+    carmenQuote,
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `— Chief, ACME Detective Agency`,
+    `   "Another case closed on the blockchain."`,
+  ].join("\n")
+}
+
+// ============================================================
+//  Base64 encoding (works in CRE WASM)
+// ============================================================
+function toBase64(str: string): string {
+  const bytes = new TextEncoder().encode(str)
+  const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+  let result = ""
+  let i = 0
+  while (i < bytes.length) {
+    const a = bytes[i++] || 0
+    const b = bytes[i++] || 0
+    const c = bytes[i++] || 0
+    const triple = (a << 16) | (b << 8) | c
+    result += CHARS[(triple >> 18) & 0x3f]
+    result += CHARS[(triple >> 12) & 0x3f]
+    result += i - 2 < bytes.length ? CHARS[(triple >> 6) & 0x3f] : "="
+    result += i - 1 < bytes.length ? CHARS[triple & 0x3f] : "="
+  }
+  return result
+}
+
+// ============================================================
+//  ERC-721 Metadata Builder
+// ============================================================
+function buildTokenURI(
+  missionId: bigint,
+  scenario: ScenarioData,
+  tier: { name: string; color: string; accent: string },
+  cityName: string,
+  chainName: string,
+  blocksUsed: bigint,
+  cluesCollected: number,
+  evidenceCount: number,
+  reward: bigint,
+  narrative: string,
+  svgImage: string,
+): string {
+  const svgDataUri = `data:image/svg+xml;base64,${toBase64(svgImage)}`
+
+  const metadata = {
+    name: `Carmen Sandiego Mission #${missionId} — ${tier.name}`,
+    description: narrative,
+    image: svgDataUri,
+    external_url: "https://github.com/mtrn87/carmen-sandiego-onchain",
+    attributes: [
+      { trait_type: "Scenario", value: scenario.title },
+      { trait_type: "Reward Tier", value: tier.name },
+      { trait_type: "Capture City", value: cityName },
+      { trait_type: "Capture Chain", value: chainName },
+      { display_type: "number", trait_type: "Blocks Used", value: Number(blocksUsed) },
+      { display_type: "number", trait_type: "Clues Collected", value: cluesCollected },
+      { display_type: "number", trait_type: "Evidence Gathered", value: evidenceCount },
+      { display_type: "number", trait_type: "Reward Points", value: Number(reward) },
+    ],
+  }
+
+  const json = JSON.stringify(metadata)
+  return `data:application/json;base64,${toBase64(json)}`
+}
+
+// ============================================================
+//  Handler: onCarmenCaptured
+// ============================================================
+const onCarmenCaptured = (runtime: Runtime<Config>, log: EVMLog): Record<string, never> => {
+  const config = runtime.config
+
+  const network = getNetwork({
+    chainFamily: "evm",
+    chainSelectorName: config.chainSelectorName,
+    isTestnet: true,
+  })
+  if (!network) throw new Error(`Network not found: ${config.chainSelectorName}`)
+
+  const evmClient = new EVMClient(network.chainSelector.selector)
+  const gm = config.gameMasterAddress
+
+  // ── Step 1: Decode CarmenCaptured event ──
+  const topics = log.topics.map((t) => bytesToHex(t)) as [`0x${string}`, ...`0x${string}`[]]
+  const data = bytesToHex(log.data)
+
+  const decoded = decodeEventLog({
+    abi: GameMasterABI,
+    data,
+    topics,
+  })
+
+  if (decoded.eventName !== "CarmenCaptured") {
+    throw new Error(`Unexpected event: ${decoded.eventName}`)
+  }
+
+  const { missionId, player, blocksUsed, reward } = decoded.args
+  runtime.log(`CarmenCaptured: mission=${missionId}, player=${player}, blocks=${blocksUsed}, reward=${reward}`)
+
+  // ── Step 2: Read mission data ──
+  const missionData = readContract(evmClient, runtime, gm, encodeFunctionData({
+    abi: GameMasterABI,
+    functionName: "getMission",
+    args: [missionId],
+  }))
+  const [, , , cluesReceived, investigationsUsed,] = decodeFunctionResult({
+    abi: GameMasterABI,
+    functionName: "getMission",
+    data: bytesToHex(missionData),
+  }) as [string, bigint, string, number, number, number]
+  runtime.log(`Mission data: clues=${cluesReceived}, investigations=${investigationsUsed}`)
+
+  // ── Step 3: Read salt to determine capture city ──
+  const saltData = readContract(evmClient, runtime, gm, encodeFunctionData({
+    abi: GameMasterABI,
+    functionName: "getMissionSalt",
+    args: [missionId],
+  }))
+  const salt = decodeFunctionResult({
+    abi: GameMasterABI,
+    functionName: "getMissionSalt",
+    data: bytesToHex(saltData),
+  }) as `0x${string}`
+
+  const citiesData = readContract(evmClient, runtime, gm, encodeFunctionData({
+    abi: GameMasterABI,
+    functionName: "getValidCities",
+  }))
+  const cities = decodeFunctionResult({
+    abi: GameMasterABI,
+    functionName: "getValidCities",
+    data: bytesToHex(citiesData),
+  }) as bigint[]
+
+  // Read mission state to get targetHash (it's now completed, but hash is still stored)
+  const [, , targetHash] = decodeFunctionResult({
+    abi: GameMasterABI,
+    functionName: "getMission",
+    data: bytesToHex(missionData),
+  }) as [string, bigint, string, number, number, number]
+
+  // Brute-force to find Carmen's city from the committed hash
+  let capturedCityId: string | undefined
+  for (const city of cities) {
+    const candidateHash = keccak256(
+      encodeAbiParameters(parseAbiParameters("uint256, bytes32"), [city, salt])
+    )
+    if (candidateHash === targetHash) {
+      capturedCityId = city.toString()
+      break
+    }
+  }
+
+  const cityName = capturedCityId ? (CITY_NAMES[capturedCityId] || `Chain ${capturedCityId}`) : "Unknown"
+  const chainName = capturedCityId ? (CHAIN_NAMES[capturedCityId] || "Unknown") : "Unknown"
+  runtime.log(`Captured in: ${cityName} (${chainName})`)
+
+  // ── Step 4: Read evidence count ──
+  const evidenceData = readContract(evmClient, runtime, gm, encodeFunctionData({
+    abi: GameMasterABI,
+    functionName: "getMissionEvidenceCount",
+    args: [missionId],
+  }))
+  const evidenceCount = Number(decodeFunctionResult({
+    abi: GameMasterABI,
+    functionName: "getMissionEvidenceCount",
+    data: bytesToHex(evidenceData),
+  }))
+  runtime.log(`Evidence count: ${evidenceCount}`)
+
+  // ── Step 5: Generate finale content ──
+  const scenario = getScenario(missionId)
+  const tier = getRewardTier(reward)
+  runtime.log(`Scenario: "${scenario.title}", Tier: ${tier.name}`)
+
+  // Generate narrative (AI planned for CRE v2, enriched template for now)
+  let narrative: string
+  if (config.openaiApiKey && config.openaiApiKey !== "" && config.openaiApiKey !== "YOUR_OPENAI_API_KEY") {
+    // TODO: When CRE supports async handlers, replace with:
+    // narrative = await generateAIFinale(scenario, missionId, cityName, tier.name,
+    //   blocksUsed, cluesReceived, config.openaiApiKey, config.openaiModel, runtime.log)
+    narrative = buildEnrichedFinale(scenario, missionId, cityName, tier.name, blocksUsed, cluesReceived)
+    runtime.log("Using enriched finale (async AI planned for CRE v2)")
+  } else {
+    narrative = buildEnrichedFinale(scenario, missionId, cityName, tier.name, blocksUsed, cluesReceived)
+    runtime.log("No AI API key — using enriched finale")
+  }
+
+  // ── Step 6: Generate SVG trophy ──
+  const svgImage = generateTrophySVG(
+    missionId, scenario, tier, cityName, blocksUsed, cluesReceived, evidenceCount,
+  )
+  runtime.log(`SVG trophy generated (${svgImage.length} chars)`)
+
+  // ── Step 7: Build ERC-721 metadata data URI ──
+  const tokenURI = buildTokenURI(
+    missionId, scenario, tier, cityName, chainName,
+    blocksUsed, cluesReceived, evidenceCount, reward,
+    narrative, svgImage,
+  )
+  runtime.log(`Token URI built (${tokenURI.length} chars)`)
+
+  // ── Step 8: Send ACTION_SET_TOKEN_URI report ──
+  const uriData = encodeAbiParameters(
+    parseAbiParameters("uint256, string"),
+    [missionId, tokenURI]
+  )
+  const uriReport = encodeAbiParameters(
+    parseAbiParameters("uint8, bytes"),
+    [ACTION_SET_TOKEN_URI, uriData as `0x${string}`]
+  )
+
+  runtime.log("Sending token URI to proxy...")
+  const reportResponse = runtime
+    .report({
+      encodedPayload: hexToBase64(uriReport),
+      encoderName: "evm",
+      signingAlgo: "ecdsa",
+      hashingAlgo: "keccak256",
+    })
+    .result()
+
+  evmClient
+    .writeReport(runtime, {
+      receiver: config.proxyAddress,
+      report: reportResponse,
+      gasConfig: { gasLimit: config.gasLimit },
+    })
+    .result()
+
+  runtime.log(`Trophy NFT metadata set for Mission #${missionId}! (${tier.name} rank)`)
+
+  return {}
+}
+
+// ============================================================
+//  Workflow initialization
+// ============================================================
+const initWorkflow = (config: Config) => {
+  const network = getNetwork({
+    chainFamily: "evm",
+    chainSelectorName: config.chainSelectorName,
+    isTestnet: true,
+  })
+  if (!network) throw new Error(`Network not found: ${config.chainSelectorName}`)
+
+  const evmClient = new EVMClient(network.chainSelector.selector)
+  const eventHash = keccak256(toBytes("CarmenCaptured(uint256,address,uint256,uint256)"))
+
+  return [
+    handler(
+      evmClient.logTrigger({
+        addresses: [hexToBase64(config.gameMasterAddress)],
+        topics: [{ values: [hexToBase64(eventHash)] }],
+      }),
+      onCarmenCaptured
+    ),
+  ]
+}
+
+export async function main() {
+  const runner = await Runner.newRunner<Config>()
+  await runner.run(initWorkflow)
+}
+
+// Export for testing
+export { generateAIFinale, buildEnrichedFinale, generateTrophySVG, buildTokenURI, getRewardTier, toBase64 }

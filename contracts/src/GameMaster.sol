@@ -41,6 +41,10 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
     mapping(uint256 => uint256) private vrfRequestToMission;            // VRF requestId => missionId
     mapping(uint256 => bytes32) public missionSalts;                    // missionId => salt (for CRE to read)
 
+    // --- Active Mission Tracking (for CRE efficient polling) ---
+    uint256[] private _activeMissionIds;                                // dynamic array of active mission IDs
+    mapping(uint256 => uint256) private _activeMissionIndex;            // missionId => index+1 in array (0 = not present)
+
     // --- Wallet Evidence ---
     mapping(uint256 => WalletFragment[]) public missionWalletFragments; // missionId => fragments
     mapping(uint256 => uint8) public missionFragmentCount;              // missionId => fragment count
@@ -137,6 +141,10 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         });
 
         activePlayerMission[msg.sender] = missionId;
+
+        // Track active mission for CRE polling
+        _activeMissionIds.push(missionId);
+        _activeMissionIndex[missionId] = _activeMissionIds.length; // 1-indexed
 
         // Request randomness from VRF to determine Carmen's location
         uint256 requestId = s_vrfCoordinator.requestRandomWords(
@@ -496,6 +504,10 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         return validChainIds;
     }
 
+    function getActiveMissionIds() external view returns (uint256[] memory) {
+        return _activeMissionIds;
+    }
+
     function getPlayerPublicKey(address player) external view returns (bytes memory) {
         return playerPublicKeys[player];
     }
@@ -581,9 +593,40 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         validChainIds = _chainIds;
     }
 
+    /**
+     * @notice Called by CRE to set the token URI for a mission's trophy NFT.
+     *         Used by the generate-finale workflow to attach AI-generated metadata.
+     * @param missionId The mission whose NFT URI to set.
+     * @param uri The metadata URI (data URI or IPFS CID).
+     */
+    function setMissionTokenURI(uint256 missionId, string calldata uri) external onlyCRE {
+        require(address(missionNFT) != address(0), "MissionNFT not set");
+        uint256 tokenId = missionNFT.missionToTokenId(missionId);
+        require(tokenId != 0, "No NFT for mission");
+        missionNFT.setTokenURIByCRE(tokenId, uri);
+        emit TokenURISet(missionId, tokenId);
+    }
+
     // ============================================================
     //                   INTERNAL FUNCTIONS
     // ============================================================
+
+    function _removeActiveMission(uint256 missionId) internal {
+        uint256 indexPlusOne = _activeMissionIndex[missionId];
+        if (indexPlusOne == 0) return; // not tracked
+
+        uint256 index = indexPlusOne - 1;
+        uint256 lastIndex = _activeMissionIds.length - 1;
+
+        if (index != lastIndex) {
+            uint256 lastMissionId = _activeMissionIds[lastIndex];
+            _activeMissionIds[index] = lastMissionId;
+            _activeMissionIndex[lastMissionId] = indexPlusOne;
+        }
+
+        _activeMissionIds.pop();
+        delete _activeMissionIndex[missionId];
+    }
 
     function _captureCarmen(uint256 missionId, uint256 revealedChainId) internal {
         Mission storage mission = missions[missionId];
@@ -593,6 +636,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         uint256 reward = _calculateReward(blocksUsed);
 
         activePlayerMission[mission.player] = 0;
+        _removeActiveMission(missionId);
 
         emit CarmenCaptured(missionId, mission.player, blocksUsed, reward);
 
@@ -619,6 +663,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         Mission storage mission = missions[missionId];
         mission.status = MissionStatus.Failed;
         activePlayerMission[mission.player] = 0;
+        _removeActiveMission(missionId);
 
         emit MissionFailed(missionId, mission.player);
     }

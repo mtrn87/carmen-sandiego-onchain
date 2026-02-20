@@ -1,0 +1,28 @@
+sequenceDiagram
+    participant Player as 👤 Player
+    participant Frontend as 🎮 Frontend
+    participant CRE as 🤖 CRE
+    participant IPFS as 💾 IPFS
+
+    Player->>Frontend: Register (generate ECIES keypair)
+    Frontend->>Frontend: Generate ECIES keypair
+    Frontend->>Frontend: Store privKey in IndexedDB
+    Frontend->>Frontend: Send pubKey to contract
+
+    CRE->>Frontend: Read getPlayerPubKey(address)
+    Frontend-->>CRE: pubKey = 0x...
+
+    CRE->>CRE: Generate clue text
+    CRE->>CRE: ECIES encrypt clue
+    CRE->>IPFS: Upload encrypted clue
+    IPFS-->>CRE: IPFS hash
+
+    CRE->>Frontend: Send clueHash + IPFS pointer
+
+    Frontend->>IPFS: Fetch encrypted clue
+    IPFS-->>Frontend: Encrypted data
+
+    Frontend->>Frontend: ECIES decrypt with privKey
+    Frontend->>Player: Display decrypted clue
+
+    Note over Frontend,CRE: Only player can decrypt!

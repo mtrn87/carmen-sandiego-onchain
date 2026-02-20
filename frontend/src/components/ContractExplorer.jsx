@@ -98,6 +98,7 @@ export default function ContractExplorer({ onOpenMap }) {
     captureMode,
     captureSelectedTx,
     setCaptureSelectedTx,
+    gameplayLoading,
   } = useGameStore()
 
   const [selectedTx, setSelectedTx] = useState(null)
@@ -214,6 +215,17 @@ export default function ContractExplorer({ onOpenMap }) {
   }
 
   // ── Render ──
+  if (isCityNodeMode && gameplayLoading && cityLocations.length === 0) {
+    return (
+      <div className={styles.explorer} data-tour="explorer">
+        <div className={styles.placeholderSection} style={{ marginTop: '40%' }}>
+          <span className={styles.placeholderIcon}>&#9211;</span>
+          <span>CONNECTING TO {cityMeta?.name?.toUpperCase() || 'NETWORK'}...</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={styles.explorer} data-tour="explorer">
       {/* top bar */}

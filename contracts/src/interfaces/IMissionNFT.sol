@@ -21,5 +21,9 @@ interface IMissionNFT {
         string calldata tokenURI
     ) external returns (uint256);
 
+    function setTokenURIByCRE(uint256 tokenId, string calldata uri) external;
+
     function getMissionRecord(uint256 tokenId) external view returns (MissionRecord memory);
+
+    function missionToTokenId(uint256 missionId) external view returns (uint256);
 }

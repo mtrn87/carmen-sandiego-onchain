@@ -38,6 +38,7 @@ interface IGameMaster {
     function updateTarget(uint256 missionId, bytes32 newTargetHash) external;
     function receiveWalletFragment(uint256 missionId, uint8 startIndex, uint8 length, bytes32 contentHash, string calldata ipfsPointer) external;
     function resolveWalletCapture(uint256 missionId, address submittedWallet, uint256 revealedChainId, bytes32 salt) external;
+    function setMissionTokenURI(uint256 missionId, string calldata uri) external;
 
     // --- CityNode Integration ---
     function resolveClueOnCity(address cityNode, uint256 requestId, uint8 clueType, bytes32 clueDataHash, bytes32 anomalyRefId) external;
@@ -53,6 +54,7 @@ interface IGameMaster {
     function getMissionFragmentCount(uint256 missionId) external view returns (uint8);
     function getMissionEvidenceCount(uint256 missionId) external view returns (uint8);
     function deriveCarmenWallet(bytes32 salt) external pure returns (address);
+    function getActiveMissionIds() external view returns (uint256[] memory);
 
     // --- Events ---
     event PlayerRegistered(address indexed player, bytes publicKey);
@@ -65,6 +67,7 @@ interface IGameMaster {
     event MissionFailed(uint256 indexed missionId, address indexed player);
     event EvidenceCollected(uint256 indexed missionId, uint8 evidenceCount, uint8 strength);
     event MissionNFTSet(address indexed missionNFT);
+    event TokenURISet(uint256 indexed missionId, uint256 indexed tokenId);
 
     // --- Wallet Evidence Events ---
     event WalletFragmentReceived(uint256 indexed missionId, uint8 fragmentIndex, uint8 startIndex, uint8 length, bytes32 contentHash, string ipfsPointer);

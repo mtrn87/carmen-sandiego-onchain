@@ -1,0 +1,58 @@
+graph TB
+    subgraph Events["📡 On-Chain Events"]
+        E1["MissionStarted"]
+        E2["InvestigationSubmitted"]
+        E3["CarmenCaptured"]
+        E4["Cron 3min"]
+    end
+
+    subgraph Workflows["🤖 CRE Workflows"]
+        W1["mission-start<br/>Brute-force hash<br/>Select clue<br/>ECIES encrypt"]
+        W2["generate-briefing<br/>Call OpenAI<br/>Call ElevenLabs<br/>Upload IPFS"]
+        W3["generate-clue<br/>Call OpenAI<br/>Call ElevenLabs<br/>Upload IPFS"]
+        W4["carmen-moves<br/>Pick random city<br/>Update presence<br/>Write to CityNode"]
+        W5["generate-finale<br/>Personalized story<br/>Call OpenAI<br/>Upload IPFS"]
+    end
+
+    subgraph ExternalAPIs["🌐 External APIs"]
+        API1["OpenAI GPT-4o-mini<br/>Text Generation"]
+        API2["ElevenLabs<br/>Audio Generation"]
+        API3["IPFS/Pinata<br/>Content Storage"]
+        API4["Alchemy RPC<br/>Read Contract State"]
+    end
+
+    subgraph OnChainWrites["⛓️ On-Chain Writes"]
+        Write1["receiveClue()<br/>via Keystone"]
+        Write2["updateTarget()<br/>Carmen moves"]
+    end
+
+    E1 -->|"Trigger"| W1
+    E1 -->|"Trigger"| W2
+    E2 -->|"Trigger"| W3
+    E3 -->|"Trigger"| W5
+    E4 -->|"Trigger"| W4
+
+    W1 -->|"Encrypt"| W2
+    W2 -->|"HTTP Fetch"| API1
+    W2 -->|"HTTP Fetch"| API2
+    W2 -->|"Upload"| API3
+    W2 -->|"Sign & Send"| Write1
+
+    W3 -->|"HTTP Fetch"| API1
+    W3 -->|"HTTP Fetch"| API2
+    W3 -->|"Upload"| API3
+    W3 -->|"Sign & Send"| Write1
+
+    W4 -->|"Read State"| API4
+    W4 -->|"Sign & Send"| Write2
+
+    W5 -->|"HTTP Fetch"| API1
+    W5 -->|"Upload"| API3
+
+    Write1 -->|"Keystone Router"| OnChainWrites
+    Write2 -->|"Keystone Router"| OnChainWrites
+
+    style Events fill:#e3f2fd
+    style Workflows fill:#f3e5f5
+    style ExternalAPIs fill:#fff9c4
+    style OnChainWrites fill:#e8f5e9

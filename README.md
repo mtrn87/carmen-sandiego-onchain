@@ -171,8 +171,22 @@ Performance is measured by blocks elapsed since mission start:
 
 ## Documentation
 
+### For Hackathon Evaluators
+- [Technical Overview](docs/TECHNICAL_OVERVIEW.md) -- Complete technical breakdown for evaluators
+- [System Diagrams](docs/SYSTEM_DIAGRAMS.md) -- Visual architecture and flow diagrams (Mermaid)
+- [Innovation](docs/INNOVATION.md) -- Why this project is innovative and what makes it unique
+- [System Flows](docs/SYSTEM_FLOWS.md) -- Detailed step-by-step flows for all major interactions
+
+### For Developers
+- [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) -- Complete setup and deployment instructions
+- [Architecture](docs/ARCHITECTURE.md) -- System architecture and contract design
 - [On-Chain Flow](docs/onchain-flow.md) -- Complete technical flow of all on-chain interactions
 - [.env.example](.env.example) -- Environment variables reference
+
+### Setup & Getting Started
+1. **Local Development:** See [Deployment Guide - Local Setup](docs/DEPLOYMENT_GUIDE.md#local-development-setup)
+2. **Testnet Deployment:** See [Deployment Guide - Testnet](docs/DEPLOYMENT_GUIDE.md#testnet-deployment)
+3. **Understanding the System:** Start with [Technical Overview](docs/TECHNICAL_OVERVIEW.md)
 
 ## Team
 

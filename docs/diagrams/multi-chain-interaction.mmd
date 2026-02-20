@@ -1,0 +1,45 @@
+graph TB
+    subgraph Sepolia["⛓️ Sepolia (HQ)"]
+        GM["GameMaster.sol<br/>Carmen Location<br/>Mission State"]
+        Proxy["GameMasterProxy<br/>CRE Report Router"]
+    end
+
+    subgraph Arbitrum["⛓️ Arbitrum Sepolia<br/>(Tokyo)"]
+        Tokyo["CityNode.sol<br/>Carmen Presence<br/>Investigation Results"]
+    end
+
+    subgraph Base["⛓️ Base Sepolia<br/>(Paris)"]
+        Paris["CityNode.sol<br/>Carmen Presence<br/>Investigation Results"]
+    end
+
+    subgraph CRE["🤖 CRE Workflows"]
+        CarmenMoves["carmen-moves<br/>Cron: Every 3 min<br/>Pick random city<br/>Update presence"]
+    end
+
+    subgraph Keystone["🔐 Keystone Router"]
+        Sign["Sign Cross-Chain<br/>Call Report"]
+    end
+
+    GM -->|"Read: getMission()"| CarmenMoves
+    GM -->|"Read: getValidCities()"| CarmenMoves
+    
+    CarmenMoves -->|"Determine new city"| CarmenMoves
+    CarmenMoves -->|"Sign Report"| Sign
+    
+    Sign -->|"Route to Arbitrum"| Tokyo
+    Sign -->|"Route to Base"| Paris
+    
+    Tokyo -->|"updateCarmenPresence()"| Tokyo
+    Paris -->|"updateCarmenPresence()"| Paris
+    
+    Tokyo -->|"Player queries"| Tokyo
+    Paris -->|"Player queries"| Paris
+    
+    Tokyo -->|"Cross-chain read"| GM
+    Paris -->|"Cross-chain read"| GM
+
+    style Sepolia fill:#f3e5f5
+    style Arbitrum fill:#e8f5e9
+    style Base fill:#c8e6c9
+    style CRE fill:#fce4ec
+    style Keystone fill:#f1f8e9

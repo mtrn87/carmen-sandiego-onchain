@@ -44,3 +44,6 @@ coverage.json
 # Logs
 *.log
 npm-debug.log*
+
+# Claude Code
+CLAUDE.md

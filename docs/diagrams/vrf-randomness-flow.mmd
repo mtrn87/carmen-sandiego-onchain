@@ -1,0 +1,35 @@
+graph TB
+    subgraph Player["👤 Player"]
+        Action["Call startMission()<br/>or submitInvestigation()"]
+    end
+
+    subgraph GameMaster["⛓️ GameMaster.sol"]
+        Request["Request VRF<br/>requestRandomWords()"]
+        Callback["Callback<br/>fulfillRandomWords()"]
+        Logic["Determine Outcome<br/>Based on randomWords"]
+    end
+
+    subgraph VRF["🎲 Chainlink VRF v2.5"]
+        Coordinator["VRF Coordinator"]
+        Generate["Generate Random<br/>Cryptographically Secure"]
+        Verify["Verify Proof<br/>On-Chain"]
+    end
+
+    Player -->|"tx"| Action
+    Action -->|"Call"| Request
+    Request -->|"Request ID"| Coordinator
+    
+    Coordinator -->|"Off-chain"| Generate
+    Generate -->|"Proof + Output"| Verify
+    Verify -->|"Valid?"| Callback
+    
+    Callback -->|"randomWords[0]"| Logic
+    Logic -->|"Carmen Location"| Logic
+    Logic -->|"Clue Type"| Logic
+    Logic -->|"Clue Veracity"| Logic
+    
+    Logic -->|"Emit Event"| Player
+
+    style Player fill:#e1f5ff
+    style GameMaster fill:#f3e5f5
+    style VRF fill:#e8f5e9

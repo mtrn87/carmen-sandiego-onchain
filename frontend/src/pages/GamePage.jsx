@@ -46,7 +46,7 @@ export default function GamePage() {
 
   if (!isConnected) return null
 
-  const handleSelectCase = (c) => {
+  const handleSelectCase = async (c) => {
     // CityNode cities: load city data and set location index
     // Use unique cityId (from InteractiveMap) to identify the city
     const cityId = c?.cityId

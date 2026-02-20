@@ -1,11 +1,12 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { GameMaster, GameMasterProxy } from "../typechain-types";
+import { GameMaster, GameMasterProxy, MissionNFT } from "../typechain-types";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
 describe("GameMasterProxy", function () {
   let gameMaster: GameMaster;
   let proxy: GameMasterProxy;
+  let missionNFT: MissionNFT;
   let vrfCoordinator: any;
 
   let owner: SignerWithAddress;
@@ -45,8 +46,8 @@ describe("GameMasterProxy", function () {
     const ipfs = "QmTestClue";
 
     const data = ethers.AbiCoder.defaultAbiCoder().encode(
-      ["uint256", "uint8", "bytes32", "string"],
-      [missionId, clueType, contentHash, ipfs]
+      ["uint256", "uint8", "bytes32", "string", "uint8"],
+      [missionId, clueType, contentHash, ipfs, 50]
     );
     const report = ethers.AbiCoder.defaultAbiCoder().encode(
       ["uint8", "bytes"],
@@ -99,6 +100,12 @@ describe("GameMasterProxy", function () {
       await gameMaster.getAddress()
     ) as GameMasterProxy;
     await proxy.waitForDeployment();
+
+    // Deploy MissionNFT and link to GameMaster
+    const NFTFactory = await ethers.getContractFactory("MissionNFT");
+    missionNFT = await NFTFactory.deploy(await gameMaster.getAddress()) as MissionNFT;
+    await missionNFT.waitForDeployment();
+    await gameMaster.connect(owner).setMissionNFT(await missionNFT.getAddress());
 
     // Set proxy as CRE oracle on GameMaster
     await gameMaster.connect(owner).setCREOracle(await proxy.getAddress());
@@ -157,8 +164,8 @@ describe("GameMasterProxy", function () {
 
       const contentHash = ethers.keccak256(ethers.toUtf8Bytes("test"));
       const data = ethers.AbiCoder.defaultAbiCoder().encode(
-        ["uint256", "uint8", "bytes32", "string"],
-        [missionId, 0, contentHash, "QmTest"]
+        ["uint256", "uint8", "bytes32", "string", "uint8"],
+        [missionId, 0, contentHash, "QmTest", 50]
       );
       const report = ethers.AbiCoder.defaultAbiCoder().encode(
         ["uint8", "bytes"],
@@ -228,6 +235,100 @@ describe("GameMasterProxy", function () {
 
       const mission = await gameMaster.getMission(missionId);
       expect(mission.targetHash).to.equal(newHash);
+    });
+  });
+
+  describe("ACTION_SET_TOKEN_URI (6)", function () {
+    async function captureViaMission(p: SignerWithAddress, vrfWord: number = 3) {
+      const missionId = await setupMission(p, vrfWord);
+      await deliverClueViaProxy(missionId, 0);
+      await deliverClueViaProxy(missionId, 1);
+      await deliverClueViaProxy(missionId, 2);
+
+      const { salt } = computeTargetHash(ARBITRUM_SEPOLIA, vrfWord, Number(missionId));
+      const captureData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint256", "uint256", "bytes32"],
+        [missionId, ARBITRUM_SEPOLIA, salt]
+      );
+      const captureReport = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint8", "bytes"],
+        [2, captureData]
+      );
+      const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "bytes10", "address"],
+        [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+      );
+      await proxy.connect(forwarder).onReport(metadata, captureReport);
+      return missionId;
+    }
+
+    it("should set token URI via proxy after capture", async function () {
+      const missionId = await captureViaMission(player);
+
+      const tokenId = await missionNFT.missionToTokenId(missionId);
+      expect(tokenId).to.be.gt(0);
+
+      const uri = "data:application/json;base64,eyJ0ZXN0IjoiZGF0YSJ9";
+      const data = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint256", "string"],
+        [missionId, uri]
+      );
+      const report = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint8", "bytes"],
+        [6, data] // ACTION_SET_TOKEN_URI = 6
+      );
+      const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "bytes10", "address"],
+        [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+      );
+
+      await proxy.connect(forwarder).onReport(metadata, report);
+
+      const storedURI = await missionNFT.tokenURI(tokenId);
+      expect(storedURI).to.equal(uri);
+    });
+
+    it("should emit ActionForwarded for token URI", async function () {
+      const missionId = await captureViaMission(player);
+      const uri = "data:application/json;base64,dGVzdA==";
+      const data = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint256", "string"],
+        [missionId, uri]
+      );
+      const report = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint8", "bytes"],
+        [6, data]
+      );
+      const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "bytes10", "address"],
+        [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+      );
+
+      await expect(proxy.connect(forwarder).onReport(metadata, report))
+        .to.emit(proxy, "ActionForwarded")
+        .withArgs(6, missionId);
+    });
+
+    it("should emit TokenURISet event on GameMaster", async function () {
+      const missionId = await captureViaMission(player);
+      const tokenId = await missionNFT.missionToTokenId(missionId);
+      const uri = "data:application/json;base64,dGVzdA==";
+      const data = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint256", "string"],
+        [missionId, uri]
+      );
+      const report = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint8", "bytes"],
+        [6, data]
+      );
+      const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "bytes10", "address"],
+        [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+      );
+
+      await expect(proxy.connect(forwarder).onReport(metadata, report))
+        .to.emit(gameMaster, "TokenURISet")
+        .withArgs(missionId, tokenId);
     });
   });
 

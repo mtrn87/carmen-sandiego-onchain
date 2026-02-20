@@ -9,7 +9,8 @@ import {IGameMaster} from "./interfaces/IGameMaster.sol";
  * @notice Receives CRE workflow reports via KeystoneForwarder and forwards
  *         decoded actions to GameMaster.
  *         Actions: 1=receiveClue, 2=resolveCapture, 3=updateTarget,
- *                  4=receiveWalletFragment, 5=resolveWalletCapture
+ *                  4=receiveWalletFragment, 5=resolveWalletCapture,
+ *                  6=setMissionTokenURI
  */
 contract GameMasterProxy is ReceiverTemplate {
     IGameMaster public gameMaster;
@@ -19,6 +20,7 @@ contract GameMasterProxy is ReceiverTemplate {
     uint8 public constant ACTION_UPDATE_TARGET = 3;
     uint8 public constant ACTION_RECEIVE_WALLET_FRAGMENT = 4;
     uint8 public constant ACTION_RESOLVE_WALLET_CAPTURE = 5;
+    uint8 public constant ACTION_SET_TOKEN_URI = 6;
 
     event ActionForwarded(uint8 action, uint256 missionId);
 
@@ -58,6 +60,11 @@ contract GameMasterProxy is ReceiverTemplate {
             (uint256 missionId, address submittedWallet, uint256 revealedChainId, bytes32 salt) =
                 abi.decode(data, (uint256, address, uint256, bytes32));
             gameMaster.resolveWalletCapture(missionId, submittedWallet, revealedChainId, salt);
+            emit ActionForwarded(action, missionId);
+        } else if (action == ACTION_SET_TOKEN_URI) {
+            (uint256 missionId, string memory uri) =
+                abi.decode(data, (uint256, string));
+            gameMaster.setMissionTokenURI(missionId, uri);
             emit ActionForwarded(action, missionId);
         } else {
             revert UnknownAction(action);
