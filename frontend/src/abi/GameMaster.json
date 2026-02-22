@@ -210,6 +210,12 @@
           "internalType": "string",
           "name": "ipfsPointer",
           "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "strength",
+          "type": "uint8"
         }
       ],
       "name": "ClueReceived",
@@ -288,6 +294,31 @@
         }
       ],
       "name": "DossierResolvedOnCity",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "evidenceCount",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "strength",
+          "type": "uint8"
+        }
+      ],
+      "name": "EvidenceCollected",
       "type": "event"
     },
     {
@@ -446,6 +477,25 @@
       "anonymous": false,
       "inputs": [
         {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "TokenURISet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
           "indexed": false,
           "internalType": "address",
           "name": "account",
@@ -454,6 +504,93 @@
       ],
       "name": "Unpaused",
       "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "player",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "submittedWallet",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "valid",
+          "type": "bool"
+        }
+      ],
+      "name": "WalletCaseBuilt",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "fragmentIndex",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "startIndex",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "length",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "contentHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "ipfsPointer",
+          "type": "string"
+        }
+      ],
+      "name": "WalletFragmentReceived",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "EVIDENCE_THRESHOLD",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
     },
     {
       "inputs": [],
@@ -581,6 +718,38 @@
     {
       "inputs": [
         {
+          "internalType": "bytes32",
+          "name": "salt",
+          "type": "bytes32"
+        }
+      ],
+      "name": "deriveCarmenWallet",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getActiveMissionIds",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint256",
           "name": "missionId",
           "type": "uint256"
@@ -679,11 +848,54 @@
               "internalType": "uint256",
               "name": "timestamp",
               "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "strength",
+              "type": "uint8"
             }
           ],
           "internalType": "struct IGameMaster.Clue[]",
           "name": "",
           "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getMissionEvidenceCount",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getMissionFragmentCount",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
         }
       ],
       "stateMutability": "view",
@@ -703,6 +915,52 @@
           "internalType": "bytes32",
           "name": "",
           "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getMissionWalletFragments",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint8",
+              "name": "startIndex",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "length",
+              "type": "uint8"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "contentHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "string",
+              "name": "ipfsPointer",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct IGameMaster.WalletFragment[]",
+          "name": "",
+          "type": "tuple[]"
         }
       ],
       "stateMutability": "view",
@@ -865,6 +1123,49 @@
           "internalType": "uint256",
           "name": "timestamp",
           "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "strength",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "missionEvidenceCount",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "missionFragmentCount",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
         }
       ],
       "stateMutability": "view",
@@ -897,6 +1198,50 @@
           "internalType": "bytes32",
           "name": "",
           "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "missionWalletFragments",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "startIndex",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "length",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "contentHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "string",
+          "name": "ipfsPointer",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
         }
       ],
       "stateMutability": "view",
@@ -1117,9 +1462,47 @@
           "internalType": "string",
           "name": "ipfsPointer",
           "type": "string"
+        },
+        {
+          "internalType": "uint8",
+          "name": "strength",
+          "type": "uint8"
         }
       ],
       "name": "receiveClue",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "startIndex",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "length",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "contentHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "string",
+          "name": "ipfsPointer",
+          "type": "string"
+        }
+      ],
+      "name": "receiveWalletFragment",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -1260,6 +1643,34 @@
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "submittedWallet",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "revealedChainId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "salt",
+          "type": "bytes32"
+        }
+      ],
+      "name": "resolveWalletCapture",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "s_vrfCoordinator",
       "outputs": [
@@ -1307,6 +1718,24 @@
         }
       ],
       "name": "setMissionNFT",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "missionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "uri",
+          "type": "string"
+        }
+      ],
+      "name": "setMissionTokenURI",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"

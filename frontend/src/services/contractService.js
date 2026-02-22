@@ -22,6 +22,7 @@ if (!GAME_MASTER_ADDRESS) {
   )
 }
 export const SEPOLIA_CHAIN_ID = 11155111
+export const HARDHAT_CHAIN_ID = 31337
 
 const DEFAULT_CITY_NODE_RPCS = {
   421614: "https://sepolia-rollup.arbitrum.io/rpc",
@@ -726,13 +727,15 @@ export async function getMissionEvents(missionId) {
 export async function ensureSepoliaNetwork() {
   if (!window.ethereum) throw new Error("No wallet detected")
   const chainId = await window.ethereum.request({ method: "eth_chainId" })
-  if (parseInt(chainId, 16) !== SEPOLIA_CHAIN_ID) {
-    await window.ethereum.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: "0x" + SEPOLIA_CHAIN_ID.toString(16) }],
-    })
-    resetConnection()
+  const currentChainId = parseInt(chainId, 16)
+  if (currentChainId === SEPOLIA_CHAIN_ID || currentChainId === HARDHAT_CHAIN_ID) {
+    return
   }
+  await window.ethereum.request({
+    method: "wallet_switchEthereumChain",
+    params: [{ chainId: "0x" + SEPOLIA_CHAIN_ID.toString(16) }],
+  })
+  resetConnection()
 }
 
 // ============================================================
