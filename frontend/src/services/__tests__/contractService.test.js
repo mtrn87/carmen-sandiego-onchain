@@ -76,11 +76,12 @@ describe('contractService', () => {
     window.ethereum = original
   })
 
-  it('CITY_MAP contains 16 cities with correct names for original chainIds', () => {
+  it('CITY_MAP contains 17 cities with correct names for original chainIds', () => {
     expect(CITY_MAP[421614].name).toBe('Tokyo')
     expect(CITY_MAP[84532].name).toBe('Paris')
     expect(CITY_MAP[51].name).toBe('Sydney')
-    expect(Object.keys(CITY_MAP).length).toBe(16)
+    expect(CITY_MAP[971].name).toBe('Berlin')
+    expect(Object.keys(CITY_MAP).length).toBe(17)
   })
 
   it('SEPOLIA_CHAIN_ID is 11155111', () => {

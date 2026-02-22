@@ -154,7 +154,13 @@ export default function LoginPage() {
             }
           }
 
-          setShowNicknameModal(true)
+          // only show nickname modal if no nickname saved yet
+          const savedNickname = localStorage.getItem('player_nickname')
+          if (savedNickname) {
+            useGameStore.getState().setPlayerNickname(savedNickname)
+          } else {
+            setShowNicknameModal(true)
+          }
         } catch (error) {
           console.error('Error syncing Privy user:', error)
         }
@@ -164,6 +170,7 @@ export default function LoginPage() {
 
   const handleNicknameConfirm = useCallback((nickname) => {
     localStorage.setItem('player_nickname', nickname)
+    useGameStore.getState().setPlayerNickname(nickname)
     setShowNicknameModal(false)
     navigate('/game')
   }, [navigate])
@@ -292,6 +299,7 @@ export default function LoginPage() {
                       }
                       // no active mission — start one on-chain, then show briefing
                       setStartingMission(true)
+                      localStorage.removeItem('carmen_abandoned_mission')
                       try {
                         await ensureSepoliaNetwork()
                         await startMissionOnChain()

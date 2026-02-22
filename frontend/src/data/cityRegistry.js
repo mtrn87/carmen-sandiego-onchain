@@ -10,7 +10,7 @@ export const CHAIN_DEFS = {
   11155111: { name: 'Ethereum Sepolia',  color: '#627EEA', icon: '/blockchain_icon/eth.png',      symbol: 'ETH' },
 }
 
-// ─── 16 cities pool ───
+// ─── 17 cities pool ───
 // id = unique city identifier used across the app
 // chainId = the real blockchain chainId this city maps to for contract calls
 
@@ -70,6 +70,17 @@ export const CITY_POOL = [
       { id: 'reykjavik-hallgrimskirkja', name: 'Hallgr\u00EDmskirkja Node', type: 'Signal Router', status: 'active', description: 'BNB transmissions spike in the northern aurora.', image: '/island_1.png', chainId: 97 },
       { id: 'reykjavik-harpa', name: 'Harpa Concert Relay', type: 'Bridge Relay', status: 'active', description: 'Cross-chain flows converge in the cold.', image: '/island_2.png', chainId: 97 },
       { id: 'reykjavik-lagoon', name: 'Blue Lagoon Vault', type: 'Custody Protocol', status: 'active', description: 'Assets are being laundered in geothermal cover.', image: '/island_3.png', chainId: 97 },
+    ],
+  },
+  {
+    id: 971, name: 'Berlin', flag: '\u{1F1E9}\u{1F1EA}',
+    chain: 'BNB Testnet', chainId: 97,
+    chainColor: '#F0B90B', chainIcon: '/blockchain_icon/bnb.png',
+    image: '/berlin.png', coords: { left: '50%', top: '23%' },
+    cases: [
+      { id: 'berlin-gate', name: 'Brandenburg Gate Relay', type: 'Bridge Relay', status: 'active', description: 'BNB ingress surging at the historic gate. Cross-chain signatures detected.', image: '/berlin_1.png', chainId: 97 },
+      { id: 'berlin-tower', name: 'TV Tower Beacon', type: 'Signal Router', status: 'active', description: 'Encrypted bursts pulse from the Fernsehturm. Signal matches known suspect patterns.', image: '/berlin_2.png', chainId: 97 },
+      { id: 'berlin-wall', name: 'East Side Gallery Vault', type: 'Custody Protocol', status: 'active', description: 'Custody traffic spikes along the Wall. Assets staged for cross-chain exit.', image: '/berlin_3.png', chainId: 97 },
     ],
   },
   // ── Base Sepolia ──
@@ -1150,31 +1161,82 @@ export function pickStartingCity(missionId) {
   return CITY_POOL[seed % CITY_POOL.length].id
 }
 
-export function pickRevealedCities(missionId, scanCount, excludeIds) {
+/**
+ * Parse CSS coord string (e.g. '83%') to a number.
+ * Falls back to 50 for unparseable values.
+ */
+function parseCoord(val) {
+  if (typeof val !== 'string') return 50
+  return parseFloat(val) || 50
+}
+
+/**
+ * Euclidean distance between two cities based on their map coords.
+ */
+function cityDistance(a, b) {
+  const ax = parseCoord(a.coords?.left), ay = parseCoord(a.coords?.top)
+  const bx = parseCoord(b.coords?.left), by = parseCoord(b.coords?.top)
+  return Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2)
+}
+
+/**
+ * Pick up to 3 cities to reveal, sorted by proximity to originCityId.
+ * Guarantees at least 1 never-scanned city when available.
+ *
+ * @param {number}   missionId      - current mission
+ * @param {number}   scanCount      - deterministic seed offset
+ * @param {number[]} excludeIds     - city IDs already on the map (discoveredCityIds)
+ * @param {number}   originCityId   - city the player just scanned (proximity anchor)
+ * @param {number[]} scannedIds     - all cities the player has ever scanned
+ */
+export function pickRevealedCities(missionId, scanCount, excludeIds, originCityId = null, scannedIds = []) {
   const seed = hashSeed(missionId, scanCount)
   const excluded = new Set(excludeIds)
+  const scannedSet = new Set(scannedIds)
 
-  // get current city's chainId so we can prioritize different chains
-  const currentCity = CITY_POOL_MAP[excludeIds[excludeIds.length - 1]]
-  const currentChainId = currentCity?.chainId
+  const origin = originCityId ? CITY_POOL_MAP[originCityId] : null
 
-  // sort candidates: different chain first, then by deterministic shuffle
-  const candidates = CITY_POOL
-    .filter((c) => !excluded.has(c.id))
-    .sort((a, b) => {
-      const aDiff = a.chainId !== currentChainId ? 0 : 1
-      const bDiff = b.chainId !== currentChainId ? 0 : 1
-      if (aDiff !== bDiff) return aDiff - bDiff
+  // all cities not currently on the map
+  const candidates = CITY_POOL.filter((c) => !excluded.has(c.id))
+  if (candidates.length === 0) return []
+
+  // sort by proximity to origin city, with deterministic tiebreaker
+  if (origin) {
+    candidates.sort((a, b) => {
+      const da = cityDistance(origin, a)
+      const db = cityDistance(origin, b)
+      if (Math.abs(da - db) > 1) return da - db
       return hashSeed(seed, a.id) - hashSeed(seed, b.id)
     })
+  } else {
+    candidates.sort((a, b) => hashSeed(seed, a.id) - hashSeed(seed, b.id))
+  }
 
-  return candidates.slice(0, 2)
+  // split into never-scanned and already-scanned
+  const fresh = candidates.filter((c) => !scannedSet.has(c.id))
+  const revisit = candidates.filter((c) => scannedSet.has(c.id))
+
+  const result = []
+
+  // guarantee at least 1 fresh city when available
+  if (fresh.length > 0) {
+    result.push(fresh.shift())
+  }
+
+  // fill remaining 2 slots from the full proximity-sorted list
+  for (const c of candidates) {
+    if (result.length >= 3) break
+    if (result.some((r) => r.id === c.id)) continue
+    result.push(c)
+  }
+
+  return result.slice(0, 3)
 }
 
 // ─── Country code lookup ───
 
 const COUNTRY_CODES = {
-  421614: 'JP', 4216141: 'CA', 97: 'GB', 98: 'CN', 99: 'IS',
+  421614: 'JP', 4216141: 'CA', 97: 'GB', 98: 'CN', 99: 'IS', 971: 'DE',
   84532: 'FR', 845321: 'IT', 51: 'AU', 511: 'KE', 512: 'BR',
   80002: 'CL', 800021: 'SN', 800022: 'RU',
   11155111: 'US', 11155112: 'MX', 11155113: 'AE',

@@ -28,7 +28,7 @@ export default function GamePage() {
     currentCityId,
     captureMode,
   } = useGameStore()
-  const [showMap, setShowMap] = useState(false)
+  const [showMap, setShowMap] = useState(true)
 
   // redirect to login if not connected
   useEffect(() => {

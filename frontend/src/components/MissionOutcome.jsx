@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
 import styles from './MissionOutcome.module.css'
 
@@ -13,25 +14,29 @@ export default function MissionOutcome() {
     missionOutcome,
     missionId,
     startNewMission,
-    closeOutcomeModal,
+    abandonMission,
   } = useGameStore()
 
+  const navigate = useNavigate()
   const isVictory = missionOutcome?.type === 'captured'
   const variant = isVictory ? styles.terminalVictory : styles.terminalDefeat
 
-  const handleNewMission = useCallback(() => {
-    startNewMission()
-  }, [startNewMission])
+  const handleAction = useCallback(() => {
+    if (isVictory) {
+      startNewMission()
+    } else {
+      abandonMission()
+      navigate('/')
+    }
+  }, [isVictory, startNewMission, abandonMission, navigate])
 
-  // Enter key triggers new mission
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Enter') handleNewMission()
-      if (e.key === 'Escape') closeOutcomeModal()
+      if (e.key === 'Enter' || e.key === 'Escape') handleAction()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [handleNewMission, closeOutcomeModal])
+  }, [handleAction])
 
   const reward = REWARD_CONFIG[missionOutcome?.rewardLabel] || REWARD_CONFIG.BRONZE
 
@@ -124,11 +129,11 @@ export default function MissionOutcome() {
         </div>
 
         {/* action button */}
-        <button className={styles.actionBtn} onClick={handleNewMission}>
+        <button className={styles.actionBtn} onClick={handleAction}>
           <span className={styles.btnFlicker}>
             {isVictory
               ? '> PRESS ENTER FOR NEW MISSION'
-              : '> PRESS ENTER TO RETRY'}
+              : '> PRESS ENTER TO EXIT'}
           </span>
         </button>
       </div>

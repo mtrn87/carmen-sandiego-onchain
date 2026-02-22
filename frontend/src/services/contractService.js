@@ -8,6 +8,7 @@
 import { ethers } from "ethers"
 import { CITY_POOL, CITY_POOL_MAP, getMockLocations, getMockClueData, getCountryCode } from '../data/cityRegistry'
 import { WALLET_POOL, pickTxWallets, getCarmenWalletIndex } from '../data/walletPool'
+import { getActiveRoute, getCityRole, getNextCity, getNearestPathCity } from '../data/scriptedRoutes'
 import GameMasterArtifact from "../abi/GameMaster.json"
 import CityNodeArtifact from "../abi/CityNode.json"
 
@@ -67,7 +68,7 @@ const GAME_MASTER_ABI = GameMasterArtifact.abi
 //  CityNode Gameplay Constants & Helpers
 // ============================================================
 
-export const MAX_ENERGY = 10
+export const MAX_ENERGY = 20
 export const ENERGY_REGEN_INTERVAL = 15 * 60 // 15 minutes in seconds
 
 // LocationInfo.category enum: uint8 → display label
@@ -870,6 +871,70 @@ function _pickNextLeadCity(currentChainId, seed) {
 function _mockClueResult(cityId, locationIdx, clueIndex, txHash, blockNumber, isStartingClue = false) {
   const clueTypes = ["BEHAVIOR_FINGERPRINT", "RELATIONSHIP", "IDENTITY_COMMIT", "FUNDING_TRAIL", "TECHNICAL_SIGNATURE", "DEAD_END"]
   const locationData = MOCK_CLUE_DATA[cityId]?.[locationIdx]
+  const cityName = CITY_NODE_META[cityId]?.name || "unknown"
+
+  // ── scripted route override ──
+  const route = getActiveRoute()
+  if (route) {
+    const role = getCityRole(route, cityId)
+    let strength, tier, clueData
+
+    if (role === 'on_path') {
+      // city on the scripted path: always strong
+      strength = 75 + Math.floor(Math.random() * 16) // 75-90
+      tier = 'strong'
+      const nextCityId = getNextCity(route, cityId)
+      if (locationData && locationData.strong) {
+        clueData = locationData.strong[clueIndex % locationData.strong.length]
+      } else {
+        clueData = `Full analysis of ${cityName} confirms Carmen's network is active here. Transaction pattern decoded — extraction route mapped. [WALLET INTEL: suspect wallet interacted with contracts on this chain in the last 24 hours]`
+      }
+      if (nextCityId) {
+        const nextCity = CITY_POOL_MAP[nextCityId]
+        if (nextCity) {
+          clueData += ` [NEXT LEAD: Cross-chain signals trace to ${nextCity.name} (${nextCity.chain}) — investigate that network next.]`
+        }
+      } else {
+        clueData += ` [NEXT LEAD: All signals converge HERE. Carmen is in ${cityName}. Prepare for capture.]`
+      }
+    } else if (role === 'near_path') {
+      // city shares chain with a path city: medium redirect
+      strength = 45 + Math.floor(Math.random() * 16) // 45-60
+      tier = 'medium'
+      const correctCityId = getNearestPathCity(route, cityId)
+      const correctCity = CITY_POOL_MAP[correctCityId]
+      if (locationData && locationData.medium) {
+        clueData = locationData.medium[clueIndex % locationData.medium.length]
+      } else {
+        clueData = `Cross-chain traffic at ${cityName} shows anomalous routing. Someone is moving assets through this node — the gas pattern is consistent with Carmen's operational style.`
+      }
+      if (correctCity) {
+        clueData += ` Signals suggest activity closer to ${correctCity.name} (${correctCity.chain}).`
+      }
+    } else {
+      // city completely off path: weak/dead-end
+      strength = 10 + Math.floor(Math.random() * 11) // 10-20
+      tier = 'weak'
+      if (locationData && locationData.weak) {
+        clueData = locationData.weak[clueIndex % locationData.weak.length]
+      } else {
+        clueData = `Faint residual signals at ${cityName} — trace too degraded to analyze. Could be anyone.`
+      }
+    }
+
+    return {
+      hash: txHash || `0x${Math.random().toString(16).slice(2, 14)}...mock`,
+      blockNumber: blockNumber || 52884300 + Math.floor(Math.random() * 100),
+      requestId: Date.now(),
+      resolved: true,
+      clueType: tier === 'weak' ? 'DEAD_END' : clueTypes[Math.floor(Math.random() * 5)],
+      clueData,
+      anomalyRefId: `0x${Math.random().toString(16).slice(2, 14)}`,
+      strength,
+    }
+  }
+
+  // ── default random behavior (no scripted route) ──
 
   // starting clue is always strong (guaranteed lead for the player)
   // regular clues: ~15% dead end chance, otherwise random 20-95
@@ -885,7 +950,6 @@ function _mockClueResult(cityId, locationIdx, clueIndex, txHash, blockNumber, is
   else tier = "strong"
 
   // pick clue text from the matching tier
-  const cityName = CITY_NODE_META[cityId]?.name || "unknown"
   let clueData
   if (locationData && locationData[tier]) {
     const tierTexts = locationData[tier]
@@ -1588,6 +1652,36 @@ export async function cityNodeRequestCapture(cityId, suspectWallet, evidenceBund
   if (!isCityNodeConfigured(chainId)) {
     console.log(`[cityNode] requestCapture(${suspectWallet}) on chain ${chainId} — MOCK`)
     await new Promise((r) => setTimeout(r, 3500))
+
+    // scripted route override: deterministic capture result
+    const route = getActiveRoute()
+    if (route) {
+      const isCaptureCityCorrect = cityId === route.captureCity
+      const isWalletCorrect = suspectWallet?.toLowerCase() === route.carmenWallet?.toLowerCase()
+
+      if (isCaptureCityCorrect && isWalletCorrect) {
+        return {
+          hash: `0x${Math.random().toString(16).slice(2, 14)}...mock`,
+          requestId: Date.now(),
+          resolved: true,
+          success: true,
+          reasonCode: "OK",
+          gmNote: "Target confirmed! Carmen Sandiego apprehended.",
+        }
+      }
+      return {
+        hash: `0x${Math.random().toString(16).slice(2, 14)}...mock`,
+        requestId: Date.now(),
+        resolved: true,
+        success: false,
+        reasonCode: isCaptureCityCorrect ? "WALLET_MISMATCH" : "WRONG_CITY",
+        gmNote: isCaptureCityCorrect
+          ? "Capture failed. The wallet address does not match Carmen's. Review your evidence."
+          : `Capture failed. Carmen is not in ${CITY_NODE_META[cityId]?.name || 'this city'}. Follow the clues to her real location.`,
+      }
+    }
+
+    // default random behavior
     const success = Math.random() > 0.4
     const reasonCodes = ["INSUFFICIENT_EVIDENCE", "WALLET_MISMATCH", "WRONG_CITY"]
     return {
