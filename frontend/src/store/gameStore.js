@@ -434,8 +434,15 @@ export const useGameStore = create((set, get) => ({
         if (abandonedId === String(activeMissionId)) {
           console.log('[initGame] mission', activeMissionId, 'was abandoned — skipping restore')
         } else {
-          const state = get()
-          await state.loadMissionState(Number(activeMissionId))
+          // check if mission is already expired before loading full state
+          const blocksUsed = await getBlocksUsed(Number(activeMissionId))
+          if (blocksUsed >= MAX_BLOCKS) {
+            console.log('[initGame] mission', activeMissionId, 'already expired (' + blocksUsed + ' blocks) — auto-abandoning')
+            localStorage.setItem(ABANDONED_MISSION_KEY, String(activeMissionId))
+          } else {
+            const state = get()
+            await state.loadMissionState(Number(activeMissionId))
+          }
         }
       }
     } catch (error) {

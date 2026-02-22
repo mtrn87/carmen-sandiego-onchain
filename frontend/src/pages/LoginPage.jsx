@@ -286,6 +286,8 @@ export default function LoginPage() {
                         }
                         useGameStore.setState({
                           briefingDone: true,
+                          showOutcomeModal: false,
+                          missionOutcome: null,
                           terminalLines: [
                             { text: '> ACME MAINFRAME :: INITIALIZING MISSION', color: 'cyan', type: 'system' },
                             { text: '> Agent connected. Welcome, Detective.', color: 'green', type: 'system' },
@@ -299,10 +301,11 @@ export default function LoginPage() {
                       }
                       // no active mission — start one on-chain, then show briefing
                       setStartingMission(true)
-                      localStorage.removeItem('carmen_abandoned_mission')
                       try {
                         await ensureSepoliaNetwork()
                         await startMissionOnChain()
+                        // only clear abandoned marker after new mission succeeds
+                        localStorage.removeItem('carmen_abandoned_mission')
                       } catch (err) {
                         console.error('[LoginPage] startMission failed:', err)
                       }
