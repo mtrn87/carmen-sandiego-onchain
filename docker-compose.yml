@@ -1,0 +1,27 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_GAME_MASTER_ADDRESS: ${VITE_GAME_MASTER_ADDRESS:-0x0000000000000000000000000000000000000000}
+        VITE_CITYNODE_TOKYO_ADDRESS: ${VITE_CITYNODE_TOKYO_ADDRESS:-}
+        VITE_CITYNODE_PARIS_ADDRESS: ${VITE_CITYNODE_PARIS_ADDRESS:-}
+        VITE_CITYNODE_LONDON_ADDRESS: ${VITE_CITYNODE_LONDON_ADDRESS:-}
+        VITE_ARBITRUM_SEPOLIA_RPC_URL: ${VITE_ARBITRUM_SEPOLIA_RPC_URL:-https://sepolia-rollup.arbitrum.io/rpc}
+        VITE_BASE_SEPOLIA_RPC_URL: ${VITE_BASE_SEPOLIA_RPC_URL:-https://sepolia.base.org}
+        VITE_XDC_APOTHEM_RPC_URL: ${VITE_XDC_APOTHEM_RPC_URL:-https://erpc.apothem.network}
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
+  # Relayer server (placeholder - uncomment when implemented)
+  # relayer:
+  #   build:
+  #     context: ./relayer
+  #   ports:
+  #     - "3001:3001"
+  #   env_file:
+  #     - ./relayer/.env
+  #   depends_on:
+  #     - frontend
+  #   restart: unless-stopped
