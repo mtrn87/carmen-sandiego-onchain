@@ -27,6 +27,8 @@ export default function GamePage() {
     selectLocation,
     currentCityId,
     captureMode,
+    captureSelectedTx,
+    backToCityPanel,
   } = useGameStore()
   const [showMap, setShowMap] = useState(true)
 
@@ -63,25 +65,29 @@ export default function GamePage() {
     setShowMap(false)
   }
 
+  // back to city location panel (preserves city state, reopens map with panel)
+  const handleBackToCityPanel = () => {
+    backToCityPanel()
+    useGameStore.setState({ autoOpenHomeCity: true })
+    setShowMap(true)
+  }
+
   // determine what to show in the main area
   const renderMainContent = () => {
     if (showMap) {
       return (
-        <>
-          <InteractiveMap
-            onSelectCase={handleSelectCase}
-          />
-          <button
-            className={styles.backToExplorer}
-            onClick={() => setShowMap(false)}
-          >
-            &#9664; BACK TO EXPLORER
-          </button>
-        </>
+        <InteractiveMap
+          onSelectCase={handleSelectCase}
+        />
       )
     }
 
-    return <ContractExplorer onOpenMap={() => setShowMap(true)} />
+    return (
+      <ContractExplorer
+        onOpenMap={() => setShowMap(true)}
+        onBackToCityPanel={handleBackToCityPanel}
+      />
+    )
   }
 
   return (
@@ -104,17 +110,19 @@ export default function GamePage() {
       {showCityClueModal && <ClueModal />}
 
       {/* left sidebar — terminal (dimmed in capture mode) */}
-      <aside className={`${styles.sidebar} ${captureMode ? styles.sidebarDimmed : ''}`}>
+      <aside className={`${styles.sidebar} ${captureMode && captureSelectedTx ? styles.sidebarDimmed : ''}`}>
         <TerminalSidebar />
       </aside>
 
-      {/* right area — explorer/map + capture bar */}
+      {/* right area — explorer/map */}
       <main className={styles.main}>
         <div className={styles.mapArea}>
           {renderMainContent()}
         </div>
-        {captureMode && <CaptureMode />}
       </main>
+
+      {/* capture modal — opens when a tx is selected in capture mode */}
+      {captureMode && captureSelectedTx && !showMap && <CaptureMode />}
 
     </div>
   )

@@ -110,10 +110,10 @@ export default function TerminalSidebar() {
     }
 
     // Block pressure warnings
-    if (blocksElapsed > 40) {
+    if (blocksElapsed > 256) {
       return 'CRITICAL: You\'re running out of blocks! Investigate the most likely city NOW before Carmen escapes!'
     }
-    if (blocksElapsed > 30) {
+    if (blocksElapsed > 192) {
       return 'Time is running low. Focus on the city that matches your clues best. Every block counts.'
     }
 

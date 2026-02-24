@@ -263,7 +263,7 @@ const CITY_LOCATIONS = [
 //  Constants
 // ============================================================
 
-const MAX_BLOCKS = 50
+const MAX_BLOCKS = 320
 
 // ============================================================
 //  Store
@@ -294,6 +294,7 @@ export const useGameStore = create((set, get) => ({
   scannedLocations: [],
   isScanning: false,
   briefingDone: false,
+  autoOpenHomeCity: false,
   tourActive: false,
   tourStep: 0,
   currentCase: null,
@@ -560,7 +561,11 @@ export const useGameStore = create((set, get) => ({
     // Poll blocks elapsed every 12s (~ 1 Sepolia block)
     const applyBlockPoll = (blocks) => {
       const clamped = Math.min(blocks, MAX_BLOCKS)
-      set({ blocksElapsed: clamped })
+      // Only update if on-chain value is higher than local (actions may have
+      // pushed local ahead of chain). This avoids resetting action-based cost.
+      if (clamped > get().blocksElapsed) {
+        set({ blocksElapsed: clamped })
+      }
       if (clamped >= MAX_BLOCKS && !get().showOutcomeModal) {
         set((s) => ({
           showOutcomeModal: true,
@@ -837,12 +842,12 @@ export const useGameStore = create((set, get) => ({
    * Triggers mission failure screen when limit is reached.
    * Returns the new blocksElapsed value.
    */
-  _spendBlocks: (cost) => {
+  _spendBlocks: (cost, { allowExceed = false } = {}) => {
     const { blocksElapsed, missionId } = get()
-    const newBlocks = Math.min(blocksElapsed + cost, MAX_BLOCKS)
+    const newBlocks = allowExceed ? blocksElapsed + cost : Math.min(blocksElapsed + cost, MAX_BLOCKS)
     set({ blocksElapsed: newBlocks })
 
-    if (newBlocks >= MAX_BLOCKS) {
+    if (newBlocks >= MAX_BLOCKS && !allowExceed) {
       set((s) => ({
         showOutcomeModal: true,
         missionOutcome: { type: 'failed' },
@@ -1075,6 +1080,7 @@ export const useGameStore = create((set, get) => ({
 
         set({
           briefingDone: true,
+          autoOpenHomeCity: true,
           tourActive: true,
           tourStep: 0,
         })
@@ -1094,6 +1100,7 @@ export const useGameStore = create((set, get) => ({
         // No on-chain mission — start in mock/demo mode
         set({
           briefingDone: true,
+          autoOpenHomeCity: true,
           tourActive: true,
           tourStep: 0,
         })
@@ -1218,6 +1225,7 @@ export const useGameStore = create((set, get) => ({
       locations: CITY_LOCATIONS,
       scannedLocations: [],
       briefingDone: false,
+      autoOpenHomeCity: false,
       isInvestigating: false,
       showClueModal: false,
       activeClue: null,
@@ -1301,6 +1309,7 @@ export const useGameStore = create((set, get) => ({
       locations: CITY_LOCATIONS,
       scannedLocations: [],
       briefingDone: false,
+      autoOpenHomeCity: false,
       isInvestigating: false,
       showClueModal: false,
       activeClue: null,
@@ -1422,8 +1431,8 @@ export const useGameStore = create((set, get) => ({
     set({ isScanning: true })
 
     try {
-      // 1. Spend 6 blocks for scanning a network
-      const newBlocks = get()._spendBlocks(6)
+      // 1. Spend 21 blocks for scanning a new city network
+      const newBlocks = get()._spendBlocks(21)
       if (newBlocks >= MAX_BLOCKS) { set({ isScanning: false }); return }
 
       // 2. Load all CityNode data (locations, anomalies, suspects, energy)
@@ -1730,6 +1739,11 @@ export const useGameStore = create((set, get) => ({
     })
   },
 
+  // go back to the city location panel (keeps city state, clears location selection)
+  backToCityPanel: () => {
+    set({ currentLocationIdx: null })
+  },
+
   selectLocation: (idx) => {
     set({ currentLocationIdx: idx })
     saveProgress(get())
@@ -1785,13 +1799,13 @@ export const useGameStore = create((set, get) => ({
     if (!currentCityId) return
     if (get()._isMissionExpired()) return
 
-    const newBlocks = get()._spendBlocks(6)
+    const newBlocks = get()._spendBlocks(3)
     if (newBlocks >= MAX_BLOCKS) return
 
     set((s) => ({
       terminalLines: [...s.terminalLines,
         { text: `> SCAN ANOMALIES: ${s.cityLocations[locationIdx]?.name}`, color: 'cyan', type: 'action' },
-        { text: `> +6 BLOCKS (${newBlocks} total)`, color: 'yellow', type: 'system' },
+        { text: `> +3 BLOCKS (${newBlocks} total)`, color: 'yellow', type: 'system' },
       ],
     }))
 
@@ -1828,17 +1842,19 @@ export const useGameStore = create((set, get) => ({
   },
 
   gameplayRequestClue: async (locationIdx, clueIndex) => {
-    const { currentCityId, startLocationIdx } = get()
+    const { currentCityId, startLocationIdx, gameplayLoading } = get()
     if (!currentCityId) return
+    if (gameplayLoading) return
     if (get()._isMissionExpired()) return
 
-    const newBlocks = get()._spendBlocks(2)
+    const newBlocks = get()._spendBlocks(5)
     if (newBlocks >= MAX_BLOCKS) return
 
     set((s) => ({
+      gameplayLoading: true,
       terminalLines: [...s.terminalLines,
         { text: `> REQUEST CLUE ${clueIndex + 1}/3: ${s.cityLocations[locationIdx]?.name}`, color: 'cyan', type: 'action' },
-        { text: `> +2 BLOCKS (${newBlocks} total)`, color: 'yellow', type: 'system' },
+        { text: `> +5 BLOCKS (${newBlocks} total)`, color: 'yellow', type: 'system' },
         { text: '> PENDING GM...', color: 'muted', type: 'system' },
       ],
     }))
@@ -1846,7 +1862,13 @@ export const useGameStore = create((set, get) => ({
     try {
       // first clue at the starting location is always strong (guaranteed lead)
       const isStartingClue = locationIdx === startLocationIdx && clueIndex === 0
-      const result = await cityNodeRequestClue(currentCityId, locationIdx, clueIndex, isStartingClue)
+
+      // count clues already collected in this city node for balancing rules
+      const cityClues = get().cityEvidence.filter((c) => c.cityId === currentCityId)
+      const totalCluesInCity = cityClues.length
+      const hasStrongClue = cityClues.some((c) => !c.isDeadEnd && c.strength > 70)
+
+      const result = await cityNodeRequestClue(currentCityId, locationIdx, clueIndex, isStartingClue, { totalCluesInCity, hasStrongClue })
 
       const isDeadEnd = result.clueType === 'DEAD_END'
       const newClue = {
@@ -1878,6 +1900,7 @@ export const useGameStore = create((set, get) => ({
       } : null
 
       set((s) => ({
+        gameplayLoading: false,
         showCityClueModal: true,
         activeCityClue: newClue,
         cityLocations: s.cityLocations.map((loc, i) =>
@@ -1903,6 +1926,7 @@ export const useGameStore = create((set, get) => ({
       saveProgress(get())
     } catch (error) {
       set((s) => ({
+        gameplayLoading: false,
         terminalLines: [...s.terminalLines,
           { text: `> !! CLUE REQUEST FAILED: ${error.message}`, color: 'red', type: 'alert' },
         ],
@@ -1995,10 +2019,12 @@ export const useGameStore = create((set, get) => ({
   gameplayRequestCapture: async (suspectWallet) => {
     const { currentCityId } = get()
     if (!currentCityId) return
+    // allow capture even past MAX_BLOCKS — the capture itself can exceed the limit
+    // only block if mission was explicitly expired before this attempt
     if (get()._isMissionExpired()) return
 
-    const newBlocks = get()._spendBlocks(3)
-    if (newBlocks >= MAX_BLOCKS) return
+    const CAPTURE_COST = 30
+    const newBlocks = get()._spendBlocks(CAPTURE_COST, { allowExceed: true })
 
     set((s) => ({
       captureState: 'pending',
@@ -2006,8 +2032,8 @@ export const useGameStore = create((set, get) => ({
         { text: '', color: 'muted', type: 'system' },
         { text: '> ████████████████████████████████████████', color: 'red', type: 'system' },
         { text: `> CAPTURE ATTEMPT: ${suspectWallet}`, color: 'red', type: 'action' },
-        { text: `> +3 BLOCKS (${newBlocks} total)`, color: 'yellow', type: 'system' },
-        { text: '> Submitting evidence bundle to GameMaster...', color: 'muted', type: 'system' },
+        { text: `> +${CAPTURE_COST} BLOCKS (${newBlocks} total)`, color: 'yellow', type: 'system' },
+        { text: '> Initiating full evidence analysis...', color: 'muted', type: 'system' },
       ],
     }))
 
@@ -2031,11 +2057,24 @@ export const useGameStore = create((set, get) => ({
           captureState: 'fail',
           captureResult: result,
           terminalLines: [...s.terminalLines,
-            { text: `> !! CAPTURE FAILED: ${result.reasonCode}`, color: 'red', type: 'alert' },
-            { text: `> GM Note: ${result.gmNote}`, color: 'yellow', type: 'system' },
+            { text: `> !! CAPTURE RESULT: ${result.reasonCode}`, color: 'red', type: 'alert' },
+            { text: `> ${result.gmNote}`, color: 'yellow', type: 'system' },
             { text: '> ████████████████████████████████████████', color: 'red', type: 'system' },
           ],
         }))
+        // if blocks exceeded after failed capture, trigger mission failure
+        if (get().blocksElapsed >= MAX_BLOCKS) {
+          setTimeout(() => {
+            set((s) => ({
+              captureMode: false,
+              showOutcomeModal: true,
+              missionOutcome: { type: 'failed' },
+              terminalLines: [...s.terminalLines,
+                { text: '> !! MISSION EXPIRED — Carmen escaped.', color: 'red', type: 'alert' },
+              ],
+            }))
+          }, 3000)
+        }
       }
     } catch (error) {
       set((s) => ({

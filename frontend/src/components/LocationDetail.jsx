@@ -97,7 +97,7 @@ export default function LocationDetail() {
           disabled={!loc.inspected || loc.scanned || gameplayLoading}
           onClick={() => gameplayScanAnomalies(currentLocationIdx)}
         >
-          {loc.scanned ? 'SCANNED' : 'SCAN (2 E)'}
+          {loc.scanned ? 'SCANNED' : 'SCAN (3 E)'}
         </button>
         {[0, 1, 2].map((ci) => (
           <button
@@ -108,7 +108,7 @@ export default function LocationDetail() {
           >
             {loc.clueSlots[ci]
               ? `CLUE #${ci + 1} \u2713`
-              : `REQ CLUE #${ci + 1} (2 E)`}
+              : `REQ CLUE #${ci + 1} (5 E)`}
           </button>
         ))}
       </div>

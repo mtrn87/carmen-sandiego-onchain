@@ -20,7 +20,7 @@ export const CITY_POOL = [
     id: 421614, name: 'Tokyo', flag: '\u{1F5FE}',
     chain: 'Arbitrum Sepolia', chainId: 421614,
     chainColor: '#28A0F0', chainIcon: '/blockchain_icon/arbitrum.png',
-    image: '/tokyo.png', coords: { left: '83%', top: '34%' },
+    image: '/tokyo.png', coords: { x: 1704, y: 315 },
     cases: [
       { id: 'tokyo-sensoji', name: 'Senso-ji Temple Node', type: 'Bridge Relay', status: 'active', description: 'Ancient relay pulsing with cross-chain traffic.', image: '/tokyo_1.png', chainId: 421614 },
       { id: 'tokyo-tower', name: 'Tokyo Tower Beacon', type: 'Signal Router', status: 'active', description: 'High-altitude signal bouncing encrypted bursts.', image: '/tokyo_2.png', chainId: 421614 },
@@ -31,7 +31,7 @@ export const CITY_POOL = [
     id: 4216141, name: 'Ottawa', flag: '\u{1F1E8}\u{1F1E6}',
     chain: 'Arbitrum Sepolia', chainId: 421614,
     chainColor: '#28A0F0', chainIcon: '/blockchain_icon/arbitrum.png',
-    image: '/ottawa.png', coords: { left: '29%', top: '27%' },
+    image: '/ottawa.png', coords: { x: 556, y: 237 },
     cases: [
       { id: 'ottawa-rideau', name: 'Rideau Canal Relay', type: 'Bridge Relay', status: 'active', description: 'A relay node pulsing under the frozen Rideau Canal.', image: '/ottawa_1.png', chainId: 421614 },
       { id: 'ottawa-parliament', name: 'Parliament Hill Beacon', type: 'Signal Router', status: 'active', description: 'Encrypted bursts match known thief signatures.', image: '/ottawa_2.png', chainId: 421614 },
@@ -43,7 +43,7 @@ export const CITY_POOL = [
     id: 97, name: 'London', flag: '\u{1F1EC}\u{1F1E7}',
     chain: 'BNB Testnet', chainId: 97,
     chainColor: '#F0B90B', chainIcon: '/blockchain_icon/bnb.png',
-    image: '/london.png', coords: { left: '46%', top: '24%' },
+    image: '/london.png', coords: { x: 959, y: 188 },
     cases: [
       { id: 'london-bigben', name: 'Big Ben Relay', type: 'Bridge Relay', status: 'active', description: 'A relay hidden beneath Big Ben. BNB ingress confirmed.', image: '/london_1.png', chainId: 97 },
       { id: 'london-palace', name: 'Buckingham Palace Beacon', type: 'Signal Router', status: 'active', description: 'Encrypted signals pulse from behind palace walls.', image: '/london_2.png', chainId: 97 },
@@ -54,7 +54,7 @@ export const CITY_POOL = [
     id: 98, name: 'Shanghai', flag: '\u{1F3E2}',
     chain: 'BNB Testnet', chainId: 97,
     chainColor: '#F0B90B', chainIcon: '/blockchain_icon/bnb.png',
-    image: '/shanghai.png', coords: { left: '78%', top: '39%' },
+    image: '/shanghai.png', coords: { x: 1607, y: 350 },
     cases: [
       { id: 'shanghai-pearl', name: 'Oriental Pearl Relay', type: 'Bridge Relay', status: 'active', description: 'A relay broadcasting from the Oriental Pearl. Cross-chain drift detected.', image: '/shanghai_1.png', chainId: 97 },
       { id: 'shanghai-tower', name: 'Shanghai Tower Node', type: 'Signal Router', status: 'active', description: 'Data spikes match the stolen NFT trail.', image: '/shanghai_2.png', chainId: 97 },
@@ -65,7 +65,7 @@ export const CITY_POOL = [
     id: 99, name: 'Reykjav\u00EDk', flag: '\u2744\uFE0F',
     chain: 'BNB Testnet', chainId: 97,
     chainColor: '#F0B90B', chainIcon: '/blockchain_icon/bnb.png',
-    image: '/island.png', coords: { left: '38px', top: '14%' },
+    image: '/island.png', coords: { x: 843, y: 87 },
     cases: [
       { id: 'reykjavik-hallgrimskirkja', name: 'Hallgr\u00EDmskirkja Node', type: 'Signal Router', status: 'active', description: 'BNB transmissions spike in the northern aurora.', image: '/island_1.png', chainId: 97 },
       { id: 'reykjavik-harpa', name: 'Harpa Concert Relay', type: 'Bridge Relay', status: 'active', description: 'Cross-chain flows converge in the cold.', image: '/island_2.png', chainId: 97 },
@@ -76,7 +76,7 @@ export const CITY_POOL = [
     id: 971, name: 'Berlin', flag: '\u{1F1E9}\u{1F1EA}',
     chain: 'BNB Testnet', chainId: 97,
     chainColor: '#F0B90B', chainIcon: '/blockchain_icon/bnb.png',
-    image: '/berlin.png', coords: { left: '50%', top: '23%' },
+    image: '/berlin.png', coords: { x: 1031, y: 180 },
     cases: [
       { id: 'berlin-gate', name: 'Brandenburg Gate Relay', type: 'Bridge Relay', status: 'active', description: 'BNB ingress surging at the historic gate. Cross-chain signatures detected.', image: '/berlin_1.png', chainId: 97 },
       { id: 'berlin-tower', name: 'TV Tower Beacon', type: 'Signal Router', status: 'active', description: 'Encrypted bursts pulse from the Fernsehturm. Signal matches known suspect patterns.', image: '/berlin_2.png', chainId: 97 },
@@ -88,7 +88,7 @@ export const CITY_POOL = [
     id: 84532, name: 'Paris', flag: '\u{1F5FC}',
     chain: 'Base Sepolia', chainId: 84532,
     chainColor: '#0052FF', chainIcon: '/blockchain_icon/base.png',
-    image: '/paris.png', coords: { left: '48%', top: '29%' },
+    image: '/paris.png', coords: { x: 972, y: 209 },
     cases: [
       { id: 'paris-eiffel', name: 'Eiffel Tower Relay', type: 'Monitoring Beacon', status: 'active', description: 'Monitoring beacon with bridge ingress traces.', image: '/paris_1.png', chainId: 84532 },
       { id: 'paris-louvre', name: 'Louvre Custody Router', type: 'Custody Protocol', status: 'active', description: 'High-value custody operations detected.', image: '/paris_2.png', chainId: 84532 },
@@ -99,7 +99,7 @@ export const CITY_POOL = [
     id: 845321, name: 'Rome', flag: '\u{1F3DB}',
     chain: 'Base Sepolia', chainId: 84532,
     chainColor: '#0052FF', chainIcon: '/blockchain_icon/base.png',
-    image: '/roma.png', coords: { left: '53%', top: '34%' },
+    image: '/roma.png', coords: { x: 1027, y: 265 },
     cases: [
       { id: 'rome-st-peter', name: 'Saint Peter Relay', type: 'Bridge Relay', status: 'active', description: 'Base hops stacking rapidly near Saint Peter.', image: '/roma_1.png', chainId: 84532 },
       { id: 'rome-colosseum', name: 'Colosseum Beacon', type: 'Signal Router', status: 'active', description: 'Signal echoes align with the theft trail.', image: '/roma_2.png', chainId: 84532 },
@@ -111,7 +111,7 @@ export const CITY_POOL = [
     id: 51, name: 'Sydney', flag: '\u{1F3A7}',
     chain: 'XDC Apothem', chainId: 51,
     chainColor: '#00AEEF', chainIcon: '/blockchain_icon/xdc.png',
-    image: '/sydney.png', coords: { left: '87%', top: '78%' },
+    image: '/sydney.png', coords: { x: 1765, y: 871 },
     cases: [
       { id: 'sydney-opera', name: 'Opera House Node', type: 'Signal Router', status: 'active', description: 'XDC transmissions intensify after dusk.', image: '/sydney_1.png', chainId: 51 },
       { id: 'sydney-bridge', name: 'Harbour Bridge Relay', type: 'Bridge Relay', status: 'active', description: 'Cross-chain drips forming a trail.', image: '/sydney_2.png', chainId: 51 },
@@ -122,7 +122,7 @@ export const CITY_POOL = [
     id: 511, name: 'Nairobi', flag: '\u{1F333}',
     chain: 'XDC Apothem', chainId: 51,
     chainColor: '#00AEEF', chainIcon: '/blockchain_icon/xdc.png',
-    image: '/nairobi.png', coords: { left: '59%', top: '61%' },
+    image: '/nairobi.png', coords: { x: 1157, y: 610 },
     cases: [
       { id: 'nairobi-park', name: 'National Park Relay', type: 'Bridge Relay', status: 'active', description: 'XDC ingress confirmed from the park.', image: '/nairobi_1.png', chainId: 51 },
       { id: 'nairobi-giraffe', name: 'Giraffe Centre Beacon', type: 'Signal Router', status: 'active', description: "The thief's route is close.", image: '/nairobi_2.png', chainId: 51 },
@@ -133,7 +133,7 @@ export const CITY_POOL = [
     id: 512, name: 'Rio de Janeiro', flag: '\u{1F3D6}',
     chain: 'XDC Apothem', chainId: 51,
     chainColor: '#00AEEF', chainIcon: '/blockchain_icon/xdc.png',
-    image: '/rio.png', coords: { left: '34%', top: '74%' },
+    image: '/rio.png', coords: { x: 730, y: 784 },
     cases: [
       { id: 'rio-cristo', name: 'Cristo Redentor Node', type: 'Signal Router', status: 'active', description: 'XDC traffic flares at night.', image: '/rio_1.png', chainId: 51 },
       { id: 'rio-copacabana', name: 'Copacabana Vault', type: 'Custody Protocol', status: 'active', description: 'Custody flows pool near Copacabana Palace.', image: '/rio_2.png', chainId: 51 },
@@ -145,7 +145,7 @@ export const CITY_POOL = [
     id: 80002, name: 'Santiago', flag: '\u{1F5FB}',
     chain: 'Polygon Amoy', chainId: 80002,
     chainColor: '#8247E5', chainIcon: '/blockchain_icon/polygon.png',
-    image: '/chile.png', coords: { left: '26%', top: '82%' },
+    image: '/chile.png', coords: { x: 583, y: 868 },
     cases: [
       { id: 'santiago-easter', name: 'Easter Island Relay', type: 'Bridge Relay', status: 'active', description: 'Polygon flows converge at Easter Island.', image: '/chile_1.png', chainId: 80002 },
       { id: 'santiago-torre', name: 'Gran Torre Node', type: 'Signal Router', status: 'active', description: 'Polygon pings align with the suspect route.', image: '/chile_2.png', chainId: 80002 },
@@ -156,7 +156,7 @@ export const CITY_POOL = [
     id: 800021, name: 'Dakar', flag: '\u{1F30D}',
     chain: 'Polygon Amoy', chainId: 80002,
     chainColor: '#8247E5', chainIcon: '/blockchain_icon/polygon.png',
-    image: '/dakar.png', coords: { left: '36%', top: '56%' },
+    image: '/dakar.png', coords: { x: 867, y: 483 },
     cases: [
       { id: 'dakar-renaissance', name: 'Renaissance Monument Relay', type: 'Bridge Relay', status: 'active', description: 'Polygon ingress rising.', image: '/dakar_1.png', chainId: 80002 },
       { id: 'dakar-goree', name: 'Goree Island Node', type: 'Signal Router', status: 'active', description: 'Traffic spikes match the stolen route.', image: '/dakar_2.png', chainId: 80002 },
@@ -167,7 +167,7 @@ export const CITY_POOL = [
     id: 800022, name: 'Moscow', flag: '\u26EA',
     chain: 'Polygon Amoy', chainId: 80002,
     chainColor: '#8247E5', chainIcon: '/blockchain_icon/polygon.png',
-    image: '/moscow.png', coords: { left: '58%', top: '22%' },
+    image: '/moscow.png', coords: { x: 1161, y: 154 },
     cases: [
       { id: 'moscow-red-square', name: 'Red Square Relay', type: 'Bridge Relay', status: 'active', description: 'Polygon ingress rising fast.', image: '/moscow_1.png', chainId: 80002 },
       { id: 'moscow-kremlin', name: 'Kremlin Beacon', type: 'Signal Router', status: 'active', description: 'Encrypted traffic matches the suspect trail.', image: '/moscow_2.png', chainId: 80002 },
@@ -179,7 +179,7 @@ export const CITY_POOL = [
     id: 11155111, name: 'New York City', flag: '\u{1F30E}',
     chain: 'Ethereum Sepolia', chainId: 11155111,
     chainColor: '#627EEA', chainIcon: '/blockchain_icon/eth.png',
-    image: '/nyc.png', coords: { left: '27%', top: '34%' },
+    image: '/nyc.png', coords: { x: 565, y: 274 },
     cases: [
       { id: 'nyc-liberty', name: 'Liberty Island Relay', type: 'Bridge Relay', status: 'active', description: 'Ethereum ingress confirmed.', image: '/nyc_1.png', chainId: 11155111 },
       { id: 'nyc-central', name: 'Central Park Beacon', type: 'Signal Router', status: 'active', description: 'Signal bursts ripple across Central Park.', image: '/nyc_2.png', chainId: 11155111 },
@@ -190,7 +190,7 @@ export const CITY_POOL = [
     id: 11155112, name: 'Mexico City', flag: '\u{1F1F2}\u{1F1FD}',
     chain: 'Ethereum Sepolia', chainId: 11155111,
     chainColor: '#627EEA', chainIcon: '/blockchain_icon/eth.png',
-    image: '/mexico.png', coords: { left: '23%', top: '50%' },
+    image: '/mexico.png', coords: { x: 431, y: 444 },
     cases: [
       { id: 'mexico-bellas', name: 'Bellas Artes Relay', type: 'Bridge Relay', status: 'active', description: 'Ethereum hops intensify near Bellas Artes.', image: '/mexico_1.png', chainId: 11155111 },
       { id: 'mexico-chapultepec', name: 'Chapultepec Beacon', type: 'Signal Router', status: 'active', description: 'The suspects route passes through here.', image: '/mexico_2.png', chainId: 11155111 },
@@ -201,7 +201,7 @@ export const CITY_POOL = [
     id: 11155113, name: 'Dubai', flag: '\u{1F3E0}',
     chain: 'Ethereum Sepolia', chainId: 11155111,
     chainColor: '#627EEA', chainIcon: '/blockchain_icon/eth.png',
-    image: '/dubai.png', coords: { left: '62%', top: '46%' },
+    image: '/dubai.png', coords: { x: 1255, y: 398 },
     cases: [
       { id: 'dubai-burj', name: 'Burj Khalifa Node', type: 'Signal Router', status: 'active', description: 'Ethereum bursts align with the theft.', image: '/dubai_1.png', chainId: 11155111 },
       { id: 'dubai-airport', name: 'Dubai Airport Relay', type: 'Bridge Relay', status: 'active', description: 'Cross-chain transfers accelerating.', image: '/dubai_2.png', chainId: 11155111 },

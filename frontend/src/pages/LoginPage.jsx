@@ -273,12 +273,29 @@ export default function LoginPage() {
                     loading={startingMission}
                     onClick={async () => {
                       if (missionId) {
-                        // mission already active — skip briefing, load city and go to game
+                        // mission already active — skip briefing, restore discovery + city state
                         setStartingMission(true)
                         try {
                           const store = useGameStore.getState()
-                          await store.selectCity(421614)
-                          store.selectLocation(0)
+                          // restore discovered cities, visited cities, trail from localStorage
+                          await store.initDiscovery(missionId)
+                          // restore saved evidence from localStorage
+                          const saved = JSON.parse(localStorage.getItem('carmen_investigation_progress') || '{}')
+                          const restored = {}
+                          if (saved.evidence?.length > 0) restored.evidence = saved.evidence
+                          if (saved.cityEvidence?.length > 0) restored.cityEvidence = saved.cityEvidence
+                          if (saved.walletFragments?.length > 0) {
+                            restored.walletFragments = saved.walletFragments
+                            restored.walletFragmentCount = saved.walletFragmentCount || saved.walletFragments.length
+                            restored.walletCaptureAvailable = (restored.walletFragmentCount || 0) >= 3
+                          }
+                          if (saved.evidenceCount > 0) restored.evidenceCount = saved.evidenceCount
+                          if (Object.keys(restored).length > 0) useGameStore.setState(restored)
+                          // restore last visited city or fall back to home
+                          const resumeCityId = saved.currentCityId || useGameStore.getState().discoveredCityIds?.[0] || 80002
+                          const resumeLocIdx = saved.currentLocationIdx ?? 0
+                          await store.selectCity(resumeCityId)
+                          store.selectLocation(resumeLocIdx)
                           store.hydrateMissionPlot(missionId)
                           await store._setupEventListeners(missionId)
                         } catch (err) {

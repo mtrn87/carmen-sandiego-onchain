@@ -868,10 +868,12 @@ function _pickNextLeadCity(currentChainId, seed) {
   return candidates[idx]
 }
 
-function _mockClueResult(cityId, locationIdx, clueIndex, txHash, blockNumber, isStartingClue = false) {
+function _mockClueResult(cityId, locationIdx, clueIndex, txHash, blockNumber, isStartingClue = false, nodeStats = {}) {
   const clueTypes = ["BEHAVIOR_FINGERPRINT", "RELATIONSHIP", "IDENTITY_COMMIT", "FUNDING_TRAIL", "TECHNICAL_SIGNATURE", "DEAD_END"]
   const locationData = MOCK_CLUE_DATA[cityId]?.[locationIdx]
   const cityName = CITY_NODE_META[cityId]?.name || "unknown"
+
+  const { totalCluesInCity = 0, hasStrongClue = false } = nodeStats
 
   // ── scripted route override ──
   const route = getActiveRoute()
@@ -936,12 +938,24 @@ function _mockClueResult(cityId, locationIdx, clueIndex, txHash, blockNumber, is
 
   // ── default random behavior (no scripted route) ──
 
-  // starting clue is always strong (guaranteed lead for the player)
-  // regular clues: ~15% dead end chance, otherwise random 20-95
-  const isDeadEnd = isStartingClue ? false : Math.random() < 0.15
-  const strength = isStartingClue
-    ? 70 + Math.floor(Math.random() * 26)  // 70-95
-    : isDeadEnd ? 5 + Math.floor(Math.random() * 16) : 20 + Math.floor(Math.random() * 76) // 20-95
+  // rules:
+  // 1. first clue in the city node is never a dead end (player needs at least one useful lead)
+  // 2. dead ends only appear from the second clue onwards (~15% chance)
+  // 3. max one clue with strength > 70 per city node (prevents multiple strong leads from same node)
+  const isFirstClueInCity = totalCluesInCity === 0
+  const isDeadEnd = isStartingClue || isFirstClueInCity ? false : Math.random() < 0.15
+
+  let strength
+  if (isStartingClue) {
+    strength = 70 + Math.floor(Math.random() * 26)  // 70-95
+  } else if (isDeadEnd) {
+    strength = 5 + Math.floor(Math.random() * 16)   // 5-20
+  } else if (hasStrongClue) {
+    // already has a strong clue in this node — cap at 65 to avoid multiple strong leads
+    strength = 20 + Math.floor(Math.random() * 46)  // 20-65
+  } else {
+    strength = 20 + Math.floor(Math.random() * 76)  // 20-95
+  }
 
   // determine tier from strength
   let tier
@@ -1281,7 +1295,7 @@ function _mockAnomalyTxRefs(cityId) {
 export async function getCityNodeSuspectWallets(cityId) {
   const chainId = resolveChainId(cityId)
   const contract = getCityNodeGameplayContract(chainId)
-  if (!contract) return _mockSuspectWallets()
+  if (!contract) return _mockSuspectWallets(cityId)
 
   try {
     const rawWallets = await contract.getSuspectWallets(0, 50)
@@ -1294,12 +1308,42 @@ export async function getCityNodeSuspectWallets(cityId) {
     }))
   } catch (err) {
     console.warn(`[cityNode] getSuspectWallets real call failed for chain ${chainId}, using mock:`, err.message)
-    return _mockSuspectWallets()
+    return _mockSuspectWallets(cityId)
   }
 }
 
-function _mockSuspectWallets() {
-  // pick 3 wallets from pool (indices 2, 7, 15)
+function _mockSuspectWallets(cityId) {
+  const route = getActiveRoute()
+
+  // scripted route: capture city gets Carmen's wallet as extremely suspicious + 3 suspicious decoys
+  if (route && cityId === route.captureCity) {
+    const decoyIndices = [2, 7, 15]
+    const suspects = [
+      {
+        wallet: route.carmenWallet,
+        suspicionLevel: 97,
+        txRefIds: [1n, 2n, 3n, 4n, 5n, 6n],
+        tagsBitmap: 19n, // high-freq + cross-chain + mixer
+        tags: decodeTags(19n),
+        _isCarmen: true,
+      },
+      ...decoyIndices.map((idx, i) => ({
+        wallet: WALLET_POOL[idx].address,
+        suspicionLevel: [68, 59, 52][i],
+        txRefIds: [[2n, 5n], [3n, 4n], [1n]][i],
+        tagsBitmap: [12n, 16n, 4n][i],
+        tags: decodeTags([12n, 16n, 4n][i]),
+      })),
+    ]
+    // shuffle so Carmen isn't always first
+    for (let i = suspects.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [suspects[i], suspects[j]] = [suspects[j], suspects[i]]
+    }
+    return suspects
+  }
+
+  // default: 3 wallets from pool
   const picks = [2, 7, 15]
   const levels = [87, 62, 45]
   const bitmaps = [3n, 12n, 16n]
@@ -1461,12 +1505,12 @@ export async function cityNodeScanAnomalies(cityId, locationIdx) {
  * Request a clue at a location.
  * Async tx — sends request, then waits for GM resolve event (ClueUnlocked or DeadEnd).
  */
-export async function cityNodeRequestClue(cityId, locationIdx, clueIndex, isStartingClue = false) {
+export async function cityNodeRequestClue(cityId, locationIdx, clueIndex, isStartingClue = false, nodeStats = {}) {
   const chainId = resolveChainId(cityId)
   if (!isCityNodeConfigured(chainId)) {
     console.log(`[cityNode] requestClue(${locationIdx}, ${clueIndex}) on chain ${chainId} — MOCK${isStartingClue ? ' [STARTING CLUE]' : ''}`)
     await new Promise((r) => setTimeout(r, 2500))
-    return _mockClueResult(cityId, locationIdx, clueIndex, null, null, isStartingClue)
+    return _mockClueResult(cityId, locationIdx, clueIndex, null, null, isStartingClue, nodeStats)
   }
 
   // Try real contract call; fall back to mock if GM is unreachable
@@ -1495,7 +1539,7 @@ export async function cityNodeRequestClue(cityId, locationIdx, clueIndex, isStar
       const timeout = setTimeout(() => {
         cleanup()
         console.warn(`[cityNode] GM resolve timeout — using mock clue for location ${locationIdx}, clue ${clueIndex}`)
-        resolve(_mockClueResult(cityId, locationIdx, clueIndex, receipt.hash, receipt.blockNumber))
+        resolve(_mockClueResult(cityId, locationIdx, clueIndex, receipt.hash, receipt.blockNumber, false, nodeStats))
       }, 15_000)
 
       let clueUnsub, deadEndUnsub
@@ -1541,7 +1585,7 @@ export async function cityNodeRequestClue(cityId, locationIdx, clueIndex, isStar
   } catch (err) {
     console.warn(`[cityNode] requestClue real call failed for chain ${chainId}, using mock:`, err.message)
     await new Promise((r) => setTimeout(r, 2000))
-    return _mockClueResult(cityId, locationIdx, clueIndex)
+    return _mockClueResult(cityId, locationIdx, clueIndex, null, null, false, nodeStats)
   }
 }
 
@@ -1669,15 +1713,27 @@ export async function cityNodeRequestCapture(cityId, suspectWallet, evidenceBund
           gmNote: "Target confirmed! Carmen Sandiego apprehended.",
         }
       }
+      // generate contextual failure message based on the suspect wallet
+      let gmNote
+      if (!isCaptureCityCorrect) {
+        gmNote = `Capture failed. Carmen is not in ${CITY_NODE_META[cityId]?.name || 'this city'}. Follow the clues to her real location.`
+      } else {
+        // right city, wrong wallet — give a helpful dismissal
+        const dismissals = [
+          "Investigation complete. This wallet's transaction history is clean — no connection to Carmen's operations.",
+          "Analysis shows this wallet is suspicious but linked to unrelated DeFi arbitrage activity, not Carmen.",
+          "Despite high transaction volume, this wallet belongs to a known yield farming bot. Not our target.",
+          "Cross-chain audit complete. This address shows mixer usage for privacy, but no match with Carmen's operational pattern.",
+        ]
+        gmNote = dismissals[Math.floor(Math.random() * dismissals.length)]
+      }
       return {
         hash: `0x${Math.random().toString(16).slice(2, 14)}...mock`,
         requestId: Date.now(),
         resolved: true,
         success: false,
-        reasonCode: isCaptureCityCorrect ? "WALLET_MISMATCH" : "WRONG_CITY",
-        gmNote: isCaptureCityCorrect
-          ? "Capture failed. The wallet address does not match Carmen's. Review your evidence."
-          : `Capture failed. Carmen is not in ${CITY_NODE_META[cityId]?.name || 'this city'}. Follow the clues to her real location.`,
+        reasonCode: isCaptureCityCorrect ? "WALLET_CLEARED" : "WRONG_CITY",
+        gmNote,
       }
     }
 
