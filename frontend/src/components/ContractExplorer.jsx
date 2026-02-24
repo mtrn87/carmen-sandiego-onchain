@@ -89,7 +89,6 @@ export default function ContractExplorer({ onOpenMap }) {
     currentCityId,
     currentLocationIdx,
     cityLocations,
-    cityAnomalyTxRefs,
     blocksElapsed,
     backToMap,
     gameplayScanAnomalies,

@@ -18,7 +18,6 @@ export default function InteractiveMap({ onSelectCase }) {
     isScanning,
     scanLocation,
     scanAndInspect,
-    investigate,
     gas,
     missionId,
     blocksElapsed,

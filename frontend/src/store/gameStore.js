@@ -1,9 +1,7 @@
 import { create } from 'zustand'
 import {
-  registerPlayer as registerPlayerOnChain,
   isPlayerRegistered,
   getPlayerActiveMission,
-  startMission as startMissionOnChain,
   submitInvestigation as submitInvestigationOnChain,
   getMission,
   getMissionClues,
@@ -16,7 +14,6 @@ import {
   onWalletFragmentReceived,
   onWalletCaseBuilt,
   onEvidenceCollected,
-  getMissionWalletFragments,
   getMissionFragmentCount,
   getMissionEvidenceCount,
   CITY_MAP,
@@ -24,7 +21,6 @@ import {
   getCityNodeLocations,
   getCityNodeAnomalyTxRefs,
   getCityNodeSuspectWallets,
-  getCityNodeEvidenceSummary,
   cityNodeInspectLocation,
   cityNodeScanAnomalies,
   cityNodeRequestClue,
@@ -34,7 +30,7 @@ import {
   onCityNodeEvents,
   buildLocationTransactions,
 } from '../services/contractService'
-import { getPublicKeyHex, decryptClue } from '../utils/ecies'
+import { decryptClue } from '../utils/ecies'
 import scenariosData from '../data/scenarios.json'
 import { CITY_POOL_MAP, pickStartingCity, pickRevealedCities } from '../data/cityRegistry'
 import { getCarmenWallet, getCarmenLocationIdx } from '../data/walletPool'
@@ -462,13 +458,13 @@ export const useGameStore = create((set, get) => ({
     try {
       const blocks = await getBlocksUsed(missionId)
       set({ blocksElapsed: blocks })
-    } catch (_) { /* ignore initial fetch error */ }
+    } catch { /* ignore initial fetch error */ }
 
     const pollId = setInterval(async () => {
       try {
         const blocks = await getBlocksUsed(missionId)
         set({ blocksElapsed: blocks })
-      } catch (_) { /* ignore poll error */ }
+      } catch { /* ignore poll error */ }
     }, 12000)
     set({ _blockPollInterval: pollId })
 
@@ -1191,8 +1187,6 @@ export const useGameStore = create((set, get) => ({
   selectCity: async (chainId) => {
     set({ currentCityId: chainId, gameplayLoading: true, currentLocationIdx: null, cityViewTab: 'overview' })
 
-    const { walletAddress } = get()
-
     try {
       const [cityInfo, locations, anomalyTxRefs, suspectWallets] = await Promise.all([
         getCityNodeInfo(chainId),
@@ -1246,7 +1240,7 @@ export const useGameStore = create((set, get) => ({
       if (_cityNodeUnsub) _cityNodeUnsub()
       if (playerAddr) {
         const unsub = await onCityNodeEvents(chainId, playerAddr, {
-          onClueUnlocked: ({ idx, clueIndex, clueType, clueDataHash, anomalyRefId }) => {
+          onClueUnlocked: ({ idx, clueIndex }) => {
             const CLUE_NAMES = ["BEHAVIOR_FINGERPRINT", "RELATIONSHIP", "IDENTITY_COMMIT", "FUNDING_TRAIL", "TECHNICAL_SIGNATURE", "DEAD_END"]
             set((s) => ({
               terminalLines: [...s.terminalLines,

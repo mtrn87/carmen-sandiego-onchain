@@ -12,7 +12,6 @@ export default function CityView() {
     currentCityInfo,
     cityLocations,
     cityAnomalyTxRefs,
-    citySuspectWallets,
     currentLocationIdx,
     selectLocation,
     backToMap,
