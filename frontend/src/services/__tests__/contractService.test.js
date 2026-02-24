@@ -34,12 +34,19 @@ const mockProvider = {
   getSigner: vi.fn(async () => mockSigner),
 }
 
+const mockReadProvider = {}
+
 // Use class-style constructors so `new ethers.BrowserProvider(...)` works
 vi.mock('ethers', () => ({
   ethers: {
     BrowserProvider: class MockBrowserProvider {
       constructor() {
         return mockProvider
+      }
+    },
+    JsonRpcProvider: class MockJsonRpcProvider {
+      constructor() {
+        return mockReadProvider
       }
     },
     Contract: class MockContract {
@@ -64,6 +71,8 @@ import {
 
 describe('contractService', () => {
   beforeEach(() => {
+    // Set env var for getReadProvider() which checks it at call time
+    import.meta.env.VITE_ALCHEMY_RPC_URL_SEPOLIA = 'https://mock-rpc-url'
     resetConnection()
     vi.clearAllMocks()
   })

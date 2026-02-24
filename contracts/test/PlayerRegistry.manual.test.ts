@@ -7,13 +7,22 @@ describe("PlayerRegistry - Manual Tests", function () {
   let owner: any;
   let addr1: any;
   let addr2: any;
+  let gameMaster: any;
+
+  /** Helper: register a player via GameMaster. */
+  async function registerViaGM(playerAddr: string, nickname: string) {
+    return playerRegistry.connect(gameMaster).registerPlayer(playerAddr, nickname);
+  }
 
   beforeEach(async function () {
-    [owner, addr1, addr2] = await ethers.getSigners();
+    [owner, addr1, addr2, gameMaster] = await ethers.getSigners();
 
     const PlayerRegistry = await ethers.getContractFactory("PlayerRegistry");
     playerRegistry = await PlayerRegistry.deploy();
     await playerRegistry.waitForDeployment();
+
+    // Set GameMaster
+    await playerRegistry.setGameMaster(gameMaster.address);
   });
 
   describe("Caso 1: Jogador NÃO existe", function () {
@@ -39,9 +48,9 @@ describe("PlayerRegistry - Manual Tests", function () {
 
   describe("Caso 2: Jogador EXISTE", function () {
     it("Should return player data when player exists", async function () {
-      // Primeiro, registrar o jogador
+      // Primeiro, registrar o jogador via GameMaster
       const nickname = "TestAgent";
-      await playerRegistry.connect(addr1).registerPlayer(nickname);
+      await registerViaGM(addr1.address, nickname);
       
       // Depois, ler os dados
       const player = await playerRegistry.getPlayer(addr1.address);
@@ -89,9 +98,9 @@ describe("PlayerRegistry - Manual Tests", function () {
       const nickname = "TestAgent_" + Math.random().toString(36).substring(7);
       console.log("  Nickname:", nickname);
       
-      // Step 3: Frontend calls registerPlayer (triggers CRE event)
-      console.log("Step 3: Frontend chama registerPlayer (emite evento para CRE)");
-      const tx = await playerRegistry.connect(addr1).registerPlayer(nickname);
+      // Step 3: GameMaster calls registerPlayer
+      console.log("Step 3: GameMaster chama registerPlayer");
+      const tx = await registerViaGM(addr1.address, nickname);
       const receipt = await tx.wait();
       console.log("  TX hash:", tx.hash);
       console.log("  Block:", receipt?.blockNumber);

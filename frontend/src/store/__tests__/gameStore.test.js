@@ -183,7 +183,10 @@ describe('gameStore', () => {
     })
 
     it('adds error terminal line on failure', async () => {
-      contractMocks.ensureSepoliaNetwork.mockRejectedValueOnce(new Error('Network fail'))
+      // Override initDiscovery to throw — completeBriefing's outer catch adds a red line
+      useGameStore.setState({
+        initDiscovery: vi.fn().mockRejectedValueOnce(new Error('Network fail')),
+      })
 
       const { completeBriefing } = useGameStore.getState()
       await completeBriefing()
