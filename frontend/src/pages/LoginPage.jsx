@@ -6,13 +6,12 @@ import GlitchText from '../components/GlitchText'
 import TypeWriter from '../components/TypeWriter'
 import NeonButton from '../components/NeonButton'
 import NicknameModal from '../components/NicknameModal'
+import LeaderboardModal from '../components/LeaderboardModal'
 import { useGameStore } from '../store/gameStore'
 import { getEthereumAddressFromPrivy, getUserInfoFromPrivy } from '../utils/privyProvider'
 import { saveAuthSession, clearAuthSession } from '../utils/authPersistence'
 import { initializePlayerRegistry, getPlayerData } from '../services/creService'
 import styles from './LoginPage.module.css'
-
-const LEADERBOARD_MSG = 'Leaderboard coming soon! Complete missions to build your rank.'
 
 const BOOT_LINES = [
   '> ACME DETECTIVE AGENCY :: MAINFRAME v3.1.4',
@@ -34,6 +33,7 @@ export default function LoginPage() {
   const [showNicknameModal, setShowNicknameModal] = useState(false)
   const { connectWallet, isConnected, walletAddress, playerNickname, disconnectWallet, missionId, initGame } = useGameStore()
   const [startingMission, setStartingMission] = useState(false)
+  const [showLeaderboard, setShowLeaderboard] = useState(false)
 
   // load on-chain state to detect existing mission
   useEffect(() => {
@@ -178,6 +178,9 @@ export default function LoginPage() {
       {/* nickname modal */}
       {showNicknameModal && <NicknameModal onConfirm={handleNicknameConfirm} />}
 
+      {/* leaderboard modal */}
+      {showLeaderboard && <LeaderboardModal onClose={() => setShowLeaderboard(false)} />}
+
       {/* boot sequence terminal */}
       {phase === 'boot' && (
         <div className={styles.terminal}>
@@ -298,7 +301,7 @@ export default function LoginPage() {
                     {startingMission ? 'Starting Mission...' : missionId ? 'Continue Mission' : 'Start Investigation'}
                   </NeonButton>
 
-                  <NeonButton variant="magenta" onClick={() => alert(LEADERBOARD_MSG)}>
+                  <NeonButton variant="magenta" onClick={() => setShowLeaderboard(true)}>
                     Leaderboard
                   </NeonButton>
 

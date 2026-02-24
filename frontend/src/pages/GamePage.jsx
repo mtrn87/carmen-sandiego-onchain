@@ -8,6 +8,7 @@ import MissionBriefing from '../components/MissionBriefing'
 import MissionOutcome from '../components/MissionOutcome'
 import MissionPlotModal from '../components/MissionPlotModal'
 import ClueModal from '../components/ClueModal'
+import LeaderboardModal from '../components/LeaderboardModal'
 
 import { useGameStore } from '../store/gameStore'
 import styles from './GamePage.module.css'
@@ -20,6 +21,8 @@ export default function GamePage() {
     showOutcomeModal,
     showPlotModal,
     showCityClueModal,
+    showLeaderboard,
+    closeLeaderboard,
     setCurrentCase,
     initGame,
     selectCity,
@@ -101,6 +104,9 @@ export default function GamePage() {
 
       {/* city clue modal — shown after requesting a clue */}
       {showCityClueModal && <ClueModal />}
+
+      {/* leaderboard modal — opened from terminal /leaderboard command */}
+      {showLeaderboard && <LeaderboardModal onClose={closeLeaderboard} />}
 
       {/* left sidebar — terminal (dimmed in capture mode) */}
       <aside className={`${styles.sidebar} ${captureMode ? styles.sidebarDimmed : ''}`}>
