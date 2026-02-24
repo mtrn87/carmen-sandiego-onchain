@@ -65,6 +65,10 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
     mapping(uint256 => address) public captureRequestCity;                     // capture requestId => CityNode address
     mapping(address => uint8) public playerCitiesVisited;                      // player => number of cities visited
 
+    // --- Rate limiting ---
+    uint256 public investigationCooldown = 1;                                     // blocks between investigations
+    mapping(address => uint256) public lastInvestigationBlock;                     // player => last investigation block
+
     // ============================================================
     //                      MODIFIERS
     // ============================================================
@@ -176,6 +180,11 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         Mission storage mission = missions[missionId];
 
         require(_isValidChainId(chainId), "Invalid city/chain");
+        require(
+            block.number >= lastInvestigationBlock[msg.sender] + investigationCooldown,
+            "Investigation cooldown"
+        );
+        lastInvestigationBlock[msg.sender] = block.number;
 
         mission.investigationsCount++;
 
@@ -586,6 +595,10 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         require(_missionNFT != address(0), "Invalid address");
         missionNFT = IMissionNFT(_missionNFT);
         emit MissionNFTSet(_missionNFT);
+    }
+
+    function setInvestigationCooldown(uint256 _cooldown) external onlyOwner {
+        investigationCooldown = _cooldown;
     }
 
     function setValidChainIds(uint256[] calldata _chainIds) external onlyOwner {

@@ -1206,4 +1206,110 @@ describe("GameMaster", function () {
       ).to.be.revertedWith("MissionNFT not set");
     });
   });
+
+  // ============================================================
+  //          INVESTIGATION RATE LIMITING
+  // ============================================================
+
+  describe("Investigation Rate Limiting", function () {
+    let gm: GameMaster;
+    let vrfCoordinator: any;
+
+    beforeEach(async function () {
+      const VRFMock = await ethers.getContractFactory("VRFCoordinatorV2PlusMock");
+      vrfCoordinator = await VRFMock.deploy(0, 0, 0);
+      const createSubTx = await vrfCoordinator.createSubscription();
+      const createSubReceipt = await createSubTx.wait();
+      const subCreatedEvent = createSubReceipt?.logs.find((log: any) => {
+        try {
+          return vrfCoordinator.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "SubscriptionCreated";
+        } catch { return false; }
+      });
+      const subId = vrfCoordinator.interface.parseLog({
+        topics: [...subCreatedEvent!.topics], data: subCreatedEvent!.data
+      })!.args[0];
+      await vrfCoordinator.fundSubscription(subId, 1000000);
+
+      const GMFactory = await ethers.getContractFactory("GameMaster");
+      gm = await GMFactory.deploy(
+        await vrfCoordinator.getAddress(), subId, VRF_KEY_HASH, validChainIds, creOracle.address
+      ) as GameMaster;
+      await gm.waitForDeployment();
+      await vrfCoordinator.addConsumer(subId, await gm.getAddress());
+
+      // Register player and start mission
+      await gm.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm.connect(player).startMission();
+      const missionId = await gm.getPlayerActiveMission(player.address);
+      await vrfCoordinator.fulfillRandomWordsWithOverride(missionId, await gm.getAddress(), [42]);
+    });
+
+    it("should allow first investigation", async function () {
+      await expect(
+        gm.connect(player).submitInvestigation(ARBITRUM_SEPOLIA)
+      ).to.emit(gm, "InvestigationSubmitted");
+    });
+
+    it("should block investigation before cooldown elapses", async function () {
+      // Set cooldown to 2 blocks so we can test the gap
+      await gm.connect(owner).setInvestigationCooldown(2);
+
+      // First investigation succeeds
+      await gm.connect(player).submitInvestigation(ARBITRUM_SEPOLIA);
+
+      // Next block (1 block gap, but cooldown requires 2) — should fail
+      await expect(
+        gm.connect(player).submitInvestigation(BASE_SEPOLIA)
+      ).to.be.revertedWith("Investigation cooldown");
+    });
+
+    it("should allow investigation after cooldown passes", async function () {
+      await gm.connect(player).submitInvestigation(ARBITRUM_SEPOLIA);
+
+      // Mine blocks to pass cooldown (default = 1 block)
+      await ethers.provider.send("evm_mine", []);
+
+      await expect(
+        gm.connect(player).submitInvestigation(BASE_SEPOLIA)
+      ).to.emit(gm, "InvestigationSubmitted");
+    });
+
+    it("should respect custom cooldown value", async function () {
+      // Set cooldown to 3 blocks
+      await gm.connect(owner).setInvestigationCooldown(3);
+      expect(await gm.investigationCooldown()).to.equal(3);
+
+      await gm.connect(player).submitInvestigation(ARBITRUM_SEPOLIA);
+
+      // Mine 1 block — still in cooldown
+      await ethers.provider.send("evm_mine", []);
+      await expect(
+        gm.connect(player).submitInvestigation(BASE_SEPOLIA)
+      ).to.be.revertedWith("Investigation cooldown");
+
+      // Mine 2 more blocks — cooldown passed
+      await ethers.provider.send("evm_mine", []);
+      await ethers.provider.send("evm_mine", []);
+
+      await expect(
+        gm.connect(player).submitInvestigation(BASE_SEPOLIA)
+      ).to.emit(gm, "InvestigationSubmitted");
+    });
+
+    it("should allow disabling cooldown (set to 0)", async function () {
+      await gm.connect(owner).setInvestigationCooldown(0);
+
+      await gm.connect(player).submitInvestigation(ARBITRUM_SEPOLIA);
+      // Same block — should succeed with cooldown=0
+      await expect(
+        gm.connect(player).submitInvestigation(BASE_SEPOLIA)
+      ).to.emit(gm, "InvestigationSubmitted");
+    });
+
+    it("should reject setInvestigationCooldown from non-owner", async function () {
+      await expect(
+        gm.connect(player).setInvestigationCooldown(5)
+      ).to.be.revertedWith("Only callable by owner");
+    });
+  });
 });
