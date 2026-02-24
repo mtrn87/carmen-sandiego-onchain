@@ -10,13 +10,15 @@
     "deploy:arbitrum-sepolia": "hardhat run scripts/deploy-citynode.ts --network arbitrumSepolia",
     "deploy:base-sepolia": "hardhat run scripts/deploy-citynode.ts --network baseSepolia",
     "deploy:all": "npm run deploy:sepolia && npm run deploy:arbitrum-sepolia && npm run deploy:base-sepolia",
-    "verify": "hardhat verify"
+    "verify": "hardhat verify",
+    "lint:sol": "solhint 'src/**/*.sol'"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
     "@nomicfoundation/hardhat-verify": "^2.0.0",
     "dotenv": "^16.3.1",
-    "hardhat": "^2.19.0"
+    "hardhat": "^2.19.0",
+    "solhint": "^5.0.0"
   },
   "dependencies": {
     "@chainlink/contracts": "^1.1.0",

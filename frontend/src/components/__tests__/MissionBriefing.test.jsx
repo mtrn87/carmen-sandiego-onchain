@@ -32,7 +32,7 @@ describe('MissionBriefing', () => {
     })
 
     // Button should appear
-    const btn = screen.queryByText(/PRESS ENTER OR CLICK TO CONTINUE/)
+    screen.queryByText(/PRESS ENTER OR CLICK TO CONTINUE/)
     // May or may not appear depending on timing, but component shouldn't crash
     vi.useRealTimers()
   })

@@ -1,5 +1,3 @@
-import { ethers } from 'ethers'
-
 export const getEthereumAddressFromPrivy = async (privyUser) => {
   try {
     if (!privyUser || !privyUser.wallet) {

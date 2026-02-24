@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import styles from './GlitchText.module.css'
 
+// eslint-disable-next-line no-unused-vars -- Tag is used as JSX component
 export default function GlitchText({ text, className = '', as: Tag = 'span' }) {
   const [glitching, setGlitching] = useState(false)
 

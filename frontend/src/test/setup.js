@@ -1,5 +1,9 @@
 import '@testing-library/jest-dom'
 
+// Provide default env vars for CI (no .env file present)
+import.meta.env.VITE_GAME_MASTER_ADDRESS ??= '0x0000000000000000000000000000000000000001'
+import.meta.env.VITE_ALCHEMY_RPC_URL_SEPOLIA ??= 'https://mock-rpc-url'
+
 // Mock canvas getContext for InteractiveMap/CyberGrid
 HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
   clearRect: vi.fn(),

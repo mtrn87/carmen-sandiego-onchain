@@ -9,7 +9,8 @@ if (typeof window !== 'undefined') {
     get() {
       return undefined
     },
-    set(value) {
+    // eslint-disable-next-line no-unused-vars
+    set(v) {
       // Silently ignore attempts to set window.ethereum
       console.debug('[Polyfill] Blocked attempt to set window.ethereum')
     },
@@ -47,7 +48,7 @@ if (typeof global === 'undefined') {
 }
 
 // Define process com todas as propriedades necessárias
-if (typeof process === 'undefined' || !process.nextTick) {
+if (typeof process === 'undefined' || !process.nextTick) { // eslint-disable-line no-undef
   window.process = {
     env: {},
     nextTick: processNextTick,

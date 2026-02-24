@@ -9,6 +9,11 @@ describe("PlayerRegistry", function () {
   let player2: any;
   let gameMaster: any;
 
+  /** Helper: register a player via GameMaster (the only path now). */
+  async function registerViaGM(playerAddr: string, nickname: string) {
+    return playerRegistry.connect(gameMaster).registerPlayer(playerAddr, nickname);
+  }
+
   beforeEach(async function () {
     [owner, player1, player2, gameMaster] = await ethers.getSigners();
 
@@ -23,7 +28,7 @@ describe("PlayerRegistry", function () {
   describe("Player Registration", function () {
     it("Should register a new player with valid nickname", async function () {
       const nickname = "Detective001";
-      await playerRegistry.connect(player1).registerPlayer(nickname);
+      await registerViaGM(player1.address, nickname);
 
       const player = await playerRegistry.getPlayer(player1.address);
       expect(player.nickname).to.equal(nickname);
@@ -34,29 +39,29 @@ describe("PlayerRegistry", function () {
 
     it("Should reject duplicate nicknames", async function () {
       const nickname = "Detective001";
-      await playerRegistry.connect(player1).registerPlayer(nickname);
+      await registerViaGM(player1.address, nickname);
 
       await expect(
-        playerRegistry.connect(player2).registerPlayer(nickname)
+        registerViaGM(player2.address, nickname)
       ).to.be.revertedWith("Nickname taken");
     });
 
     it("Should reject invalid nicknames (too short)", async function () {
       await expect(
-        playerRegistry.connect(player1).registerPlayer("ab")
+        registerViaGM(player1.address, "ab")
       ).to.be.revertedWith("Invalid nickname");
     });
 
     it("Should reject invalid nicknames (too long)", async function () {
       const longNickname = "a".repeat(21);
       await expect(
-        playerRegistry.connect(player1).registerPlayer(longNickname)
+        registerViaGM(player1.address, longNickname)
       ).to.be.revertedWith("Invalid nickname");
     });
 
     it("Should reject invalid characters in nickname", async function () {
       await expect(
-        playerRegistry.connect(player1).registerPlayer("Detective@001")
+        registerViaGM(player1.address, "Detective@001")
       ).to.be.revertedWith("Invalid nickname");
     });
 
@@ -64,16 +69,16 @@ describe("PlayerRegistry", function () {
       const validNicknames = ["Detective_001", "Detective-001", "Detective001"];
       for (let i = 0; i < validNicknames.length; i++) {
         const signer = (await ethers.getSigners())[i + 4]; // Use different signers
-        await playerRegistry.connect(signer).registerPlayer(validNicknames[i]);
+        await registerViaGM(signer.address, validNicknames[i]);
         const player = await playerRegistry.getPlayer(signer.address);
         expect(player.nickname).to.equal(validNicknames[i]);
       }
     });
 
     it("Should reject if player already registered", async function () {
-      await playerRegistry.connect(player1).registerPlayer("Detective001");
+      await registerViaGM(player1.address, "Detective001");
       await expect(
-        playerRegistry.connect(player1).registerPlayer("Detective002")
+        registerViaGM(player1.address, "Detective002")
       ).to.be.revertedWith("Already registered");
     });
 
@@ -81,35 +86,21 @@ describe("PlayerRegistry", function () {
       const nickname = "Detective001";
       expect(await playerRegistry.isNicknameAvailable(nickname)).to.be.true;
 
-      await playerRegistry.connect(player1).registerPlayer(nickname);
+      await registerViaGM(player1.address, nickname);
       expect(await playerRegistry.isNicknameAvailable(nickname)).to.be.false;
     });
 
-    it("Should register player on behalf (CRE/GameMaster only)", async function () {
-      const nickname = "Detective001";
-      await playerRegistry
-        .connect(gameMaster)
-        .registerPlayerOnBehalf(player1.address, nickname);
-
-      const player = await playerRegistry.getPlayer(player1.address);
-      expect(player.nickname).to.equal(nickname);
-      expect(player.wallet).to.equal(player1.address);
-      expect(player.isActive).to.be.true;
-    });
-
-    it("Should reject registerPlayerOnBehalf from non-GameMaster", async function () {
+    it("Should reject registerPlayer from non-GameMaster", async function () {
       await expect(
         playerRegistry
           .connect(player1)
-          .registerPlayerOnBehalf(player2.address, "Detective001")
+          .registerPlayer(player2.address, "Detective001")
       ).to.be.revertedWith("Only GameMaster");
     });
 
-    it("Should reject registerPlayerOnBehalf with invalid address", async function () {
+    it("Should reject registerPlayer with invalid address", async function () {
       await expect(
-        playerRegistry
-          .connect(gameMaster)
-          .registerPlayerOnBehalf(ethers.ZeroAddress, "Detective001")
+        registerViaGM(ethers.ZeroAddress, "Detective001")
       ).to.be.revertedWith("Invalid address");
     });
   });
@@ -129,7 +120,7 @@ describe("PlayerRegistry", function () {
     });
 
     it("Should reject requestRegistration if already registered", async function () {
-      await playerRegistry.connect(player1).registerPlayer("Detective001");
+      await registerViaGM(player1.address, "Detective001");
       await expect(
         playerRegistry.connect(player1).requestRegistration("Detective002")
       ).to.be.revertedWith("Already registered");
@@ -142,7 +133,7 @@ describe("PlayerRegistry", function () {
     });
 
     it("Should reject requestRegistration with taken nickname", async function () {
-      await playerRegistry.connect(player1).registerPlayer("Detective001");
+      await registerViaGM(player1.address, "Detective001");
       await expect(
         playerRegistry.connect(player2).requestRegistration("Detective001")
       ).to.be.revertedWith("Nickname taken");
@@ -164,7 +155,7 @@ describe("PlayerRegistry", function () {
 
     it("Should emit RegistrationConfirmed event", async function () {
       const nickname = "Detective001";
-      await playerRegistry.connect(player1).registerPlayer(nickname);
+      await registerViaGM(player1.address, nickname);
 
       await expect(
         playerRegistry.connect(gameMaster).confirmRegistration(player1.address, nickname)
@@ -188,7 +179,7 @@ describe("PlayerRegistry", function () {
     });
 
     it("Should reject confirmRegistration from non-GameMaster", async function () {
-      await playerRegistry.connect(player1).registerPlayer("Detective001");
+      await registerViaGM(player1.address, "Detective001");
       await expect(
         playerRegistry.connect(player2).confirmRegistration(player1.address, "Detective001")
       ).to.be.revertedWith("Only GameMaster");
@@ -197,7 +188,7 @@ describe("PlayerRegistry", function () {
 
   describe("Stats Update", function () {
     beforeEach(async function () {
-      await playerRegistry.connect(player1).registerPlayer("Detective001");
+      await registerViaGM(player1.address, "Detective001");
     });
 
     it("Should update player stats after mission success", async function () {
@@ -272,7 +263,7 @@ describe("PlayerRegistry", function () {
 
   describe("Mission Recording", function () {
     beforeEach(async function () {
-      await playerRegistry.connect(player1).registerPlayer("Detective001");
+      await registerViaGM(player1.address, "Detective001");
     });
 
     it("Should record mission with full details", async function () {
@@ -334,7 +325,7 @@ describe("PlayerRegistry", function () {
 
   describe("NFT Management", function () {
     beforeEach(async function () {
-      await playerRegistry.connect(player1).registerPlayer("Detective001");
+      await registerViaGM(player1.address, "Detective001");
     });
 
     it("Should award NFT to player", async function () {
@@ -359,7 +350,7 @@ describe("PlayerRegistry", function () {
 
   describe("View Functions", function () {
     beforeEach(async function () {
-      await playerRegistry.connect(player1).registerPlayer("Detective001");
+      await registerViaGM(player1.address, "Detective001");
       // Record some missions
       await playerRegistry
         .connect(gameMaster)
@@ -394,7 +385,7 @@ describe("PlayerRegistry", function () {
     it("Should return 0 for win rate if no missions", async function () {
       const signers = await ethers.getSigners();
       const newPlayer = signers[5]; // Use a different signer
-      await playerRegistry.connect(newPlayer).registerPlayer("NewPlayer");
+      await registerViaGM(newPlayer.address, "NewPlayer");
 
       const winRate = await playerRegistry.getPlayerWinRate(newPlayer.address);
       expect(winRate).to.equal(0n);
@@ -403,7 +394,7 @@ describe("PlayerRegistry", function () {
 
   describe("Admin Functions", function () {
     beforeEach(async function () {
-      await playerRegistry.connect(player1).registerPlayer("Detective001");
+      await registerViaGM(player1.address, "Detective001");
     });
 
     it("Should deactivate player (admin only)", async function () {

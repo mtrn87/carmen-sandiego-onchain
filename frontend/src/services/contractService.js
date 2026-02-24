@@ -1320,7 +1320,7 @@ export async function cityNodeInspectLocation(chainId, locationIdx) {
         noteHash = parsed.args.noteHash || parsed.args[2]
         break
       }
-    } catch (_) { /* skip unparseable logs */ }
+    } catch { /* skip unparseable logs */ }
   }
 
   return {
@@ -1358,7 +1358,7 @@ export async function cityNodeScanAnomalies(chainId, locationIdx) {
       const parsed = contract.interface.parseLog(log)
       if (parsed?.name === "AnomalyTxLinked") anomaliesFound++
       if (parsed?.name === "SuspectWalletObserved") suspectsFound++
-    } catch (_) { /* skip */ }
+    } catch { /* skip */ }
   }
 
   return {
@@ -1395,7 +1395,7 @@ export async function cityNodeRequestClue(chainId, locationIdx, clueIndex, isSta
           requestId = Number(parsed.args.requestId || parsed.args[0])
           break
         }
-      } catch (_) { /* skip */ }
+      } catch { /* skip */ }
     }
 
     // Wait for ClueUnlocked or DeadEnd event from GM resolve (timeout 15s, then fallback)
@@ -1515,7 +1515,7 @@ export async function cityNodeRequestDossier(chainId) {
         requestId = Number(parsed.args.requestId || parsed.args[0])
         break
       }
-    } catch (_) { /* skip */ }
+    } catch { /* skip */ }
   }
 
   // Wait for DossierResolved (timeout 60s)
@@ -1588,7 +1588,7 @@ export async function cityNodeRequestCapture(chainId, suspectWallet, evidenceBun
         requestId = Number(parsed.args.requestId || parsed.args[0])
         break
       }
-    } catch (_) { /* skip */ }
+    } catch { /* skip */ }
   }
 
   // Wait for CaptureResolved (timeout 60s)
