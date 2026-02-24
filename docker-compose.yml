@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  # Chainlink Runtime Environment (CRE) - Player Registration Workflow
+  cre-player-registration:
+    image: node:22-alpine
+    container_name: cre-player-registration
+    working_dir: /app
+    volumes:
+      - ./cre-workflows/player-registration:/app
+    environment:
+      - NODE_ENV=production
+      - SEPOLIA_RPC_URL=${SEPOLIA_RPC_URL}
+      - PLAYER_REGISTRY_ADDRESS=${PLAYER_REGISTRY_ADDRESS}
+      - CHAINLINK_FUNCTIONS_PRIVATE_KEY=${CHAINLINK_FUNCTIONS_PRIVATE_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - PINATA_JWT=${PINATA_JWT}
+    ports:
+      - "3002:3000"
+    command: >
+      sh -c "npm install && npm run start"
+    restart: unless-stopped
+    networks:
+      - carmen-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # CRE - Player Check Workflow
+  cre-player-check:
+    image: node:22-alpine
+    container_name: cre-player-check
+    working_dir: /app
+    volumes:
+      - ./cre-workflows/player-check:/app
+    environment:
+      - NODE_ENV=production
+      - SEPOLIA_RPC_URL=${SEPOLIA_RPC_URL}
+      - PLAYER_REGISTRY_ADDRESS=${PLAYER_REGISTRY_ADDRESS}
+      - CHAINLINK_FUNCTIONS_PRIVATE_KEY=${CHAINLINK_FUNCTIONS_PRIVATE_KEY}
+    ports:
+      - "3003:3000"
+    command: >
+      sh -c "npm install && npm run start"
+    restart: unless-stopped
+    networks:
+      - carmen-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Chainlink Functions Relayer
+  relayer:
+    image: node:22-alpine
+    container_name: relayer
+    working_dir: /app
+    volumes:
+      - ./chainlink-functions:/app
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - SEPOLIA_RPC_URL=${SEPOLIA_RPC_URL}
+      - PLAYER_REGISTRY_ADDRESS=${PLAYER_REGISTRY_ADDRESS}
+      - CHAINLINK_FUNCTIONS_PRIVATE_KEY=${CHAINLINK_FUNCTIONS_PRIVATE_KEY}
+    ports:
+      - "3001:3001"
+    command: >
+      sh -c "npm install && npm start"
+    restart: unless-stopped
+    networks:
+      - carmen-network
+    depends_on:
+      - cre-player-registration
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend
+  frontend:
+    image: node:22-alpine
+    container_name: frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    environment:
+      - VITE_SEPOLIA_RPC_URL=${SEPOLIA_RPC_URL}
+      - VITE_RELAYER_URL=http://relayer:3001
+      - VITE_PLAYER_REGISTRY_ADDRESS=${PLAYER_REGISTRY_ADDRESS}
+      - VITE_GAME_MASTER_ADDRESS=${GAME_MASTER_ADDRESS}
+    ports:
+      - "5173:5173"
+    command: >
+      sh -c "npm install && npm run dev"
+    restart: unless-stopped
+    networks:
+      - carmen-network
+    depends_on:
+      - relayer
+
+networks:
+  carmen-network:
+    driver: bridge
+
+volumes:
+  cre-player-registration:
+  cre-player-check:
+  relayer:
+  frontend:
