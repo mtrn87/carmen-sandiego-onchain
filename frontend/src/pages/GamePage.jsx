@@ -100,8 +100,8 @@ export default function GamePage() {
       {/* mission briefing overlay — shown before game loads */}
       {!briefingDone && <MissionBriefing />}
 
-      {/* victory/defeat overlay — shown when mission ends */}
-      {showOutcomeModal && <MissionOutcome />}
+      {/* victory/defeat overlay — only after briefing is done */}
+      {briefingDone && showOutcomeModal && <MissionOutcome />}
 
       {/* mission plot overlay — opened from terminal command */}
       {showPlotModal && <MissionPlotModal />}

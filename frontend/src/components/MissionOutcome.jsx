@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
+import { CITY_POOL_MAP } from '../data/cityRegistry'
 import styles from './MissionOutcome.module.css'
 
 const LINE_TYPE_SPEED = 22
@@ -10,34 +11,116 @@ const REWARD_CONFIG = {
   BRONZE: { icon: '\u{1F949}', sub: 'Case closed within the limit' },
 }
 
-function buildVictoryLines(missionId, outcome) {
+const CAPTURE_LOCATIONS = {
+  421614: 'a hidden server room beneath the Senso-ji Temple in Tokyo, disguised as a blockchain mining operation behind the ancient shrine walls',
+  4216141: 'a satellite uplink station on Parliament Hill in Ottawa, where encrypted signals were bouncing off the Peace Tower antenna',
+  80002: 'an underground crypto vault carved into the rock beneath Santiago\'s Gran Torre, the tallest building in South America',
+  800021: 'a clandestine NFT gallery hidden in a Buenos Aires tango club in San Telmo, where each painting concealed a private key',
+  84532: 'a floating DeFi exchange barge on the Seine River near the Pont Alexandre III in Paris, camouflaged as a dinner cruise',
+  845321: 'an abandoned vault beneath Zurich\'s Bahnhofstrasse, where Swiss banks once stored gold and now store cold wallets',
+  845322: 'a converted windmill in Amsterdam\'s Jordaan district, its sails rotating to power a massive cross-chain relay node',
+  512: 'a hidden smart contract terminal inside a favela-top bar in Rio de Janeiro, overlooking the Christ the Redeemer statue',
+  51: 'a Victorian-era telegraph station beneath London\'s Tower Bridge, retrofitted as a Chainlink oracle relay hub',
+  511: 'a penthouse trading floor atop Dubai\'s Burj Khalifa, where holographic screens displayed every blockchain in real-time',
+  513: 'a secret room behind the waterfall at Singapore\'s Jewel Changi Airport, housing a quantum-encrypted wallet vault',
+  111551111: 'a decommissioned subway car beneath New York\'s Grand Central Terminal, converted into a mobile hacking lab',
+  111551112: 'a rooftop antenna farm in Seoul\'s Gangnam district, disguised as a K-pop recording studio',
+  111551113: 'a converted lighthouse on Sydney Harbour, its beam repurposed to broadcast encrypted transaction data across the Pacific',
+  111551114: 'an ancient catacomb beneath Rome\'s Colosseum, where fiber optic cables ran alongside two-thousand-year-old aqueducts',
+  111551115: 'a hidden floor inside Cairo\'s Egyptian Museum, where blockchain nodes were cooled by the same air conditioning protecting the pharaohs\' treasures',
+  111551116: 'a converted temple in Bangkok\'s Chinatown, its golden spires concealing directional antennas for cross-chain communication',
+}
+
+function buildVictoryLines(missionId, outcome, gameState) {
   const reward = REWARD_CONFIG[outcome?.rewardLabel] || REWARD_CONFIG.BRONZE
-  return [
+  const { cityTrail, currentCityId, walletFragments, evidence, clues } = gameState
+
+  const captureCity = CITY_POOL_MAP[currentCityId]
+  const captureCityName = captureCity ? `${captureCity.flag} ${captureCity.name}` : 'an undisclosed location'
+  const captureChain = captureCity?.chain || 'the decentralized network'
+  const captureLocation = CAPTURE_LOCATIONS[currentCityId] || `a concealed relay node in ${captureCityName}`
+
+  const trailCities = (cityTrail || [])
+    .map((id) => CITY_POOL_MAP[id])
+    .filter(Boolean)
+  const trailNames = trailCities.map((c) => `${c.flag} ${c.name}`).join(' -> ')
+
+  const clueCount = (clues || []).length
+  const evidenceCount = (evidence || []).length
+  const fragmentCount = (walletFragments || []).length
+
+  const lines = [
     { text: `MISSION #${missionId} — CASE CLOSED`, color: 'green' },
     { text: '', color: 'muted' },
-    { text: 'After weeks of relentless pursuit across multiple blockchains,', color: 'cyan' },
-    { text: 'the ACME Detective Agency is proud to announce:', color: 'cyan' },
+    { text: '> ACME DETECTIVE AGENCY — FINAL REPORT', color: 'green' },
+    { text: '> STATUS: TARGET APPREHENDED', color: 'green' },
     { text: '', color: 'muted' },
     { text: 'CARMEN SANDIEGO HAS BEEN CAPTURED.', color: 'green' },
     { text: '', color: 'muted' },
-    { text: `Her trail of encrypted transactions and cross-chain obfuscation`, color: 'white' },
-    { text: `was no match for your analytical instincts and persistence.`, color: 'white' },
-    { text: `The stolen assets have been recovered and returned to their`, color: 'white' },
-    { text: `rightful owners across the decentralized network.`, color: 'white' },
-    { text: '', color: 'muted' },
-    { text: `BLOCKS USED: ${outcome?.blocksUsed || '?'}    REWARD: ${outcome?.reward || 0} pts    RATING: ${outcome?.rewardLabel || 'BRONZE'}`, color: 'yellow' },
-    { text: `${reward.icon}  ${reward.sub}`, color: 'yellow' },
-    { text: '', color: 'muted' },
-    { text: `You have been promoted to: ${outcome?.newRankTitle || 'Detective'}`, color: 'green' },
-    { text: `MissionNFT #${missionId} has been minted as your trophy.`, color: 'cyan' },
-    { text: '', color: 'muted' },
-    { text: 'On behalf of the entire ACME Detective Agency and the Chainlink', color: 'white' },
-    { text: 'Convergence Hackathon team — thank you for playing.', color: 'white' },
-    { text: '', color: 'muted' },
-    { text: 'The blockchain never forgets. Neither will we, Detective.', color: 'green' },
-    { text: '', color: 'muted' },
-    { text: 'Until the next case...', color: 'green' },
   ]
+
+  if (trailNames) {
+    lines.push({ text: 'INVESTIGATION TRAIL:', color: 'yellow' })
+    lines.push({ text: trailNames, color: 'cyan' })
+    lines.push({ text: '', color: 'muted' })
+  }
+
+  lines.push({ text: `Your pursuit led you across ${trailCities.length || 'multiple'} cities and`, color: 'white' })
+  lines.push({ text: `${captureChain}'s blockchain topology. Each node you scanned`, color: 'white' })
+  lines.push({ text: `narrowed the search perimeter until only one location remained.`, color: 'white' })
+  lines.push({ text: '', color: 'muted' })
+
+  if (clueCount > 0 || evidenceCount > 0) {
+    lines.push({ text: 'EVIDENCE SUMMARY:', color: 'yellow' })
+    if (clueCount > 0) {
+      lines.push({ text: `  > ${clueCount} decrypted clue${clueCount > 1 ? 's' : ''} recovered from on-chain oracle feeds`, color: 'cyan' })
+    }
+    if (evidenceCount > 0) {
+      lines.push({ text: `  > ${evidenceCount} critical evidence item${evidenceCount > 1 ? 's' : ''} flagged by CRE analysis`, color: 'cyan' })
+    }
+    if (fragmentCount > 0) {
+      lines.push({ text: `  > ${fragmentCount} wallet fragment${fragmentCount > 1 ? 's' : ''} intercepted from cross-chain relays`, color: 'cyan' })
+    }
+    lines.push({ text: '', color: 'muted' })
+  }
+
+  if (fragmentCount > 0) {
+    const fragmentChars = walletFragments.map((f) => f.chars).join('')
+    lines.push({ text: `WALLET CAPTURE:`, color: 'yellow' })
+    lines.push({ text: `  The fragmented wallet signature [${fragmentChars}...] was`, color: 'white' })
+    lines.push({ text: `  reconstructed from ${fragmentCount} intercepted relay transmissions.`, color: 'white' })
+    lines.push({ text: `  Cross-referencing with Chainlink VRF salt data confirmed`, color: 'white' })
+    lines.push({ text: `  a match with Carmen's operational wallet.`, color: 'white' })
+    lines.push({ text: '', color: 'muted' })
+  }
+
+  lines.push({ text: `CAPTURE LOCATION:`, color: 'yellow' })
+  lines.push({ text: `  ${captureCityName} — ${captureChain}`, color: 'green' })
+  lines.push({ text: '', color: 'muted' })
+  lines.push({ text: `  ACME field agents located the suspect in`, color: 'white' })
+  lines.push({ text: `  ${captureLocation}.`, color: 'white' })
+  lines.push({ text: '', color: 'muted' })
+  lines.push({ text: `  The stolen assets have been frozen and returned to their`, color: 'white' })
+  lines.push({ text: `  rightful owners across the decentralized network.`, color: 'white' })
+  lines.push({ text: '', color: 'muted' })
+
+  lines.push({ text: `MISSION STATS:`, color: 'yellow' })
+  lines.push({ text: `  BLOCKS: ${outcome?.blocksUsed || '?'}    REWARD: ${outcome?.reward || 0} pts    RATING: ${outcome?.rewardLabel || 'BRONZE'}`, color: 'cyan' })
+  lines.push({ text: `  ${reward.icon}  ${reward.sub}`, color: 'cyan' })
+  lines.push({ text: '', color: 'muted' })
+
+  lines.push({ text: `RANK: ${outcome?.newRankTitle || 'Detective'}`, color: 'green' })
+  lines.push({ text: `MissionNFT #${missionId} has been minted to your wallet as proof of capture.`, color: 'cyan' })
+  lines.push({ text: '', color: 'muted' })
+
+  lines.push({ text: `On behalf of the ACME Detective Agency and the Chainlink`, color: 'white' })
+  lines.push({ text: `Convergence Hackathon team — outstanding work, Detective.`, color: 'white' })
+  lines.push({ text: '', color: 'muted' })
+  lines.push({ text: 'The blockchain never forgets. Neither will we.', color: 'green' })
+  lines.push({ text: '', color: 'muted' })
+  lines.push({ text: 'Until the next case...', color: 'green' })
+
+  return lines
 }
 
 const DEFEAT_LINES = [
@@ -79,6 +162,11 @@ export default function MissionOutcome() {
     missionId,
     startNewMission,
     abandonMission,
+    cityTrail,
+    currentCityId,
+    walletFragments,
+    evidence,
+    clues,
   } = useGameStore()
 
   const navigate = useNavigate()
@@ -87,9 +175,11 @@ export default function MissionOutcome() {
 
   const INSTANT_LINES = isVictory ? VICTORY_HEADER : DEFEAT_HEADER
   const TYPED_LINES = useMemo(() => {
-    if (isVictory) return buildVictoryLines(missionId, missionOutcome)
+    if (isVictory) return buildVictoryLines(missionId, missionOutcome, {
+      cityTrail, currentCityId, walletFragments, evidence, clues,
+    })
     return DEFEAT_LINES
-  }, [isVictory, missionId, missionOutcome])
+  }, [isVictory, missionId, missionOutcome, cityTrail, currentCityId, walletFragments, evidence, clues])
 
   const [currentLine, setCurrentLine] = useState(0)
   const [currentChar, setCurrentChar] = useState(0)

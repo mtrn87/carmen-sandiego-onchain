@@ -244,7 +244,7 @@ export default function CaptureMode() {
     toggleCaptureMode,
     gameplayRequestCapture,
     citySuspectWallets,
-    cityAnomalyTxRefs,
+    cityLocations,
     currentCityId,
     captureSelectedTx,
     setCaptureSelectedTx,
@@ -254,7 +254,11 @@ export default function CaptureMode() {
   const [showProgress, setShowProgress] = useState(false)
   const pendingWalletRef = useRef(null)
 
-  const hasAnomalyScan = cityAnomalyTxRefs.length > 0
+  // check if the specific location of this tx was scanned for anomalies
+  const txLocationIdx = captureSelectedTx?._locationIdx
+  const hasAnomalyScan = txLocationIdx != null
+    ? Boolean(cityLocations[txLocationIdx]?.scanned)
+    : false
   const cityName = CITY_POOL_MAP[currentCityId]?.name || 'Unknown'
 
   const fromAddr = captureSelectedTx?.from ? String(captureSelectedTx.from) : null

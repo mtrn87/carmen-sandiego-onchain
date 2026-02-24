@@ -519,9 +519,10 @@ export default function ContractExplorer({ onOpenMap, onBackToCityPanel }) {
               const locationScanned = currentLocation
                 ? currentLocation.scanned
                 : cityLocations.some((l) => l.scanned)
+              // tag each tx with its locationIdx so CaptureMode knows which location it belongs to
               const displayTxs = currentLocation
-                ? (currentLocation.transactions || [])
-                : cityLocations.flatMap((l) => l.transactions || [])
+                ? (currentLocation.transactions || []).map(tx => ({ ...tx, _locationIdx: currentLocationIdx }))
+                : cityLocations.flatMap((l, li) => (l.transactions || []).map(tx => ({ ...tx, _locationIdx: li })))
 
               return (
                 <>

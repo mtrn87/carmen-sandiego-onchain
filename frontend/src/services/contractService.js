@@ -1196,6 +1196,9 @@ function _generateLocationTxs(cityId, locationIdx, carmenWallet, carmenLocationI
     { sig: "0x23b872dd", label: "transferFrom" },
   ]
 
+  // suspect wallet indices that appear in _mockSuspectWallets — spread across locations
+  const SUSPECT_INDICES = [2, 7, 15]
+
   const txs = []
   for (let i = 0; i < count; i++) {
     const mIdx = Math.floor(rng() * normalMethods.length)
@@ -1218,6 +1221,53 @@ function _generateLocationTxs(cityId, locationIdx, carmenWallet, carmenLocationI
       anomalyLabel: null,
       isAnomaly: false,
     })
+  }
+
+  // inject 1 suspect wallet tx per location so suspects appear in the explorer
+  const suspectIdx = SUSPECT_INDICES[locationIdx % SUSPECT_INDICES.length]
+  const suspectWallet = WALLET_POOL[suspectIdx]
+  const [counterparty] = pickTxWallets(seed * 71 + locationIdx * 53, carmenIdx)
+  const sMIdx = Math.floor(rng() * normalMethods.length)
+  const sVal = rng() * 4
+  txs.push({
+    txHashLike: `0x${_hexFromSeed(seed * 71 + locationIdx * 53, 64)}`,
+    from: suspectWallet.address,
+    to: counterparty.address,
+    methodSigLike: normalMethods[sMIdx].sig,
+    methodLabel: normalMethods[sMIdx].label,
+    blockLike: 52884200 + Math.floor(rng() * 200),
+    valueLike: BigInt(Math.floor(sVal * 1e18)),
+    valueDisplay: sVal.toFixed(4),
+    anomalyType: null,
+    anomalyLabel: null,
+    isAnomaly: false,
+  })
+
+  // in capture city of scripted route: inject Carmen's route wallet in additional locations
+  // (carmenLocationIdx gets the main Carmen tx below, other locations get a secondary appearance)
+  const route = getActiveRoute()
+  if (route && carmenWallet && locationIdx !== carmenLocationIdx) {
+    // Carmen also appears as TO in a tx at non-Carmen locations in the capture city
+    const cityId_ = cityId
+    const isCaptureCity = cityId_ === route.captureCity
+    if (isCaptureCity) {
+      const [normalFrom] = pickTxWallets(seed * 83 + locationIdx * 37, carmenIdx)
+      const cMIdx2 = Math.floor(rng() * normalMethods.length)
+      const cVal2 = rng() * 2
+      txs.push({
+        txHashLike: `0x${_hexFromSeed(seed * 83 + locationIdx * 37, 64)}`,
+        from: normalFrom.address,
+        to: carmenWallet.address,
+        methodSigLike: normalMethods[cMIdx2].sig,
+        methodLabel: normalMethods[cMIdx2].label,
+        blockLike: 52884200 + Math.floor(rng() * 200),
+        valueLike: BigInt(Math.floor(cVal2 * 1e18)),
+        valueDisplay: cVal2.toFixed(4),
+        anomalyType: null,
+        anomalyLabel: null,
+        isAnomaly: false,
+      })
+    }
   }
 
   // inject exactly 1 Carmen tx if this is the Carmen location
@@ -1343,9 +1393,9 @@ function _mockSuspectWallets(cityId) {
     return suspects
   }
 
-  // default: 3 wallets from pool
+  // default: 3 wallets from pool — moderate suspicion, none extreme
   const picks = [2, 7, 15]
-  const levels = [87, 62, 45]
+  const levels = [62, 48, 35]
   const bitmaps = [3n, 12n, 16n]
   const refs = [[1n, 2n, 3n, 4n], [2n, 5n], [3n]]
 

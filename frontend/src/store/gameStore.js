@@ -566,7 +566,7 @@ export const useGameStore = create((set, get) => ({
       if (clamped > get().blocksElapsed) {
         set({ blocksElapsed: clamped })
       }
-      if (clamped >= MAX_BLOCKS && !get().showOutcomeModal) {
+      if (clamped >= MAX_BLOCKS && !get().showOutcomeModal && get().briefingDone) {
         set((s) => ({
           showOutcomeModal: true,
           missionOutcome: { type: 'failed' },
@@ -806,6 +806,7 @@ export const useGameStore = create((set, get) => ({
 
       // Listen for mission failure
       const unsubFail = await onMissionFailed(missionId, () => {
+        if (!get().briefingDone) return // don't show outcome before briefing
         set((s) => ({
           showOutcomeModal: true,
           missionOutcome: { type: 'failed' },
