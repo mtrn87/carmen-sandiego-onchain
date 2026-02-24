@@ -5,6 +5,15 @@
     "func-visibility": ["warn", { "ignoreConstructors": true }],
     "no-empty-blocks": "off",
     "reason-string": ["warn", { "maxLength": 64 }],
-    "max-line-length": ["warn", 120]
+    "max-line-length": "off",
+    "use-natspec": "off",
+    "gas-custom-errors": "off",
+    "gas-indexed-events": "off",
+    "gas-increment-by-one": "off",
+    "gas-strict-inequalities": "off",
+    "gas-struct-packing": "off",
+    "gas-small-strings": "off",
+    "immutable-vars-naming": "off",
+    "max-states-count": "off"
   }
 }
