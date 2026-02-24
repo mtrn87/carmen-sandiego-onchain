@@ -9,11 +9,12 @@ import NicknameModal from '../components/NicknameModal'
 import { useGameStore } from '../store/gameStore'
 import { getEthereumAddressFromPrivy, generateMultiChainAddressesFromPrivy, getUserInfoFromPrivy } from '../utils/privyProvider'
 import { saveAuthSession, clearAuthSession } from '../utils/authPersistence'
+import { initializePlayerRegistry, getPlayerData } from '../services/creService'
 import { getOrCreateKeyPair } from '../utils/ecies'
-import { isPlayerRegistered, registerPlayer as registerPlayerOnChain, ensureSepoliaNetwork, getSigner, startMission as startMissionOnChain, getPlayerActiveMission } from '../services/contractService'
+import { isPlayerRegistered, registerPlayer as registerPlayerOnChain, getPlayerActiveMission } from '../services/contractService'
+import styles from './LoginPage.module.css'
 
 const LEADERBOARD_MSG = 'Leaderboard coming soon! Complete missions to build your rank.'
-import styles from './LoginPage.module.css'
 
 const BOOT_LINES = [
   '> ACME DETECTIVE AGENCY :: MAINFRAME v3.1.4',
@@ -105,62 +106,63 @@ export default function LoginPage() {
     if (user && !isConnected) {
       (async () => {
         try {
-          console.log('Syncing Privy user...', user)
+          console.log('[LoginPage] Syncing Privy user...', user)
 
-          // Extract wallet address if user connected via MetaMask/wallet
+          // Extract wallet address
           let address = null
-          let addresses = null
-
           if (user.wallet) {
             try {
               address = await getEthereumAddressFromPrivy(user)
-              addresses = await generateMultiChainAddressesFromPrivy(user)
             } catch (walletError) {
-              console.warn('Wallet error:', walletError)
+              console.warn('[LoginPage] Wallet error:', walletError)
               address = user.wallet.address
             }
           }
-          // Login with Google/email — no embedded wallet, no valid ETH address
 
-          const userInfo = getUserInfoFromPrivy(user)
-
-          if (address) connectWallet(address)
-
-          saveAuthSession(address, userInfo, addresses, null)
-
-          // Generate ECIES keys and check on-chain registration
-          if (user.wallet && address) {
-            try {
-              await ensureSepoliaNetwork()
-              // Use actual signer address (MetaMask active account)
-              const signer = await getSigner()
-              const signerAddr = await signer.getAddress()
-              console.log('[LoginPage] Privy address:', address, 'Signer address:', signerAddr)
-              if (signerAddr.toLowerCase() !== address.toLowerCase()) {
-                console.warn('[LoginPage] ADDRESS MISMATCH — using signer address instead')
-                connectWallet(signerAddr) // update store with correct address
-              }
-              const checkAddr = signerAddr
-              const { publicKeyHex } = await getOrCreateKeyPair()
-              const registered = await isPlayerRegistered(checkAddr)
-              if (!registered) {
-                console.log('Registering player on-chain with ECIES public key...')
-                await registerPlayerOnChain(publicKeyHex)
-                console.log('Player registered on-chain.')
-              }
-              // initGame() is called by GamePage on mount — no need to call here
-            } catch (regErr) {
-              console.warn('On-chain registration skipped:', regErr.message)
-            }
+          if (!address) {
+            console.error('[LoginPage] No wallet address found')
+            return
           }
 
-          setShowNicknameModal(true)
+          console.log('[LoginPage] Wallet address:', address)
+
+          // Initialize PlayerRegistry contract
+          const playerRegistryAddress = import.meta.env.VITE_PLAYER_REGISTRY_ADDRESS_SEPOLIA
+          if (!playerRegistryAddress) {
+            throw new Error('VITE_PLAYER_REGISTRY_ADDRESS_SEPOLIA not set in .env')
+          }
+          await initializePlayerRegistry(playerRegistryAddress)
+
+          // Save session
+          const userInfo = getUserInfoFromPrivy(user)
+          connectWallet(address)
+          localStorage.setItem('wallet_address', address)
+          saveAuthSession(address, userInfo, null, null)
+
+          // Check if player exists (simple read, no CRE)
+          console.log('[LoginPage] Checking if player exists...')
+          
+          // Try to use the registered address if available (for returning players)
+          const addressToCheck = localStorage.getItem('player_registered_address') || address
+          const playerData = await getPlayerData(addressToCheck)
+
+          if (playerData) {
+            // Player exists, go to game
+            console.log('[LoginPage] Player exists:', playerData)
+            saveAuthSession(address, userInfo, null, playerData.nickname, addressToCheck)
+            navigate('/game')
+          } else {
+            // Player doesn't exist, show nickname modal
+            console.log('[LoginPage] Player does not exist, showing nickname modal')
+            setShowNicknameModal(true)
+          }
         } catch (error) {
-          console.error('Error syncing Privy user:', error)
+          console.error('[LoginPage] Error syncing Privy user:', error)
+          alert('Error: ' + error.message)
         }
       })()
     }
-  }, [user, isConnected, connectWallet])
+  }, [user, isConnected, connectWallet, navigate])
 
   const handleNicknameConfirm = useCallback((nickname) => {
     localStorage.setItem('player_nickname', nickname)
@@ -290,14 +292,7 @@ export default function LoginPage() {
                         navigate('/game')
                         return
                       }
-                      // no active mission — start one on-chain, then show briefing
-                      setStartingMission(true)
-                      try {
-                        await ensureSepoliaNetwork()
-                        await startMissionOnChain()
-                      } catch (err) {
-                        console.error('[LoginPage] startMission failed:', err)
-                      }
+                      // no active mission — navigate to game to start briefing
                       setStartingMission(false)
                       navigate('/game')
                     }}

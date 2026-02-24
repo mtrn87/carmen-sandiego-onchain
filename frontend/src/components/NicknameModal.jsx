@@ -1,5 +1,8 @@
 import { useState, useCallback } from 'react'
+import { usePrivy } from '@privy-io/react-auth'
 import { useGameStore } from '../store/gameStore'
+import { registerPlayerFlow, signRegistrationMessage, callChainlinkFunctionsForRegistration } from '../services/creService'
+import { saveAuthSession } from '../utils/authPersistence'
 import NeonButton from './NeonButton'
 import styles from './NicknameModal.module.css'
 
@@ -12,6 +15,7 @@ export default function NicknameModal({ onConfirm }) {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const { setPlayerNickname } = useGameStore()
+  const { user, signMessage } = usePrivy()
 
   const validateNickname = useCallback((value) => {
     setError('')
@@ -57,18 +61,55 @@ export default function NicknameModal({ onConfirm }) {
       return
     }
 
+    if (!user || !signMessage) {
+      setError('User not authenticated. Please reconnect.')
+      return
+    }
+
     setLoading(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
+      console.log('[NicknameModal] Registering player with nickname:', nickname)
+      
+      // Get wallet address from localStorage
+      const walletAddress = localStorage.getItem('wallet_address')
+      if (!walletAddress) {
+        throw new Error('Wallet address not found. Please reconnect.')
+      }
+      
+      // Step 1: Sign message (zero gas)
+      console.log('[NicknameModal] Signing registration message...')
+      const signedData = await signRegistrationMessage(user, signMessage, walletAddress, nickname)
+      
+      // Step 2: Call Chainlink Functions to relay (Chainlink pays gas)
+      console.log('[NicknameModal] Calling Chainlink Functions...')
+      try {
+        await callChainlinkFunctionsForRegistration(signedData)
+      } catch (err) {
+        // Fallback: If Chainlink Functions not available, use direct call
+        console.warn('[NicknameModal] Chainlink Functions not available, using fallback:', err.message)
+        console.log('[NicknameModal] Using fallback: direct registration request')
+        await registerPlayerFlow(nickname, walletAddress)
+      }
+      
+      console.log('[NicknameModal] Registration request sent')
+      
+      // Save nickname to store and session
       setPlayerNickname(nickname)
+      const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}')
+      // Save the registered address (from signedData) for future logins
+      const currentAddress = localStorage.getItem('wallet_address')
+      const registeredAddress = signedData.playerAddress
+      console.log('[NicknameModal] Saving registered address:', registeredAddress)
+      saveAuthSession(currentAddress, userInfo, null, nickname, registeredAddress)
+      
       setSuccess(true)
 
       setTimeout(() => {
         onConfirm(nickname)
       }, 800)
     } catch (err) {
-      setError('Failed to register nickname. Please try again.')
+      console.error('[NicknameModal] Registration error:', err)
+      setError(err.message || 'Failed to register nickname. Please try again.')
       setLoading(false)
     }
   }

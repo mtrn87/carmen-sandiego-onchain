@@ -19,8 +19,6 @@ import {
   getMissionWalletFragments,
   getMissionFragmentCount,
   getMissionEvidenceCount,
-  ensureSepoliaNetwork,
-  getSigner,
   CITY_MAP,
   getCityNodeInfo,
   getCityNodeLocations,
@@ -334,24 +332,15 @@ export const useGameStore = create((set, get) => ({
     if (!walletAddress || !/^0x[0-9a-fA-F]{40}$/.test(walletAddress)) return
 
     try {
-      await ensureSepoliaNetwork()
+      // Use Privy wallet address directly (no MetaMask access needed)
+      const queryAddr = walletAddress
+      console.log('[initGame] Using Privy wallet address:', queryAddr)
 
-      // Use actual signer address (may differ from Privy walletAddress)
-      const signer = await getSigner()
-      const signerAddr = await signer.getAddress()
-      console.log('[initGame] walletAddress (store):', walletAddress)
-      console.log('[initGame] signerAddress (actual):', signerAddr)
-      if (signerAddr.toLowerCase() !== walletAddress.toLowerCase()) {
-        console.warn('[initGame] ADDRESS MISMATCH — updating store to signer address')
-        set({ walletAddress: signerAddr })
-      }
-      const queryAddr = signerAddr
-
-      // Check registration
+      // Check registration (read-only, no signer needed)
       const registered = await isPlayerRegistered(queryAddr)
       set({ isRegistered: registered })
 
-      // Check active mission
+      // Check active mission (read-only, no signer needed)
       const activeMissionId = await getPlayerActiveMission(queryAddr)
       if (activeMissionId > 0n) {
         const state = get()
@@ -797,7 +786,6 @@ export const useGameStore = create((set, get) => ({
     }))
 
     try {
-      await ensureSepoliaNetwork()
       const receipt = await submitInvestigationOnChain(chainId)
 
       // Safety timeout: if CRE doesn't respond within 90s, unlock the UI
@@ -875,15 +863,12 @@ export const useGameStore = create((set, get) => ({
     })
 
     try {
-      await ensureSepoliaNetwork()
-
       // Try to fetch active mission if we don't have one yet
       let mId = existingMissionId
       if (!mId) {
         try {
-          const signer = await getSigner()
-          const signerAddr = await signer.getAddress()
-          const activeMissionId = await getPlayerActiveMission(signerAddr)
+          const { walletAddress } = get()
+          const activeMissionId = await getPlayerActiveMission(walletAddress)
           if (activeMissionId > 0n) {
             mId = Number(activeMissionId)
             const mission = await getMission(mId)
@@ -1723,7 +1708,6 @@ export const useGameStore = create((set, get) => ({
     }))
 
     try {
-      await ensureSepoliaNetwork()
       // Submit investigation on the city where Carmen is — CRE will handle the wallet capture resolution
       // For now, this is stored locally. The CRE workflow or a separate tx would call resolveWalletCapture.
       set((s) => ({

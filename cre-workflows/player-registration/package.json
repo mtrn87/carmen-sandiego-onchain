@@ -1,0 +1,17 @@
+{
+  "name": "player-registration-workflow",
+  "version": "1.0.0",
+  "description": "CRE Workflow for registering a player",
+  "main": "dist/main.js",
+  "private": true,
+  "scripts": {
+    "postinstall": "bunx cre-setup"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@chainlink/cre-sdk": "^1.0.9"
+  },
+  "devDependencies": {
+    "@types/bun": "1.2.21"
+  }
+}

@@ -116,6 +116,7 @@ const CITY_NODE_GAMEPLAY_ABI = CityNodeArtifact.abi
 
 let _provider = null
 let _signer = null
+let _readProvider = null
 
 export async function getProvider() {
   if (_provider) return _provider
@@ -131,13 +132,21 @@ export async function getSigner() {
   return _signer
 }
 
+export async function getReadProvider() {
+  if (_readProvider) return _readProvider
+  const rpcUrl = import.meta.env.VITE_ALCHEMY_RPC_URL_SEPOLIA
+  if (!rpcUrl) throw new Error("VITE_ALCHEMY_RPC_URL_SEPOLIA not set")
+  _readProvider = new ethers.JsonRpcProvider(rpcUrl)
+  return _readProvider
+}
+
 export async function getContract() {
   const signer = await getSigner()
   return new ethers.Contract(GAME_MASTER_ADDRESS, GAME_MASTER_ABI, signer)
 }
 
 export async function getReadContract() {
-  const provider = await getProvider()
+  const provider = await getReadProvider()
   return new ethers.Contract(GAME_MASTER_ADDRESS, GAME_MASTER_ABI, provider)
 }
 
