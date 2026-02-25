@@ -422,14 +422,35 @@ export const useGameStore = create((set, get) => ({
         console.warn('Failed to load evidence count:', err)
       }
 
+      // Restore persisted progress from localStorage
+      const saved = loadProgress()
+      const restoredState = {}
+      if (saved) {
+        if (saved.discoveredCityIds?.length > 0) restoredState.discoveredCityIds = saved.discoveredCityIds
+        if (saved.visitedCityIds?.length > 0) restoredState.visitedCityIds = saved.visitedCityIds
+        if (saved.cityTrail?.length > 0) restoredState.cityTrail = saved.cityTrail
+        if (saved.discoveryScanCount > 0) restoredState.discoveryScanCount = saved.discoveryScanCount
+        if (saved.scannedLocations?.length > 0) restoredState.scannedLocations = saved.scannedLocations
+        if (saved.blocksElapsed > 0) restoredState.blocksElapsed = saved.blocksElapsed
+        if (saved.currentCityId) restoredState.currentCityId = saved.currentCityId
+        if (saved.evidence?.length > 0) restoredState.evidence = saved.evidence
+        if (saved.cityEvidence?.length > 0) restoredState.cityEvidence = saved.cityEvidence
+        if (saved.walletFragments?.length > 0) {
+          restoredState.walletFragments = saved.walletFragments
+          restoredState.walletFragmentCount = saved.walletFragmentCount || saved.walletFragments.length
+          restoredState.walletCaptureAvailable = (restoredState.walletFragmentCount || 0) >= 3
+        }
+        if (saved.evidenceCount > 0) restoredState.evidenceCount = saved.evidenceCount
+      }
+
       set({
         missionId,
         missionData: mission,
         missionEvents: events,
         lastKnownLocation: getLastKnownLocationFromEvents(events),
-        walletFragmentCount,
-        walletCaptureAvailable: walletFragmentCount >= 3,
-        evidenceCount,
+        walletFragmentCount: restoredState.walletFragmentCount ?? walletFragmentCount,
+        walletCaptureAvailable: restoredState.walletCaptureAvailable ?? (walletFragmentCount >= 3),
+        evidenceCount: restoredState.evidenceCount ?? evidenceCount,
         currentMission: {
           id: `mission-${missionId}`,
           title: `Mission #${missionId}`,
@@ -437,8 +458,10 @@ export const useGameStore = create((set, get) => ({
           status: statusMap[mission.status] || 'active',
         },
         clues: decryptedClues,
+        blocksElapsed: blocksUsed,
         // Don't set briefingDone here — let completeBriefing handle it
         // so the user always sees the briefing screen on new sessions
+        ...restoredState,
       })
 
       const state = get()
@@ -640,6 +663,7 @@ export const useGameStore = create((set, get) => ({
               ],
             }
           })
+          saveProgress(get())
         } catch (err) {
           console.error('Fragment decryption failed:', err)
           set((s) => ({
@@ -662,6 +686,7 @@ export const useGameStore = create((set, get) => ({
             { text: `> On-chain evidence count: ${event.evidenceCount}`, color: 'cyan', type: 'system' },
           ],
         }))
+        saveProgress(get())
       })
       newUnsubs.push(unsubEvidence)
 
