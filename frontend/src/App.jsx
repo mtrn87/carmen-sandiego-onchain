@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import GamePage from './pages/GamePage'
+import HelpPage from './pages/HelpPage'
+import SettingsPage from './pages/SettingsPage'
 import ErrorBoundary from './components/ErrorBoundary'
 import LoginPage from './pages/LoginPage'
 import ProfilePage from './pages/ProfilePage'
@@ -35,6 +37,8 @@ export default function App() {
     <ErrorBoundary name="App">
       <Routes>
         <Route path="/" element={<LoginPage />} />
+        <Route path="/help" element={<HelpPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="/game" element={
           <ErrorBoundary name="GamePage">
             <GamePage />
