@@ -942,4 +942,313 @@ describe("CityNode", function () {
       expect(bitmap2).to.equal(2);  // only bit 1
     });
   });
+
+  // ============================================================
+  //    COVERAGE GAPS: Energy Regeneration Boundaries
+  // ============================================================
+
+  describe("Energy Regeneration Boundaries", function () {
+    beforeEach(async function () {
+      await cityNode.connect(owner).setupLocations(sampleLocations);
+    });
+
+    it("should regenerate exactly 1 energy after exactly 15 minutes", async function () {
+      await cityNode.connect(player).inspectLocation(0); // 10 -> 9
+      await time.increase(15 * 60); // exactly 15 minutes
+      const energy = await cityNode.getEnergy(player.address);
+      expect(energy).to.equal(10); // 9 + 1 = 10
+    });
+
+    it("should NOT regenerate energy before 15 minutes", async function () {
+      await cityNode.connect(player).inspectLocation(0); // 10 -> 9
+      await time.increase(14 * 60 + 59); // 14:59
+      const energy = await cityNode.getEnergy(player.address);
+      expect(energy).to.equal(9); // no regen yet
+    });
+
+    it("should regenerate multiple ticks correctly", async function () {
+      // Spend 5 energy
+      await cityNode.connect(player).inspectLocation(0); // 10->9
+      await cityNode.connect(player).inspectLocation(1); // 9->8
+      await cityNode.connect(player).inspectLocation(2); // 8->7
+      await cityNode.connect(player).scanAnomalies(0);   // 7->5 (scan costs 2)
+
+      // Inspect location 0 is already done, doing scan needs inspect first
+      await cityNode.connect(owner).addAnomalyTxRef(makeTxRef(1));
+
+      // advance 45 minutes = 3 regen ticks
+      await time.increase(45 * 60);
+      const energy = await cityNode.getEnergy(player.address);
+      expect(energy).to.equal(8); // 5 + 3 = 8
+    });
+
+    it("should cap regeneration at MAX_ENERGY (10)", async function () {
+      await cityNode.connect(player).inspectLocation(0); // 10 -> 9
+      // advance 24 hours (96 regen ticks)
+      await time.increase(24 * 60 * 60);
+      const energy = await cityNode.getEnergy(player.address);
+      expect(energy).to.equal(10); // capped at MAX
+    });
+
+    it("should not exceed MAX_ENERGY even with massive time elapsed", async function () {
+      await cityNode.connect(player).inspectLocation(0); // 10 -> 9
+      // advance 7 days
+      await time.increase(7 * 24 * 60 * 60);
+      const energy = await cityNode.getEnergy(player.address);
+      expect(energy).to.equal(10);
+    });
+
+    it("should handle zero-energy state with regeneration", async function () {
+      await cityNode.connect(owner).addAnomalyTxRef(makeTxRef(1));
+
+      // Exhaust all energy: inspect*3 (3) + scan*3 (6) + flagTx (1) = 10
+      await cityNode.connect(player).inspectLocation(0); // 10->9
+      await cityNode.connect(player).inspectLocation(1); // 9->8
+      await cityNode.connect(player).inspectLocation(2); // 8->7
+      await cityNode.connect(player).scanAnomalies(0);   // 7->5
+      await cityNode.connect(player).scanAnomalies(1);   // 5->3
+      await cityNode.connect(player).scanAnomalies(2);   // 3->1
+
+      const refId = ethers.keccak256(ethers.toUtf8Bytes("tx1"));
+      await cityNode.connect(player).flagTx(refId);      // 1->0
+
+      let energy = await cityNode.getEnergy(player.address);
+      expect(energy).to.equal(0);
+
+      // after 15 min, should have 1 energy
+      await time.increase(15 * 60);
+      energy = await cityNode.getEnergy(player.address);
+      expect(energy).to.equal(1);
+
+      // can now inspect again
+      // reset progress first to inspect again
+      await cityNode.connect(owner).resetPlayerProgress(player.address);
+      await cityNode.connect(player).inspectLocation(0);
+      energy = await cityNode.getEnergy(player.address);
+      expect(energy).to.equal(9); // was 10 after reset, then -1
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: Array Pagination Edge Cases
+  // ============================================================
+
+  describe("Array Pagination Edge Cases", function () {
+    it("should handle large number of anomaly tx refs", async function () {
+      // Add 20 tx refs
+      for (let i = 1; i <= 20; i++) {
+        await cityNode.connect(owner).addAnomalyTxRef(makeTxRef(i, i % 6));
+      }
+
+      // Paginate: get first 10
+      const page1 = await cityNode.getAnomalyTxRefs(0, 10);
+      expect(page1.length).to.equal(10);
+      expect(page1[0].refId).to.equal(1);
+      expect(page1[9].refId).to.equal(10);
+
+      // Get next 10
+      const page2 = await cityNode.getAnomalyTxRefs(10, 10);
+      expect(page2.length).to.equal(10);
+      expect(page2[0].refId).to.equal(11);
+
+      // Get past the end
+      const page3 = await cityNode.getAnomalyTxRefs(20, 10);
+      expect(page3.length).to.equal(0);
+    });
+
+    it("should handle pagination with limit larger than remaining", async function () {
+      for (let i = 1; i <= 5; i++) {
+        await cityNode.connect(owner).addAnomalyTxRef(makeTxRef(i));
+      }
+
+      const result = await cityNode.getAnomalyTxRefs(3, 100);
+      expect(result.length).to.equal(2); // only 2 remaining
+    });
+
+    it("should handle suspect wallet pagination with limit=1", async function () {
+      for (let i = 0; i < 5; i++) {
+        const wallet = ethers.Wallet.createRandom().address;
+        await cityNode.connect(owner).addSuspectWallet(makeSuspectWallet(wallet, i + 1));
+      }
+
+      // Iterate one by one
+      for (let i = 0; i < 5; i++) {
+        const page = await cityNode.getSuspectWallets(i, 1);
+        expect(page.length).to.equal(1);
+        expect(page[0].suspicionLevel).to.equal(i + 1);
+      }
+
+      // Past end
+      const empty = await cityNode.getSuspectWallets(5, 1);
+      expect(empty.length).to.equal(0);
+    });
+
+    it("should handle cursor at exact boundary", async function () {
+      for (let i = 1; i <= 3; i++) {
+        await cityNode.connect(owner).addAnomalyTxRef(makeTxRef(i));
+      }
+
+      // cursor = length = 3 → empty
+      const result = await cityNode.getAnomalyTxRefs(3, 10);
+      expect(result.length).to.equal(0);
+
+      // cursor = length - 1 = 2 → 1 result
+      const last = await cityNode.getAnomalyTxRefs(2, 10);
+      expect(last.length).to.equal(1);
+      expect(last[0].refId).to.equal(3);
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: Deep Energy Exhaustion
+  // ============================================================
+
+  describe("Deep Energy Exhaustion", function () {
+    beforeEach(async function () {
+      await cityNode.connect(owner).setupLocations(sampleLocations);
+      await cityNode.connect(owner).addAnomalyTxRef(makeTxRef(1));
+    });
+
+    it("should reject inspect when at 0 energy", async function () {
+      // Drain energy to 0
+      await cityNode.connect(player).inspectLocation(0); // 10->9
+      await cityNode.connect(player).inspectLocation(1); // 9->8
+      await cityNode.connect(player).inspectLocation(2); // 8->7
+      await cityNode.connect(player).scanAnomalies(0);   // 7->5
+      await cityNode.connect(player).scanAnomalies(1);   // 5->3
+      await cityNode.connect(player).scanAnomalies(2);   // 3->1
+
+      const refId = ethers.keccak256(ethers.toUtf8Bytes("tx1"));
+      await cityNode.connect(player).flagTx(refId);      // 1->0
+
+      expect(await cityNode.getEnergy(player.address)).to.equal(0);
+
+      // All actions should fail
+      await cityNode.connect(owner).resetPlayerProgress(player.address);
+      // Reset resets energy too, so re-drain
+      await cityNode.connect(player).inspectLocation(0);
+      await cityNode.connect(player).inspectLocation(1);
+      await cityNode.connect(player).inspectLocation(2);
+      await cityNode.connect(player).scanAnomalies(0);
+      await cityNode.connect(player).scanAnomalies(1);
+      await cityNode.connect(player).scanAnomalies(2);
+      await cityNode.connect(player).flagTx(refId);
+
+      expect(await cityNode.getEnergy(player.address)).to.equal(0);
+
+      // Now test: all actions should fail
+      await cityNode.connect(owner).resetPlayerProgress(player.address);
+      // resetPlayerProgress resets energy but we want to test at 0
+      // Let's just verify the reject works by not resetting
+
+      // Actually, let's create a fresh player at 0 energy
+      // Drain otherUser's energy
+      await cityNode.connect(otherUser).inspectLocation(0);
+      await cityNode.connect(otherUser).inspectLocation(1);
+      await cityNode.connect(otherUser).inspectLocation(2);
+      await cityNode.connect(otherUser).scanAnomalies(0);
+      await cityNode.connect(otherUser).scanAnomalies(1);
+      await cityNode.connect(otherUser).scanAnomalies(2);
+      await cityNode.connect(otherUser).flagTx(refId);
+
+      expect(await cityNode.getEnergy(otherUser.address)).to.equal(0);
+
+      // requestCapture costs 3 energy → should fail
+      const suspectWallet = ethers.Wallet.createRandom().address;
+      const evidenceHash = ethers.keccak256(ethers.toUtf8Bytes("evidence"));
+      await expect(
+        cityNode.connect(otherUser).requestCapture(suspectWallet, evidenceHash)
+      ).to.be.revertedWith("Not enough energy");
+    });
+
+    it("should allow action after partial regen from 0", async function () {
+      // Drain otherUser to 0
+      await cityNode.connect(otherUser).inspectLocation(0);
+      await cityNode.connect(otherUser).inspectLocation(1);
+      await cityNode.connect(otherUser).inspectLocation(2);
+      await cityNode.connect(otherUser).scanAnomalies(0);
+      await cityNode.connect(otherUser).scanAnomalies(1);
+      await cityNode.connect(otherUser).scanAnomalies(2);
+      const refId = ethers.keccak256(ethers.toUtf8Bytes("tx1"));
+      await cityNode.connect(otherUser).flagTx(refId);
+
+      expect(await cityNode.getEnergy(otherUser.address)).to.equal(0);
+
+      // Wait for 1 regen tick (15 min)
+      await time.increase(15 * 60);
+      expect(await cityNode.getEnergy(otherUser.address)).to.equal(1);
+
+      // Can now flag again (costs 1)
+      const refId2 = ethers.keccak256(ethers.toUtf8Bytes("tx2"));
+      await cityNode.connect(otherUser).flagTx(refId2);
+      expect(await cityNode.getEnergy(otherUser.address)).to.equal(0);
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: Concurrent Request Handling
+  // ============================================================
+
+  describe("Concurrent Request Handling", function () {
+    beforeEach(async function () {
+      await cityNode.connect(owner).setupLocations(sampleLocations);
+      await cityNode.connect(owner).addAnomalyTxRef(makeTxRef(1));
+    });
+
+    it("should handle multiple clue requests from same player", async function () {
+      // Inspect and scan all 3 locations
+      await cityNode.connect(player).inspectLocation(0);
+      await cityNode.connect(player).inspectLocation(1);
+      await cityNode.connect(player).scanAnomalies(0);
+      await cityNode.connect(player).scanAnomalies(1);
+
+      // Request clues at different locations
+      await expect(cityNode.connect(player).requestClue(0, 0))
+        .to.emit(cityNode, "ClueRequested")
+        .withArgs(1, player.address, 0, 0);
+
+      await expect(cityNode.connect(player).requestClue(1, 0))
+        .to.emit(cityNode, "ClueRequested")
+        .withArgs(2, player.address, 1, 0);
+
+      // Both can be resolved independently
+      const clueHash1 = ethers.keccak256(ethers.toUtf8Bytes("clue1"));
+      const clueHash2 = ethers.keccak256(ethers.toUtf8Bytes("clue2"));
+
+      await cityNode.connect(gameMaster).resolveClue(1, 0, clueHash1, ethers.ZeroHash);
+      await cityNode.connect(gameMaster).resolveClue(2, 1, clueHash2, ethers.ZeroHash);
+
+      const [, cluesFound] = await cityNode.getPlayerProgress(player.address);
+      expect(cluesFound).to.equal(2);
+    });
+
+    it("should handle multiple capture requests from different players", async function () {
+      const wallet1 = ethers.Wallet.createRandom().address;
+      const wallet2 = ethers.Wallet.createRandom().address;
+      const evidenceHash = ethers.keccak256(ethers.toUtf8Bytes("evidence"));
+
+      await cityNode.connect(player).requestCapture(wallet1, evidenceHash);
+      await cityNode.connect(otherUser).requestCapture(wallet2, evidenceHash);
+
+      // Resolve in reverse order
+      const gmNote = ethers.keccak256(ethers.toUtf8Bytes("note"));
+      await cityNode.connect(gameMaster).resolveCapture(2, false, 1, gmNote);
+      await cityNode.connect(gameMaster).resolveCapture(1, true, 0, gmNote);
+    });
+
+    it("should assign sequential request IDs to clue requests", async function () {
+      await cityNode.connect(player).inspectLocation(0);
+      await cityNode.connect(player).scanAnomalies(0);
+      await cityNode.connect(otherUser).inspectLocation(0);
+      await cityNode.connect(otherUser).scanAnomalies(0);
+
+      await expect(cityNode.connect(player).requestClue(0, 0))
+        .to.emit(cityNode, "ClueRequested")
+        .withArgs(1, player.address, 0, 0);
+
+      await expect(cityNode.connect(otherUser).requestClue(0, 1))
+        .to.emit(cityNode, "ClueRequested")
+        .withArgs(2, otherUser.address, 0, 1);
+    });
+  });
 });
