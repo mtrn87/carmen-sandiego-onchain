@@ -156,6 +156,10 @@ export default function TerminalSidebar() {
       openMissionPlotModal()
       return
     }
+    if (command === '/leaderboard') {
+      useGameStore.getState().openLeaderboard()
+      return
+    }
 
     setTimeout(() => {
       addTerminalLine('> ACME AI: Processing your request...', 'muted', 'system')

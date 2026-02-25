@@ -233,6 +233,7 @@ export const useGameStore = create((set, get) => ({
   currentCase: null,
   currentPlot: null,
   showPlotModal: false,
+  showLeaderboard: false,
   lastKnownLocation: null,
   terminalLines: [],
   missionNFTTokenId: null,
@@ -1315,6 +1316,9 @@ export const useGameStore = create((set, get) => ({
   },
 
   closeMissionPlotModal: () => set({ showPlotModal: false }),
+
+  openLeaderboard: () => set({ showLeaderboard: true }),
+  closeLeaderboard: () => set({ showLeaderboard: false }),
 
   // ============================================================
   //  Gameplay Loop Actions
