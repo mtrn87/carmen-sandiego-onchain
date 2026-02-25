@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { usePrivy } from '@privy-io/react-auth'
+import { usePrivy, useWallets } from '@privy-io/react-auth'
 import CyberGrid from '../components/CyberGrid'
 import GlitchText from '../components/GlitchText'
 import TypeWriter from '../components/TypeWriter'
@@ -11,6 +11,8 @@ import { useGameStore } from '../store/gameStore'
 import { getEthereumAddressFromPrivy, getUserInfoFromPrivy } from '../utils/privyProvider'
 import { saveAuthSession, clearAuthSession } from '../utils/authPersistence'
 import { initializePlayerRegistry, getPlayerData } from '../services/creService'
+import { getOrCreateKeyPair } from '../utils/ecies'
+import { isPlayerRegistered, registerPlayer as registerPlayerOnChain, getPlayerActiveMission, initializeExternalProvider } from '../services/contractService'
 import styles from './LoginPage.module.css'
 
 const BOOT_LINES = [
@@ -73,6 +75,7 @@ export default function LoginPage() {
   }, [])
 
   const { user, login, logout } = usePrivy()
+  const { wallets } = useWallets()
 
   const handleConnect = useCallback(async () => {
     setConnecting(true)
@@ -124,6 +127,20 @@ export default function LoginPage() {
 
           console.log('[LoginPage] Wallet address:', address)
 
+          // Initialize Privy wallet provider for signing transactions
+          const privyWallet = wallets.find(w => w.address?.toLowerCase() === address.toLowerCase()) || wallets[0]
+          if (privyWallet) {
+            try {
+              // Switch to Sepolia before getting the provider
+              await privyWallet.switchChain(11155111)
+              const eip1193 = await privyWallet.getEthereumProvider()
+              initializeExternalProvider(eip1193)
+              console.log('[LoginPage] Privy EIP-1193 provider initialized on Sepolia')
+            } catch (provErr) {
+              console.warn('[LoginPage] Could not get Privy provider:', provErr.message)
+            }
+          }
+
           // Initialize PlayerRegistry contract
           const playerRegistryAddress = import.meta.env.VITE_PLAYER_REGISTRY_ADDRESS_SEPOLIA
           if (!playerRegistryAddress) {
@@ -160,7 +177,7 @@ export default function LoginPage() {
         }
       })()
     }
-  }, [user, isConnected, connectWallet, navigate])
+  }, [user, isConnected, wallets, connectWallet, navigate])
 
   const handleNicknameConfirm = useCallback((nickname) => {
     localStorage.setItem('player_nickname', nickname)

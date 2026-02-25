@@ -236,6 +236,26 @@ export default function InteractiveMap({ onSelectCase }) {
               </div>
             )}
 
+            {/* On-chain investigate button — sends submitInvestigation TX */}
+            {isScanned && missionId && (
+              <button
+                className={`${styles.investigateBtn} ${isInvestigating ? styles.investigateBtnDisabled : ''}`}
+                style={{ '--chain-color': loc.chainColor }}
+                disabled={isInvestigating}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  investigate(loc.id)
+                  setSelectedMarker(null)
+                }}
+              >
+                {isInvestigating ? (
+                  <>&#9203; INVESTIGATING...</>
+                ) : (
+                  <>&#128269; INVESTIGATE CITY</>
+                )}
+              </button>
+            )}
+
             <button className={styles.locationPanelClose} onClick={() => setSelectedMarker(null)}>
               CLOSE
             </button>

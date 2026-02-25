@@ -11,8 +11,10 @@ import MissionPlotModal from '../components/MissionPlotModal'
 import ClueModal from '../components/ClueModal'
 import LeaderboardModal from '../components/LeaderboardModal'
 
+import { useWallets } from '@privy-io/react-auth'
 import { useGameStore } from '../store/gameStore'
 import { clearAuthSession } from '../utils/authPersistence'
+import { initializeExternalProvider } from '../services/contractService'
 import styles from './GamePage.module.css'
 
 export default function GamePage() {
@@ -36,6 +38,7 @@ export default function GamePage() {
     playerNickname,
     walletAddress,
   } = useGameStore()
+  const { wallets } = useWallets()
   const [showMap, setShowMap] = useState(false)
 
   const handleLogout = useCallback(async () => {
@@ -48,6 +51,22 @@ export default function GamePage() {
       console.error('Logout failed:', error)
     }
   }, [logout, disconnectWallet, navigate])
+
+  // Initialize Privy wallet provider (handles page refresh on /game)
+  useEffect(() => {
+    if (!wallets.length) return
+    const wallet = wallets[0]
+    ;(async () => {
+      try {
+        await wallet.switchChain(11155111)
+        const eip1193 = await wallet.getEthereumProvider()
+        initializeExternalProvider(eip1193)
+        console.log('[GamePage] Privy EIP-1193 provider initialized on Sepolia')
+      } catch (err) {
+        console.warn('[GamePage] Could not get Privy provider:', err.message)
+      }
+    })()
+  }, [wallets])
 
   // redirect to login if not connected
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import {
   isPlayerRegistered,
+  getPlayerOnChainPublicKey,
   getPlayerActiveMission,
   submitInvestigation as submitInvestigationOnChain,
   getMission,
@@ -44,6 +45,12 @@ import { decryptClue } from '../utils/ecies'
 import scenariosData from '../data/scenarios.json'
 import { CITY_POOL_MAP, pickStartingCity, pickRevealedCities } from '../data/cityRegistry'
 import { getCarmenWallet, getCarmenLocationIdx } from '../data/walletPool'
+
+/** Resolve a city pool ID (e.g. 511 for Nairobi) to the real on-chain chainId (e.g. 51 for XDC Apothem). */
+function resolveChainId(cityPoolId) {
+  const city = CITY_POOL_MAP[cityPoolId]
+  return city?.chainId ?? cityPoolId
+}
 
 const MISSION_PLOT_STORAGE_KEY = 'carmen_current_mission_plot'
 const PROGRESS_STORAGE_KEY = 'carmen_investigation_progress'
@@ -352,6 +359,19 @@ export const useGameStore = create((set, get) => ({
       // Check registration (read-only, no signer needed)
       const registered = await isPlayerRegistered(queryAddr)
       set({ isRegistered: registered })
+
+      // Ensure local ECIES key matches on-chain key (re-register if mismatch)
+      try {
+        const localPubKey = await getPublicKeyHex()
+        const onChainPubKey = await getPlayerOnChainPublicKey(queryAddr)
+        if (onChainPubKey && onChainPubKey.toLowerCase() !== localPubKey.toLowerCase()) {
+          console.warn('[initGame] ECIES key mismatch! Re-registering local key on-chain...')
+          await registerPlayerOnChain(localPubKey)
+          console.log('[initGame] ECIES key re-registered successfully')
+        }
+      } catch (keyErr) {
+        console.warn('[initGame] Could not verify/update ECIES key:', keyErr.message)
+      }
 
       // Check active mission (read-only, no signer needed)
       const activeMissionId = await getPlayerActiveMission(queryAddr)
@@ -953,7 +973,7 @@ export const useGameStore = create((set, get) => ({
     }))
 
     try {
-      const receipt = await submitInvestigationOnChain(chainId)
+      const receipt = await submitInvestigationOnChain(resolveChainId(chainId))
 
       // Safety timeout: if CRE doesn't respond within 90s, unlock the UI
       const timeoutId = setTimeout(() => {
@@ -1044,6 +1064,84 @@ export const useGameStore = create((set, get) => ({
         } catch (err) {
           console.warn('[completeBriefing] Could not fetch active mission:', err.message)
         }
+      }
+
+      // If still no mission, start one on-chain
+      if (!mId) {
+        console.log('[completeBriefing] No active mission found, starting mission flow...')
+
+        // Step 1: Register/update ECIES public key on-chain
+        const { walletAddress: playerAddr } = get()
+        const localPubKey = await getPublicKeyHex()
+        const onChainPubKey = await getPlayerOnChainPublicKey(playerAddr)
+        const localPubKeyLower = localPubKey.toLowerCase()
+        const onChainPubKeyLower = (onChainPubKey || '').toLowerCase()
+        const needsRegister = !onChainPubKey || onChainPubKeyLower !== localPubKeyLower
+
+        if (needsRegister) {
+          console.log('[completeBriefing] ECIES key mismatch or missing, registering...')
+          console.log('[completeBriefing]   local :', localPubKey.slice(0, 20) + '...')
+          console.log('[completeBriefing]   onchain:', (onChainPubKey || 'none').slice(0, 20) + '...')
+          set((s) => ({
+            terminalLines: [
+              ...s.terminalLines,
+              { text: '> Registering ECIES encryption key on-chain...', color: 'yellow', type: 'system' },
+            ],
+          }))
+          const regReceipt = await registerPlayerOnChain(localPubKey)
+          console.log('[completeBriefing] registerPlayer TX:', regReceipt.hash)
+          set((s) => ({
+            terminalLines: [
+              ...s.terminalLines,
+              { text: '> ECIES key registered. Secure channel established.', color: 'green', type: 'system' },
+            ],
+          }))
+        } else {
+          console.log('[completeBriefing] ECIES key matches on-chain')
+        }
+
+        // Step 2: Start mission
+        set((s) => ({
+          terminalLines: [
+            ...s.terminalLines,
+            { text: '> Starting new mission on-chain... (VRF pending)', color: 'yellow', type: 'system' },
+          ],
+        }))
+        const receipt = await startMissionOnChain()
+        console.log('[completeBriefing] startMission TX:', receipt.hash)
+
+        // Poll for VRF fulfillment (targetHash != 0)
+        const { walletAddress: addr } = get()
+        let activeMissionId = await getPlayerActiveMission(addr)
+        mId = Number(activeMissionId)
+        set({ missionId: mId })
+
+        // Wait up to 90s for VRF
+        let mission = await getMission(mId)
+        let vrfAttempts = 0
+        while (mission.targetHash === '0x' + '0'.repeat(64) && vrfAttempts < 18) {
+          vrfAttempts++
+          set((s) => ({
+            terminalLines: [
+              ...s.terminalLines.filter(l => !l.text.includes('Waiting for VRF')),
+              { text: `> Waiting for VRF randomness... (${vrfAttempts * 5}s)`, color: 'yellow', type: 'system' },
+            ],
+          }))
+          await new Promise(r => setTimeout(r, 5000))
+          mission = await getMission(mId)
+        }
+
+        if (mission.targetHash === '0x' + '0'.repeat(64)) {
+          throw new Error('VRF timeout — refresh and try again')
+        }
+
+        set({ missionData: mission })
+        set((s) => ({
+          terminalLines: [
+            ...s.terminalLines,
+            { text: `> Mission #${mId} ready! VRF fulfilled.`, color: 'green', type: 'system' },
+          ],
+        }))
       }
 
       // Initialize city discovery and load starting city
@@ -1362,11 +1460,12 @@ export const useGameStore = create((set, get) => ({
     set({ currentCityId: chainId, gameplayLoading: true, currentLocationIdx: null, cityViewTab: 'overview' })
 
     try {
+      const realChainId = resolveChainId(chainId)
       const [cityInfo, locations, anomalyTxRefs, suspectWallets] = await Promise.all([
-        getCityNodeInfo(chainId),
-        getCityNodeLocations(chainId),
-        getCityNodeAnomalyTxRefs(chainId),
-        getCityNodeSuspectWallets(chainId),
+        getCityNodeInfo(realChainId),
+        getCityNodeLocations(realChainId),
+        getCityNodeAnomalyTxRefs(realChainId),
+        getCityNodeSuspectWallets(realChainId),
       ])
 
       // Restore saved location states (inspected/scanned) from localStorage
@@ -1456,7 +1555,7 @@ export const useGameStore = create((set, get) => ({
       const { _cityNodeUnsub } = get()
       if (_cityNodeUnsub) _cityNodeUnsub()
       if (playerAddr) {
-        const unsub = await onCityNodeEvents(chainId, playerAddr, {
+        const unsub = await onCityNodeEvents(realChainId, playerAddr, {
           onClueUnlocked: ({ idx, clueIndex }) => {
             const CLUE_NAMES = ["BEHAVIOR_FINGERPRINT", "RELATIONSHIP", "IDENTITY_COMMIT", "FUNDING_TRAIL", "TECHNICAL_SIGNATURE", "DEAD_END"]
             set((s) => ({
@@ -1623,7 +1722,7 @@ export const useGameStore = create((set, get) => ({
     }))
 
     try {
-      const result = await cityNodeInspectLocation(currentCityId, locationIdx)
+      const result = await cityNodeInspectLocation(resolveChainId(currentCityId), locationIdx)
       set((s) => ({
         cityLocations: s.cityLocations.map((loc, i) =>
           i === locationIdx ? { ...loc, inspected: true } : loc
@@ -1657,7 +1756,7 @@ export const useGameStore = create((set, get) => ({
     }))
 
     try {
-      const result = await cityNodeScanAnomalies(currentCityId, locationIdx)
+      const result = await cityNodeScanAnomalies(resolveChainId(currentCityId), locationIdx)
       set((s) => ({
         cityLocations: s.cityLocations.map((loc, i) =>
           i === locationIdx ? { ...loc, scanned: true } : loc
@@ -1671,8 +1770,8 @@ export const useGameStore = create((set, get) => ({
 
       // refresh anomaly data
       const [anomalyTxRefs, suspectWallets] = await Promise.all([
-        getCityNodeAnomalyTxRefs(currentCityId),
-        getCityNodeSuspectWallets(currentCityId),
+        getCityNodeAnomalyTxRefs(resolveChainId(currentCityId)),
+        getCityNodeSuspectWallets(resolveChainId(currentCityId)),
       ])
       set({ cityAnomalyTxRefs: anomalyTxRefs, citySuspectWallets: suspectWallets })
 
@@ -1706,7 +1805,7 @@ export const useGameStore = create((set, get) => ({
     try {
       // first clue at the starting location is always strong (guaranteed lead)
       const isStartingClue = locationIdx === startLocationIdx && clueIndex === 0
-      const result = await cityNodeRequestClue(currentCityId, locationIdx, clueIndex, isStartingClue)
+      const result = await cityNodeRequestClue(resolveChainId(currentCityId), locationIdx, clueIndex, isStartingClue)
 
       const isDeadEnd = result.clueType === 'DEAD_END'
       const newClue = {
@@ -1784,7 +1883,7 @@ export const useGameStore = create((set, get) => ({
     }))
 
     try {
-      await cityNodeFlagTx(currentCityId, refId)
+      await cityNodeFlagTx(resolveChainId(currentCityId), refId)
       set((s) => ({
         terminalLines: [...s.terminalLines,
           { text: '> TX FLAGGED. Added to evidence bundle.', color: 'green', type: 'system' },
@@ -1815,7 +1914,7 @@ export const useGameStore = create((set, get) => ({
     }))
 
     try {
-      const result = await cityNodeRequestDossier(currentCityId)
+      const result = await cityNodeRequestDossier(resolveChainId(currentCityId))
       set((s) => ({
         dossierData: result,
         showDossierModal: true,
@@ -1866,7 +1965,7 @@ export const useGameStore = create((set, get) => ({
     }))
 
     try {
-      const result = await cityNodeRequestCapture(currentCityId, suspectWallet, '0x0')
+      const result = await cityNodeRequestCapture(resolveChainId(currentCityId), suspectWallet, '0x0')
 
       if (result.success) {
         set((s) => ({

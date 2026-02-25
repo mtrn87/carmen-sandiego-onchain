@@ -117,11 +117,24 @@ const CITY_NODE_GAMEPLAY_ABI = CityNodeArtifact.abi
 let _provider = null
 let _signer = null
 let _readProvider = null
+// _eventProvider removed — all event polling now uses getReadProvider()
+let _externalEip1193 = null
+
+/**
+ * Inject an external EIP-1193 provider (e.g. from Privy embedded wallet).
+ * Call this once after wallet login before any write transactions.
+ */
+export function initializeExternalProvider(eip1193Provider) {
+  _externalEip1193 = eip1193Provider
+  _provider = null
+  _signer = null
+}
 
 export async function getProvider() {
   if (_provider) return _provider
-  if (!window.ethereum) throw new Error("No wallet detected")
-  _provider = new ethers.BrowserProvider(window.ethereum)
+  const eip1193 = _externalEip1193 || window.ethereum
+  if (!eip1193) throw new Error("No wallet detected — call initializeExternalProvider() first")
+  _provider = new ethers.BrowserProvider(eip1193)
   return _provider
 }
 
@@ -134,8 +147,9 @@ export async function getSigner() {
 
 export async function getReadProvider() {
   if (_readProvider) return _readProvider
-  const rpcUrl = import.meta.env.VITE_ALCHEMY_RPC_URL_SEPOLIA
-  if (!rpcUrl) throw new Error("VITE_ALCHEMY_RPC_URL_SEPOLIA not set")
+  const rpcUrl = import.meta.env.VITE_SEPOLIA_RPC_URL
+    || import.meta.env.VITE_ALCHEMY_RPC_URL_SEPOLIA
+    || "https://rpc.ankr.com/eth_sepolia"
   _readProvider = new ethers.JsonRpcProvider(rpcUrl)
   return _readProvider
 }
@@ -148,6 +162,44 @@ export async function getContract() {
 export async function getReadContract() {
   const provider = await getReadProvider()
   return new ethers.Contract(GAME_MASTER_ADDRESS, GAME_MASTER_ABI, provider)
+}
+
+/**
+ * Poll-based event watcher using getLogs instead of eth_newFilter.
+ * Avoids "filter not found" errors from Alchemy's filter expiry.
+ * @param {ethers.Contract} contract
+ * @param {object} filter - ethers event filter
+ * @param {Function} handler - called with decoded event args
+ * @param {number} intervalMs - polling interval (default 6s)
+ * @returns {Function} unsubscribe
+ */
+function pollEvents(contract, filter, handler, intervalMs = 6000) {
+  let lastBlock = -1
+  let stopped = false
+
+  const poll = async () => {
+    if (stopped) return
+    try {
+      const provider = contract.runner?.provider || contract.provider
+      const currentBlock = await provider.getBlockNumber()
+      const fromBlock = lastBlock === -1 ? currentBlock : lastBlock + 1
+      if (fromBlock > currentBlock) return
+      const events = await contract.queryFilter(filter, fromBlock, currentBlock)
+      lastBlock = currentBlock
+      for (const ev of events) {
+        try { handler(ev) } catch {}
+      }
+    } catch (err) {
+      // silently retry next interval — avoids crashing on transient RPC errors
+      console.warn('[pollEvents] poll error:', err.message)
+    }
+  }
+
+  // initial poll
+  poll()
+  const id = setInterval(poll, intervalMs)
+
+  return () => { stopped = true; clearInterval(id) }
 }
 
 /** Reset cached provider/signer (call on wallet disconnect) */
@@ -320,6 +372,17 @@ export async function isPlayerRegistered(address) {
 }
 
 /**
+ * Get player's on-chain ECIES public key (hex string).
+ * Returns null if not registered.
+ */
+export async function getPlayerOnChainPublicKey(address) {
+  const contract = await getReadContract()
+  const pubKey = await contract.getPlayerPublicKey(address)
+  if (!pubKey || pubKey.length <= 2) return null
+  return pubKey
+}
+
+/**
  * Get player's active mission ID (0 = no active mission).
  * @param {string} address
  * @returns {bigint}
@@ -476,27 +539,24 @@ export async function deriveCarmenWallet(salt) {
 
 /**
  * Listen for WalletFragmentReceived events for a specific mission.
- * @param {number|bigint} missionId
- * @param {Function} callback - ({ missionId, fragmentIndex, startIndex, length, contentHash, ipfsPointer }) => void
- * @returns {Function} unsubscribe function
+ * Uses getLogs polling — no eth_newFilter needed.
  */
 export async function onWalletFragmentReceived(missionId, callback) {
   try {
     const contract = await getReadContract()
     if (!contract.filters?.WalletFragmentReceived) return () => {}
     const filter = contract.filters.WalletFragmentReceived(missionId)
-    const handler = (mId, fragmentIndex, startIndex, length, contentHash, ipfsPointer) => {
+    return pollEvents(contract, filter, (ev) => {
+      const a = ev.args
       callback({
-        missionId: Number(mId),
-        fragmentIndex: Number(fragmentIndex),
-        startIndex: Number(startIndex),
-        length: Number(length),
-        contentHash,
-        ipfsPointer,
+        missionId: Number(a[0]),
+        fragmentIndex: Number(a[1]),
+        startIndex: Number(a[2]),
+        length: Number(a[3]),
+        contentHash: a[4],
+        ipfsPointer: a[5],
       })
-    }
-    contract.on(filter, handler)
-    return () => contract.off(filter, handler)
+    })
   } catch {
     return () => {}
   }
@@ -504,24 +564,21 @@ export async function onWalletFragmentReceived(missionId, callback) {
 
 /**
  * Listen for EvidenceCollected events for a specific mission.
- * @param {number|bigint} missionId
- * @param {Function} callback - ({ missionId, evidenceCount, strength }) => void
- * @returns {Function} unsubscribe function
+ * Uses getLogs polling.
  */
 export async function onEvidenceCollected(missionId, callback) {
   try {
     const contract = await getReadContract()
     if (!contract.filters?.EvidenceCollected) return () => {}
     const filter = contract.filters.EvidenceCollected(missionId)
-    const handler = (mId, evidenceCount, strength) => {
+    return pollEvents(contract, filter, (ev) => {
+      const a = ev.args
       callback({
-        missionId: Number(mId),
-        evidenceCount: Number(evidenceCount),
-        strength: Number(strength),
+        missionId: Number(a[0]),
+        evidenceCount: Number(a[1]),
+        strength: Number(a[2]),
       })
-    }
-    contract.on(filter, handler)
-    return () => contract.off(filter, handler)
+    })
   } catch {
     return () => {}
   }
@@ -529,20 +586,20 @@ export async function onEvidenceCollected(missionId, callback) {
 
 /**
  * Listen for WalletCaseBuilt events for a specific mission.
+ * Uses getLogs polling.
  */
 export async function onWalletCaseBuilt(missionId, callback) {
   const contract = await getReadContract()
   const filter = contract.filters.WalletCaseBuilt(missionId)
-  const handler = (mId, player, submittedWallet, valid) => {
+  return pollEvents(contract, filter, (ev) => {
+    const a = ev.args
     callback({
-      missionId: Number(mId),
-      player,
-      submittedWallet,
-      valid,
+      missionId: Number(a[0]),
+      player: a[1],
+      submittedWallet: a[2],
+      valid: a[3],
     })
-  }
-  contract.on(filter, handler)
-  return () => contract.off(filter, handler)
+  })
 }
 
 /** Get blocks used in a mission. */
@@ -557,67 +614,66 @@ export async function getBlocksUsed(missionId) {
 
 /**
  * Listen for ClueReceived events for a specific mission.
- * @param {number|bigint} missionId
- * @param {Function} callback - (clueType, contentHash, ipfsPointer) => void
- * @returns {Function} unsubscribe function
+ * Uses getLogs polling — no eth_newFilter needed.
  */
 export async function onClueReceived(missionId, callback) {
   const contract = await getReadContract()
   const filter = contract.filters.ClueReceived(missionId)
-  const handler = (mId, clueType, contentHash, ipfsPointer) => {
+  return pollEvents(contract, filter, (ev) => {
+    const a = ev.args
+    console.log('[onClueReceived] ipfsPointer type:', typeof a[3], 'length:', a[3]?.length)
     callback({
-      missionId: Number(mId),
-      clueType: Number(clueType),
-      contentHash,
-      ipfsPointer,
+      missionId: Number(a[0]),
+      clueType: Number(a[1]),
+      contentHash: a[2],
+      ipfsPointer: a[3],
+      strength: Number(a[4] || 0),
     })
-  }
-  contract.on(filter, handler)
-  return () => contract.off(filter, handler)
+  })
 }
 
 /**
  * Listen for CarmenCaptured events for a specific mission.
+ * Uses getLogs polling.
  */
 export async function onCarmenCaptured(missionId, callback) {
   const contract = await getReadContract()
   const filter = contract.filters.CarmenCaptured(missionId)
-  const handler = (mId, player, blocksUsed, reward) => {
+  return pollEvents(contract, filter, (ev) => {
+    const a = ev.args
     callback({
-      missionId: Number(mId),
-      player,
-      blocksUsed: Number(blocksUsed),
-      reward: Number(reward),
+      missionId: Number(a[0]),
+      player: a[1],
+      blocksUsed: Number(a[2]),
+      reward: Number(a[3]),
     })
-  }
-  contract.on(filter, handler)
-  return () => contract.off(filter, handler)
+  })
 }
 
 /**
  * Listen for MissionFailed events for a specific mission.
+ * Uses getLogs polling.
  */
 export async function onMissionFailed(missionId, callback) {
   const contract = await getReadContract()
   const filter = contract.filters.MissionFailed(missionId)
-  const handler = (mId, player) => {
-    callback({ missionId: Number(mId), player })
-  }
-  contract.on(filter, handler)
-  return () => contract.off(filter, handler)
+  return pollEvents(contract, filter, (ev) => {
+    const a = ev.args
+    callback({ missionId: Number(a[0]), player: a[1] })
+  })
 }
 
 /**
  * Listen for CarmenMoved events for a specific mission.
+ * Uses getLogs polling.
  */
 export async function onCarmenMoved(missionId, callback) {
   const contract = await getReadContract()
   const filter = contract.filters.CarmenMoved(missionId)
-  const handler = (mId, newTargetHash) => {
-    callback({ missionId: Number(mId), newTargetHash })
-  }
-  contract.on(filter, handler)
-  return () => contract.off(filter, handler)
+  return pollEvents(contract, filter, (ev) => {
+    const a = ev.args
+    callback({ missionId: Number(a[0]), newTargetHash: a[1] })
+  })
 }
 
 /**
@@ -800,17 +856,28 @@ export async function onCaptureResolvedOnCity(callback) {
  */
 export async function getMissionEvents(missionId) {
   const contract = await getReadContract()
-  const provider = await getProvider()
+  const provider = await getReadProvider()
   const currentBlock = await provider.getBlockNumber()
-  // Look back up to 5000 blocks (more than enough for any mission)
+  // Look back up to 5000 blocks (~17h on Sepolia). Ankr RPC has no strict block range limit.
+  // safeQuery() handles errors gracefully if the provider imposes limits.
   const fromBlock = Math.max(0, currentBlock - 5000)
+
+  // Helper: safe queryFilter that returns [] on RPC limits
+  async function safeQuery(filter) {
+    try {
+      return await contract.queryFilter(filter, fromBlock)
+    } catch (err) {
+      // Alchemy free tier or other provider limit — skip silently
+      return []
+    }
+  }
 
   const events = []
 
   try {
     // Fetch InvestigationSubmitted events
     const investFilter = contract.filters.InvestigationSubmitted(missionId)
-    const investLogs = await contract.queryFilter(investFilter, fromBlock)
+    const investLogs = await safeQuery(investFilter)
     for (const log of investLogs) {
       const chainId = Number(log.args[2])
       const city = CITY_MAP[chainId]
@@ -829,7 +896,7 @@ export async function getMissionEvents(missionId) {
 
     // Fetch ClueReceived events
     const clueFilter = contract.filters.ClueReceived(missionId)
-    const clueLogs = await contract.queryFilter(clueFilter, fromBlock)
+    const clueLogs = await safeQuery(clueFilter)
     const clueTypes = ["Text", "Audio", "Image"]
     for (const log of clueLogs) {
       events.push({
@@ -847,7 +914,7 @@ export async function getMissionEvents(missionId) {
 
     // Fetch CarmenMoved events
     const movedFilter = contract.filters.CarmenMoved(missionId)
-    const movedLogs = await contract.queryFilter(movedFilter, fromBlock)
+    const movedLogs = await safeQuery(movedFilter)
     for (const log of movedLogs) {
       events.push({
         name: "CarmenMoved",
@@ -863,7 +930,7 @@ export async function getMissionEvents(missionId) {
 
     // Fetch CarmenCaptured events
     const capturedFilter = contract.filters.CarmenCaptured(missionId)
-    const capturedLogs = await contract.queryFilter(capturedFilter, fromBlock)
+    const capturedLogs = await safeQuery(capturedFilter)
     for (const log of capturedLogs) {
       events.push({
         name: "CarmenCaptured",
@@ -880,7 +947,7 @@ export async function getMissionEvents(missionId) {
 
     // Fetch MissionFailed events
     const failedFilter = contract.filters.MissionFailed(missionId)
-    const failedLogs = await contract.queryFilter(failedFilter, fromBlock)
+    const failedLogs = await safeQuery(failedFilter)
     for (const log of failedLogs) {
       events.push({
         name: "MissionFailed",
@@ -906,13 +973,14 @@ export async function getMissionEvents(missionId) {
  * Ensure wallet is connected to Sepolia. Prompts chain switch if needed.
  */
 export async function ensureSepoliaNetwork() {
-  if (!window.ethereum) throw new Error("No wallet detected")
-  const chainId = await window.ethereum.request({ method: "eth_chainId" })
+  const eip1193 = _externalEip1193 || window.ethereum
+  if (!eip1193) throw new Error("No wallet detected")
+  const chainId = await eip1193.request({ method: "eth_chainId" })
   const currentChainId = parseInt(chainId, 16)
   if (currentChainId === SEPOLIA_CHAIN_ID || currentChainId === HARDHAT_CHAIN_ID) {
     return
   }
-  await window.ethereum.request({
+  await eip1193.request({
     method: "wallet_switchEthereumChain",
     params: [{ chainId: "0x" + SEPOLIA_CHAIN_ID.toString(16) }],
   })
@@ -965,21 +1033,22 @@ function getCityNodeGameplayContract(chainId) {
  * Switch wallet to the CityNode's chain. Adds the chain if unknown.
  */
 export async function ensureCityNodeNetwork(chainId) {
-  if (!window.ethereum) throw new Error("No wallet detected")
-  const current = parseInt(await window.ethereum.request({ method: "eth_chainId" }), 16)
+  const eip1193 = _externalEip1193 || window.ethereum
+  if (!eip1193) throw new Error("No wallet detected")
+  const current = parseInt(await eip1193.request({ method: "eth_chainId" }), 16)
   if (current === chainId) return
 
   const params = CHAIN_PARAMS[chainId]
   if (!params) throw new Error(`Unknown chain ${chainId} — cannot switch wallet`)
 
   try {
-    await window.ethereum.request({
+    await eip1193.request({
       method: "wallet_switchEthereumChain",
       params: [{ chainId: params.chainId }],
     })
   } catch (err) {
     if (err.code === 4902) {
-      await window.ethereum.request({
+      await eip1193.request({
         method: "wallet_addEthereumChain",
         params: [params],
       })
@@ -998,7 +1067,8 @@ async function getCityNodeWriteContract(chainId) {
   const address = CITY_NODE_ADDRESSES[chainId]
   if (!address) throw new Error(`CityNode address not configured for chain ${chainId}`)
   await ensureCityNodeNetwork(chainId)
-  const provider = new ethers.BrowserProvider(window.ethereum)
+  const eip1193 = _externalEip1193 || window.ethereum
+  const provider = new ethers.BrowserProvider(eip1193)
   const signer = await provider.getSigner()
 
   // Wrap signer to override gas estimation for local Hardhat nodes
@@ -1809,60 +1879,59 @@ export async function onCityNodeEvents(chainId, playerAddress, callbacks) {
   if (!contract) return () => {}
 
   const unsubs = []
+  const addr = playerAddress.toLowerCase()
 
   if (callbacks.onLocationInspected) {
-    const handler = (player, idx, noteHash) => {
-      if (player.toLowerCase() !== playerAddress.toLowerCase()) return
-      callbacks.onLocationInspected({ player, idx: Number(idx), noteHash })
-    }
-    contract.on("LocationInspected", handler)
-    unsubs.push(() => contract.off("LocationInspected", handler))
+    const filter = contract.filters.LocationInspected(playerAddress)
+    unsubs.push(pollEvents(contract, filter, (ev) => {
+      const a = ev.args
+      callbacks.onLocationInspected({ player: a[0], idx: Number(a[1]), noteHash: a[2] })
+    }))
   }
 
   if (callbacks.onClueUnlocked) {
-    const handler = (player, idx, clueIndex, clueType, clueDataHash, anomalyRefId) => {
-      if (player.toLowerCase() !== playerAddress.toLowerCase()) return
+    const filter = contract.filters.ClueUnlocked(playerAddress)
+    unsubs.push(pollEvents(contract, filter, (ev) => {
+      const a = ev.args
       callbacks.onClueUnlocked({
-        player,
-        idx: Number(idx),
-        clueIndex: Number(clueIndex),
-        clueType: Number(clueType),
-        clueDataHash,
-        anomalyRefId,
+        player: a[0],
+        idx: Number(a[1]),
+        clueIndex: Number(a[2]),
+        clueType: Number(a[3]),
+        clueDataHash: a[4],
+        anomalyRefId: a[5],
       })
-    }
-    contract.on("ClueUnlocked", handler)
-    unsubs.push(() => contract.off("ClueUnlocked", handler))
+    }))
   }
 
   if (callbacks.onEnergySpent) {
-    const handler = (player, amount, remaining, actionType) => {
-      if (player.toLowerCase() !== playerAddress.toLowerCase()) return
+    const filter = contract.filters.EnergySpent(playerAddress)
+    unsubs.push(pollEvents(contract, filter, (ev) => {
+      const a = ev.args
       callbacks.onEnergySpent({
-        player,
-        amount: Number(amount),
-        remaining: Number(remaining),
-        actionType: Number(actionType),
+        player: a[0],
+        amount: Number(a[1]),
+        remaining: Number(a[2]),
+        actionType: Number(a[3]),
       })
-    }
-    contract.on("EnergySpent", handler)
-    unsubs.push(() => contract.off("EnergySpent", handler))
+    }))
   }
 
   if (callbacks.onCaptureResolved) {
-    const handler = (requestId, player, wallet, success, reasonCode, gmNoteHash) => {
-      if (player.toLowerCase() !== playerAddress.toLowerCase()) return
+    // CaptureResolved may not have player as first indexed param — use unfiltered + manual check
+    const filter = contract.filters.CaptureResolved()
+    unsubs.push(pollEvents(contract, filter, (ev) => {
+      const a = ev.args
+      if (a[1]?.toLowerCase() !== addr) return
       callbacks.onCaptureResolved({
-        requestId: Number(requestId),
-        player,
-        wallet,
-        success: Boolean(success),
-        reasonCode: Number(reasonCode),
-        gmNoteHash,
+        requestId: Number(a[0]),
+        player: a[1],
+        wallet: a[2],
+        success: Boolean(a[3]),
+        reasonCode: Number(a[4]),
+        gmNoteHash: a[5],
       })
-    }
-    contract.on("CaptureResolved", handler)
-    unsubs.push(() => contract.off("CaptureResolved", handler))
+    }))
   }
 
   return () => unsubs.forEach((fn) => fn())
