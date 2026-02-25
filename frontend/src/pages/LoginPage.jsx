@@ -11,8 +11,7 @@ import { useGameStore } from '../store/gameStore'
 import { getEthereumAddressFromPrivy, getUserInfoFromPrivy } from '../utils/privyProvider'
 import { saveAuthSession, clearAuthSession } from '../utils/authPersistence'
 import { initializePlayerRegistry, getPlayerData } from '../services/creService'
-import { getOrCreateKeyPair } from '../utils/ecies'
-import { isPlayerRegistered, registerPlayer as registerPlayerOnChain, getPlayerActiveMission, initializeExternalProvider } from '../services/contractService'
+import { initializeExternalProvider } from '../services/contractService'
 import styles from './LoginPage.module.css'
 
 const BOOT_LINES = [

@@ -14,6 +14,7 @@ export default function InteractiveMap({ onSelectCase }) {
     activeClue,
     closeClueModal,
     isInvestigating,
+    investigate,
     scannedLocations,
     isScanning,
     scanLocation,

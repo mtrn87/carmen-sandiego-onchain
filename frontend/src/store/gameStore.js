@@ -17,7 +17,6 @@ import {
   onWalletFragmentReceived,
   onWalletCaseBuilt,
   onEvidenceCollected,
-  onPlayerRegistered,
   onMissionStarted,
   onCarmenLocationCommitted,
   onTokenURISet,

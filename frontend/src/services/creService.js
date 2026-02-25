@@ -45,7 +45,7 @@ export async function initializePlayerRegistry(address) {
 /**
  * Get PlayerRegistry contract instance
  */
-function getPlayerRegistryContract() {
+function _getPlayerRegistryContract() {
   if (!_playerRegistryContract) {
     throw new Error("PlayerRegistry not initialized. Call initializePlayerRegistry first.");
   }

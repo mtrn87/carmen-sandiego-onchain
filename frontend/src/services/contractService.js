@@ -187,7 +187,7 @@ function pollEvents(contract, filter, handler, intervalMs = 6000) {
       const events = await contract.queryFilter(filter, fromBlock, currentBlock)
       lastBlock = currentBlock
       for (const ev of events) {
-        try { handler(ev) } catch {}
+        try { handler(ev) } catch { /* handler error, skip */ }
       }
     } catch (err) {
       // silently retry next interval — avoids crashing on transient RPC errors
@@ -866,7 +866,7 @@ export async function getMissionEvents(missionId) {
   async function safeQuery(filter) {
     try {
       return await contract.queryFilter(filter, fromBlock)
-    } catch (err) {
+    } catch {
       // Alchemy free tier or other provider limit — skip silently
       return []
     }
