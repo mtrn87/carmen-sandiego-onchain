@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { getReadProvider } from "./contractService";
+import { getReadProvider, getSigner } from "./contractService";
 
 const PLAYER_REGISTRY_ABI = [
   // View functions (simple reads, no CRE needed)
@@ -45,11 +45,22 @@ export async function initializePlayerRegistry(address) {
 /**
  * Get PlayerRegistry contract instance
  */
-function getPlayerRegistryContract() {
+function _getPlayerRegistryContract() {
   if (!_playerRegistryContract) {
     throw new Error("PlayerRegistry not initialized. Call initializePlayerRegistry first.");
   }
   return _playerRegistryContract;
+}
+
+/**
+ * Get write-capable contract instance (with signer for sending transactions)
+ */
+async function getPlayerRegistryWriteContract() {
+  if (!_playerRegistryAddress) {
+    throw new Error("PlayerRegistry address not set");
+  }
+  const signer = await getSigner();
+  return new ethers.Contract(_playerRegistryAddress, PLAYER_REGISTRY_ABI, signer);
 }
 
 /**
@@ -150,8 +161,8 @@ export async function signRegistrationMessage(user, privySignMessage, playerAddr
   console.log("[creService] Player address:", playerAddress);
   console.log("[creService] Signer address:", actualPlayerAddress);
 
-  // Get current nonce from contract
-  const contract = getPlayerRegistryContract();
+  // Get current nonce from contract (read-only is fine here)
+  const contract = await getPlayerRegistryReadContract();
   const nonceBigInt = await contract.nonces(actualPlayerAddress);
   const nonce = Number(nonceBigInt);  // Convert BigInt to number
 
@@ -249,7 +260,7 @@ export async function callChainlinkFunctionsForRegistration(signedData) {
  * No gas required from user - CRE pays
  */
 export async function requestRegistration(nickname) {
-  const contract = getPlayerRegistryContract();
+  const contract = await getPlayerRegistryWriteContract();
   console.log("[creService] Calling requestRegistration for nickname:", nickname);
   const tx = await contract.requestRegistration(nickname);
   const receipt = await tx.wait();

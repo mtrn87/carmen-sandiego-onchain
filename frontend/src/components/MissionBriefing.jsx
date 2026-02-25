@@ -244,6 +244,21 @@ export default function MissionBriefing() {
             )}
           </div>
 
+          {/* skip button (visible during typing) */}
+          {!allDone && (
+            <button
+              className={styles.skipBtn}
+              onClick={() => {
+                setTypedLines(TYPED_LINES.map((l) => ({ text: l.text, color: l.color })))
+                setSkipped(true)
+                setAllDone(true)
+                audioRef.current?.pause()
+              }}
+            >
+              SKIP &gt;&gt;
+            </button>
+          )}
+
           {/* continue prompt */}
           {allDone && (
             <button

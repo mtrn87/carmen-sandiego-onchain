@@ -1265,13 +1265,13 @@ describe("GameMaster", function () {
       expect(await gm.getPlayerActiveMission(player.address)).to.equal(0);
     });
 
-    it("should fail mission when MAX_BLOCKS (50) is exhausted", async function () {
+    it("should fail mission when MAX_BLOCKS (200) is exhausted", async function () {
       await gm.connect(player).startMission();
       const missionId = await gm.getPlayerActiveMission(player.address);
       await vrfCoordinator.fulfillRandomWordsWithOverride(missionId, await gm.getAddress(), [42]);
 
-      // Mine 50 blocks
-      for (let i = 0; i < 50; i++) {
+      // Mine 200 blocks to exceed MAX_BLOCKS
+      for (let i = 0; i < 200; i++) {
         await ethers.provider.send("evm_mine", []);
       }
 

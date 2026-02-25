@@ -24,15 +24,13 @@ function getMedalTier(blocksUsed) {
 export default function ProfilePage() {
   const { address } = useParams()
   const navigate = useNavigate()
-  const { getPlayerGlobalProgress, getMissionRecord, gameMaster, walletAddress } = useGameStore();
+  const { walletAddress } = useGameStore()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [progress, setProgress] = useState(null)
   const [trophies, setTrophies] = useState([])
   const [stats, setStats] = useState(null)
-  const [missionHistory, setMissionHistory] = useState([]);
-  const [playerData, setPlayerData] = useState(null);
 
   const targetAddress = address || walletAddress
 

@@ -24,11 +24,11 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
     uint256 public immutable vrfSubscriptionId;
     bytes32 public immutable vrfKeyHash;
     uint32  public constant VRF_CALLBACK_GAS = 200_000;
-    uint16  public constant VRF_CONFIRMATIONS = 3;
+    uint16  public constant VRF_CONFIRMATIONS = 3;     // Sepolia minimum is 3
     uint32  public constant VRF_NUM_WORDS = 1;
 
     // --- Game Config ---
-    uint256 public constant MAX_BLOCKS = 50;           // Max blocks before mission fails
+    uint256 public constant MAX_BLOCKS = 200;          // Max blocks before mission fails (~40 min on Sepolia)
     uint256 public constant MAX_INVESTIGATIONS = 10;   // Max investigation attempts
     uint8 public constant EVIDENCE_THRESHOLD = 65;     // Clue strength > this = evidence
     uint256[] public validChainIds;                     // Chain IDs representing cities

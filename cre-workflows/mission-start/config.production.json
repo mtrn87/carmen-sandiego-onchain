@@ -1,6 +1,6 @@
 {
   "chainSelectorName": "ethereum-testnet-sepolia",
-  "gameMasterAddress": "0x0EAf52Fe6b3A115A5B1A7C5d4df2Eb8b5d933BC1",
-  "proxyAddress": "0x792fE8722fef784b30feBB7258706FaC1320Bff7",
+  "gameMasterAddress": "0x84e4af8bf4f2c32276B5F4C32D36756dB0e2a43e",
+  "proxyAddress": "0x414Cb64924e9116c67Dc5beeA30e6DeE81e56839",
   "gasLimit": "500000"
 }

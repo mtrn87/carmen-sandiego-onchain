@@ -434,6 +434,39 @@
   color: #F0B90B;
 }
 
+/* ── investigate city button ── */
+.investigateBtn {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 2px;
+  color: var(--cyan);
+  background: rgba(0, 255, 255, 0.06);
+  border: none;
+  border-top: 1px solid rgba(0, 255, 255, 0.15);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.investigateBtn:hover {
+  background: rgba(0, 255, 255, 0.12);
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+
+.investigateBtnDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  animation: pulse 1.5s ease infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+}
+
 .locationPanelClose {
   padding: 10px;
   font-family: var(--font-mono);
