@@ -65,6 +65,13 @@ export const onEvidenceCollected = vi.fn(async () => vi.fn())
 export const getMissionWalletFragments = vi.fn(async () => [])
 export const getMissionFragmentCount = vi.fn(async () => 0)
 export const getMissionEvidenceCount = vi.fn(async () => 0)
+export const onPlayerRegistered = vi.fn(async () => vi.fn())
+export const onMissionStarted = vi.fn(async () => vi.fn())
+export const onCarmenLocationCommitted = vi.fn(async () => vi.fn())
+export const onTokenURISet = vi.fn(async () => vi.fn())
+export const onClueResolvedOnCity = vi.fn(async () => vi.fn())
+export const onDossierResolvedOnCity = vi.fn(async () => vi.fn())
+export const onCaptureResolvedOnCity = vi.fn(async () => vi.fn())
 export const getCityNodeEnergy = vi.fn(async () => 10)
 export const MAX_ENERGY = 10
 export const ENERGY_REGEN_INTERVAL = 900
