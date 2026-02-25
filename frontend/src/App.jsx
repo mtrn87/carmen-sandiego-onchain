@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import GamePage from './pages/GamePage'
+import HelpPage from './pages/HelpPage'
+import SettingsPage from './pages/SettingsPage'
 import { useGameStore } from './store/gameStore'
 import { loadAuthSession } from './utils/authPersistence'
 
@@ -34,6 +36,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LoginPage />} />
         <Route path="/game" element={<GamePage />} />
+        <Route path="/help" element={<HelpPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Routes>
     </>
   )
