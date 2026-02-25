@@ -68,3 +68,12 @@ export const getMissionEvidenceCount = vi.fn(async () => 0)
 export const getCityNodeEnergy = vi.fn(async () => 10)
 export const MAX_ENERGY = 10
 export const ENERGY_REGEN_INTERVAL = 900
+
+// Profile / MissionNFT mocks
+export const MISSION_NFT_ADDRESS = '0xMOCK_NFT_ADDRESS'
+export const getPlayerGlobalProgress = vi.fn(async () => ({ citiesVisited: 2, totalClues: 5, identityCommitsCount: 3 }))
+export const getMissionNFTBalance = vi.fn(async () => 0)
+export const getMissionRecord = vi.fn(async () => null)
+export const getMissionNFTTokenURI = vi.fn(async () => null)
+export const getMissionToTokenId = vi.fn(async () => null)
+export const getPlayerMissionTrophies = vi.fn(async () => [])
