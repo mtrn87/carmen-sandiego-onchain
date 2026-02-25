@@ -1,9 +1,11 @@
 import { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
-import LoginPage from './pages/LoginPage'
+import { Route, Routes } from 'react-router-dom'
 import GamePage from './pages/GamePage'
 import HelpPage from './pages/HelpPage'
 import SettingsPage from './pages/SettingsPage'
+import ErrorBoundary from './components/ErrorBoundary'
+import LoginPage from './pages/LoginPage'
+import ProfilePage from './pages/ProfilePage'
 import { useGameStore } from './store/gameStore'
 import { loadAuthSession } from './utils/authPersistence'
 
@@ -32,13 +34,18 @@ export default function App() {
   }, [initializeWeb3AuthSession])
 
   return (
-    <>
+    <ErrorBoundary name="App">
       <Routes>
         <Route path="/" element={<LoginPage />} />
-        <Route path="/game" element={<GamePage />} />
         <Route path="/help" element={<HelpPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/game" element={
+          <ErrorBoundary name="GamePage">
+            <GamePage />
+          </ErrorBoundary>
+        } />
+        <Route path="/profile/:address" element={<ProfilePage />} />
       </Routes>
-    </>
+    </ErrorBoundary>
   )
 }
