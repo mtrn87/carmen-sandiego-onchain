@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import styles from './ProfilePage.module.css';
-import { ethers } from 'ethers';
 
 const ProfilePage = () => {
-  const { getPlayerGlobalProgress, getMissionRecord, missionNFT, gameMaster } = useGameStore();
+  const { getPlayerGlobalProgress, getMissionRecord, gameMaster } = useGameStore();
   const [playerData, setPlayerData] = useState(null);
   const [missionHistory, setMissionHistory] = useState([]);
 
