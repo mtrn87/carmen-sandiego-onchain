@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
-import LoginPage from './pages/LoginPage'
+import { Route, Routes } from 'react-router-dom'
 import GamePage from './pages/GamePage'
 import ErrorBoundary from './components/ErrorBoundary'
+import LoginPage from './pages/LoginPage'
+import ProfilePage from './pages/ProfilePage'
 import { useGameStore } from './store/gameStore'
 import { loadAuthSession } from './utils/authPersistence'
 
@@ -39,6 +40,7 @@ export default function App() {
             <GamePage />
           </ErrorBoundary>
         } />
+        <Route path="/profile/:address" element={<ProfilePage />} />
       </Routes>
     </ErrorBoundary>
   )
