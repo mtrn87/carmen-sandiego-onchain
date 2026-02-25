@@ -3,10 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
 import {
   getPlayerGlobalProgress,
-  getMissionNFTBalance,
   getPlayerMissionTrophies,
   CITY_MAP,
-  MISSION_NFT_ADDRESS,
 } from '../services/contractService'
 import styles from './ProfilePage.module.css'
 
@@ -26,7 +24,7 @@ function getMedalTier(blocksUsed) {
 export default function ProfilePage() {
   const { address } = useParams()
   const navigate = useNavigate()
-  const { walletAddress, isConnected } = useGameStore()
+  const { walletAddress } = useGameStore()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
