@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePrivy } from '@privy-io/react-auth'
 import TerminalSidebar from '../components/TerminalSidebar'
 import InteractiveMap from '../components/InteractiveMap'
 import ContractExplorer from '../components/ContractExplorer'
@@ -11,10 +12,12 @@ import ClueModal from '../components/ClueModal'
 import LeaderboardModal from '../components/LeaderboardModal'
 
 import { useGameStore } from '../store/gameStore'
+import { clearAuthSession } from '../utils/authPersistence'
 import styles from './GamePage.module.css'
 
 export default function GamePage() {
   const navigate = useNavigate()
+  const { logout } = usePrivy()
   const {
     isConnected,
     briefingDone,
@@ -29,8 +32,22 @@ export default function GamePage() {
     selectLocation,
     currentCityId,
     captureMode,
+    disconnectWallet,
+    playerNickname,
+    walletAddress,
   } = useGameStore()
   const [showMap, setShowMap] = useState(false)
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout()
+      disconnectWallet()
+      clearAuthSession()
+      navigate('/')
+    } catch (error) {
+      console.error('Logout failed:', error)
+    }
+  }, [logout, disconnectWallet, navigate])
 
   // redirect to login if not connected
   useEffect(() => {
@@ -107,6 +124,16 @@ export default function GamePage() {
 
       {/* leaderboard modal — opened from terminal /leaderboard command */}
       {showLeaderboard && <LeaderboardModal onClose={closeLeaderboard} />}
+
+      {/* top bar — agent info + logout */}
+      <div className={styles.topBar}>
+        <span className={styles.agentInfo}>
+          {playerNickname || (walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '')}
+        </span>
+        <button className={styles.logoutBtn} onClick={handleLogout}>
+          LOGOUT
+        </button>
+      </div>
 
       {/* left sidebar — terminal (dimmed in capture mode) */}
       <aside className={`${styles.sidebar} ${captureMode ? styles.sidebarDimmed : ''}`}>

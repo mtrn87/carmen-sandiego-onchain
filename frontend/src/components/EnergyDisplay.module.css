@@ -70,3 +70,11 @@
   opacity: 0.4;
   margin: 0 1px;
 }
+
+.timer {
+  font-size: 0.6rem;
+  color: var(--yellow);
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+}
