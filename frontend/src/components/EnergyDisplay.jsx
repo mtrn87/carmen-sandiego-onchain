@@ -26,7 +26,7 @@ export default function EnergyDisplay() {
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [energyNextRegen, energy.current, energy.max])
+  }, [energyNextRegen, energy, energy.max])
 
   const pct = energy.max > 0 ? (energy.current / energy.max) * 100 : 0
   const isLow = energy.current <= 3

@@ -10,6 +10,7 @@ import { CITY_POOL_MAP, getMockLocations, getMockClueData, getCountryCode } from
 import { WALLET_POOL, pickTxWallets, getCarmenWalletIndex } from '../data/walletPool'
 import GameMasterArtifact from "../abi/GameMaster.json"
 import CityNodeArtifact from "../abi/CityNode.json"
+import MissionNFTArtifact from "../abi/MissionNFT.json"
 
 // ============================================================
 //  Constants
@@ -1935,4 +1936,113 @@ export async function onCityNodeEvents(chainId, playerAddress, callbacks) {
   }
 
   return () => unsubs.forEach((fn) => fn())
+}
+
+// ============================================================
+//  Player Profile / MissionNFT
+// ============================================================
+
+export const MISSION_NFT_ADDRESS = import.meta.env.VITE_MISSION_NFT_ADDRESS || null
+
+async function getMissionNFTContract() {
+  if (!MISSION_NFT_ADDRESS) return null
+  const provider = await getReadProvider()
+  return new ethers.Contract(MISSION_NFT_ADDRESS, MissionNFTArtifact.abi, provider)
+}
+
+/** Get player global progress from GameMaster. */
+export async function getPlayerGlobalProgress(playerAddress) {
+  const contract = await getReadContract()
+  const [citiesVisited, totalClues, identityCommitsCount] =
+    await contract.getPlayerGlobalProgress(playerAddress)
+  return {
+    citiesVisited: Number(citiesVisited),
+    totalClues: Number(totalClues),
+    identityCommitsCount: Number(identityCommitsCount),
+  }
+}
+
+/** Get the number of MissionNFT trophies owned by a player. */
+export async function getMissionNFTBalance(playerAddress) {
+  const nft = await getMissionNFTContract()
+  if (!nft) return 0
+  return Number(await nft.balanceOf(playerAddress))
+}
+
+/** Get the MissionRecord for a given tokenId. */
+export async function getMissionRecord(tokenId) {
+  const nft = await getMissionNFTContract()
+  if (!nft) return null
+  const r = await nft.getMissionRecord(tokenId)
+  return {
+    missionId: Number(r.missionId),
+    player: r.player,
+    capturedChainId: Number(r.capturedChainId),
+    cluesCollected: Number(r.cluesCollected),
+    investigationsUsed: Number(r.investigationsUsed),
+    blocksUsed: Number(r.blocksUsed),
+    reward: Number(r.reward),
+    timestamp: Number(r.timestamp),
+  }
+}
+
+/** Get tokenURI for a given tokenId. */
+export async function getMissionNFTTokenURI(tokenId) {
+  const nft = await getMissionNFTContract()
+  if (!nft) return null
+  try {
+    return await nft.tokenURI(tokenId)
+  } catch {
+    return null
+  }
+}
+
+/** Get the tokenId for a given missionId. */
+export async function getMissionToTokenId(missionId) {
+  const nft = await getMissionNFTContract()
+  if (!nft) return null
+  try {
+    return Number(await nft.missionToTokenId(missionId))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Fetch all mission trophies for a player by scanning Transfer events.
+ * Returns array of { tokenId, record, tokenURI }.
+ */
+export async function getPlayerMissionTrophies(playerAddress) {
+  const nft = await getMissionNFTContract()
+  if (!nft) return []
+
+  const balance = Number(await nft.balanceOf(playerAddress))
+  if (balance === 0) return []
+
+  // Scan Transfer events to this player to discover their tokenIds
+  const filter = nft.filters.Transfer(null, playerAddress)
+  const events = await nft.queryFilter(filter, 0, 'latest')
+
+  const trophies = []
+  const seen = new Set()
+
+  for (const event of events) {
+    const tokenId = Number(event.args.tokenId)
+    if (seen.has(tokenId)) continue
+    seen.add(tokenId)
+
+    // Verify current ownership (could have been transferred away)
+    try {
+      const owner = await nft.ownerOf(tokenId)
+      if (owner.toLowerCase() !== playerAddress.toLowerCase()) continue
+    } catch {
+      continue
+    }
+
+    const record = await getMissionRecord(tokenId)
+    const uri = await getMissionNFTTokenURI(tokenId)
+    trophies.push({ tokenId, record, tokenURI: uri })
+  }
+
+  return trophies
 }
