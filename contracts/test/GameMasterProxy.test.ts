@@ -383,4 +383,290 @@ describe("GameMasterProxy", function () {
       expect(await gameMaster.getPlayerActiveMission(player.address)).to.equal(0);
     });
   });
+
+  // ============================================================
+  //    COVERAGE GAPS: ACTION_RECEIVE_WALLET_FRAGMENT (4)
+  // ============================================================
+
+  describe("ACTION_RECEIVE_WALLET_FRAGMENT (4)", function () {
+    it("should forward wallet fragment to GameMaster via proxy", async function () {
+      const missionId = await setupMission(player, 3);
+
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("fragment-0"));
+      const ipfs = "QmTestFragment";
+
+      const data = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint256", "uint8", "uint8", "bytes32", "string"],
+        [missionId, 0, 5, contentHash, ipfs] // startIndex=0, length=5
+      );
+      const report = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint8", "bytes"],
+        [4, data] // ACTION_RECEIVE_WALLET_FRAGMENT = 4
+      );
+      const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "bytes10", "address"],
+        [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+      );
+
+      await expect(proxy.connect(forwarder).onReport(metadata, report))
+        .to.emit(proxy, "ActionForwarded")
+        .withArgs(4, missionId);
+
+      // Verify fragment was stored
+      const fragments = await gameMaster.getMissionWalletFragments(missionId);
+      expect(fragments.length).to.equal(1);
+      expect(fragments[0].startIndex).to.equal(0);
+      expect(fragments[0].length).to.equal(5);
+      expect(fragments[0].contentHash).to.equal(contentHash);
+    });
+
+    it("should forward multiple fragments via proxy", async function () {
+      const missionId = await setupMission(player, 3);
+
+      for (let i = 0; i < 3; i++) {
+        const contentHash = ethers.keccak256(ethers.toUtf8Bytes(`fragment-${i}`));
+        const data = ethers.AbiCoder.defaultAbiCoder().encode(
+          ["uint256", "uint8", "uint8", "bytes32", "string"],
+          [missionId, i * 10, 5, contentHash, `QmFrag${i}`]
+        );
+        const report = ethers.AbiCoder.defaultAbiCoder().encode(
+          ["uint8", "bytes"],
+          [4, data]
+        );
+        const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+          ["bytes32", "bytes10", "address"],
+          [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+        );
+
+        await proxy.connect(forwarder).onReport(metadata, report);
+      }
+
+      expect(await gameMaster.getMissionFragmentCount(missionId)).to.equal(3);
+    });
+
+    it("should reject fragment out of bounds via proxy", async function () {
+      const missionId = await setupMission(player, 3);
+
+      const data = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint256", "uint8", "uint8", "bytes32", "string"],
+        [missionId, 38, 5, ethers.ZeroHash, "QmBad"] // 38+5=43 > 40
+      );
+      const report = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint8", "bytes"],
+        [4, data]
+      );
+      const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "bytes10", "address"],
+        [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+      );
+
+      await expect(
+        proxy.connect(forwarder).onReport(metadata, report)
+      ).to.be.revertedWith("Fragment out of bounds");
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: ACTION_RESOLVE_WALLET_CAPTURE (5)
+  // ============================================================
+
+  describe("ACTION_RESOLVE_WALLET_CAPTURE (5)", function () {
+    async function setupMissionWithFragments(p: SignerWithAddress, vrfWord: number = 3) {
+      const missionId = await setupMission(p, vrfWord);
+
+      // Deliver 3 wallet fragments via proxy
+      for (let i = 0; i < 3; i++) {
+        const contentHash = ethers.keccak256(ethers.toUtf8Bytes(`frag-${i}`));
+        const data = ethers.AbiCoder.defaultAbiCoder().encode(
+          ["uint256", "uint8", "uint8", "bytes32", "string"],
+          [missionId, i * 10, 5, contentHash, `QmFrag${i}`]
+        );
+        const report = ethers.AbiCoder.defaultAbiCoder().encode(
+          ["uint8", "bytes"],
+          [4, data]
+        );
+        const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+          ["bytes32", "bytes10", "address"],
+          [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+        );
+        await proxy.connect(forwarder).onReport(metadata, report);
+      }
+
+      return missionId;
+    }
+
+    it("should resolve wallet capture with correct wallet via proxy", async function () {
+      const missionId = await setupMissionWithFragments(player, 3);
+
+      // Compute expected values
+      const { salt } = computeTargetHash(ARBITRUM_SEPOLIA, 3, Number(missionId));
+      const carmenWallet = await gameMaster.deriveCarmenWallet(salt);
+
+      const data = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint256", "address", "uint256", "bytes32"],
+        [missionId, carmenWallet, ARBITRUM_SEPOLIA, salt]
+      );
+      const report = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint8", "bytes"],
+        [5, data] // ACTION_RESOLVE_WALLET_CAPTURE = 5
+      );
+      const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "bytes10", "address"],
+        [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+      );
+
+      await expect(proxy.connect(forwarder).onReport(metadata, report))
+        .to.emit(proxy, "ActionForwarded")
+        .withArgs(5, missionId);
+
+      // Mission should be completed
+      const mission = await gameMaster.getMission(missionId);
+      expect(mission.status).to.equal(2); // Completed
+    });
+
+    it("should emit WalletCaseBuilt on valid wallet capture", async function () {
+      const missionId = await setupMissionWithFragments(player, 3);
+
+      const { salt } = computeTargetHash(ARBITRUM_SEPOLIA, 3, Number(missionId));
+      const carmenWallet = await gameMaster.deriveCarmenWallet(salt);
+
+      const data = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint256", "address", "uint256", "bytes32"],
+        [missionId, carmenWallet, ARBITRUM_SEPOLIA, salt]
+      );
+      const report = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint8", "bytes"],
+        [5, data]
+      );
+      const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "bytes10", "address"],
+        [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+      );
+
+      await expect(proxy.connect(forwarder).onReport(metadata, report))
+        .to.emit(gameMaster, "WalletCaseBuilt")
+        .withArgs(missionId, player.address, carmenWallet, true);
+    });
+
+    it("should reject wallet capture with wrong wallet via proxy", async function () {
+      const missionId = await setupMissionWithFragments(player, 3);
+
+      const { salt } = computeTargetHash(ARBITRUM_SEPOLIA, 3, Number(missionId));
+      const wrongWallet = ethers.Wallet.createRandom().address;
+
+      const data = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint256", "address", "uint256", "bytes32"],
+        [missionId, wrongWallet, ARBITRUM_SEPOLIA, salt]
+      );
+      const report = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint8", "bytes"],
+        [5, data]
+      );
+      const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "bytes10", "address"],
+        [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+      );
+
+      // Should NOT revert, but mission stays active (wrong wallet)
+      await proxy.connect(forwarder).onReport(metadata, report);
+
+      const mission = await gameMaster.getMission(missionId);
+      expect(mission.status).to.equal(1); // Still Active
+    });
+
+    it("should reject wallet capture with insufficient fragments", async function () {
+      const missionId = await setupMission(player, 3);
+
+      // Only deliver 2 fragments (need 3)
+      for (let i = 0; i < 2; i++) {
+        const contentHash = ethers.keccak256(ethers.toUtf8Bytes(`frag-${i}`));
+        const data = ethers.AbiCoder.defaultAbiCoder().encode(
+          ["uint256", "uint8", "uint8", "bytes32", "string"],
+          [missionId, i * 10, 5, contentHash, `QmFrag${i}`]
+        );
+        const report = ethers.AbiCoder.defaultAbiCoder().encode(
+          ["uint8", "bytes"],
+          [4, data]
+        );
+        const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+          ["bytes32", "bytes10", "address"],
+          [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+        );
+        await proxy.connect(forwarder).onReport(metadata, report);
+      }
+
+      const { salt } = computeTargetHash(ARBITRUM_SEPOLIA, 3, Number(missionId));
+      const carmenWallet = await gameMaster.deriveCarmenWallet(salt);
+
+      const data = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint256", "address", "uint256", "bytes32"],
+        [missionId, carmenWallet, ARBITRUM_SEPOLIA, salt]
+      );
+      const report = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint8", "bytes"],
+        [5, data]
+      );
+      const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "bytes10", "address"],
+        [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+      );
+
+      await expect(
+        proxy.connect(forwarder).onReport(metadata, report)
+      ).to.be.revertedWith("Need 3+ fragments");
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: Metadata and Report Edge Cases
+  // ============================================================
+
+  describe("Metadata and Report Edge Cases", function () {
+    it("should handle report with various metadata values", async function () {
+      const missionId = await setupMission(player, 3);
+
+      // Use non-zero metadata values
+      const workflowId = ethers.keccak256(ethers.toUtf8Bytes("workflow-123"));
+      const workflowName = "0x" + Buffer.from("carmen-cre").toString("hex").padEnd(20, "0");
+      const workflowOwner = ethers.Wallet.createRandom().address;
+
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("clue-meta-test"));
+      const data = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint256", "uint8", "bytes32", "string", "uint8"],
+        [missionId, 0, contentHash, "QmMetaTest", 50]
+      );
+      const report = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint8", "bytes"],
+        [1, data]
+      );
+      const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "bytes10", "address"],
+        [workflowId, workflowName, workflowOwner]
+      );
+
+      // Should succeed regardless of metadata values
+      await proxy.connect(forwarder).onReport(metadata, report);
+      const clues = await gameMaster.getMissionClues(missionId);
+      expect(clues.length).to.equal(1);
+    });
+
+    it("should reject unknown action codes (0, 7, 255)", async function () {
+      const data = ethers.AbiCoder.defaultAbiCoder().encode(["uint256"], [1]);
+      const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "bytes10", "address"],
+        [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+      );
+
+      for (const actionCode of [0, 7, 255]) {
+        const report = ethers.AbiCoder.defaultAbiCoder().encode(
+          ["uint8", "bytes"],
+          [actionCode, data]
+        );
+
+        await expect(
+          proxy.connect(forwarder).onReport(metadata, report)
+        ).to.be.revertedWithCustomError(proxy, "UnknownAction");
+      }
+    });
+  });
 });

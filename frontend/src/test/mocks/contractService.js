@@ -72,3 +72,6 @@ export const onTokenURISet = vi.fn(async () => vi.fn())
 export const onClueResolvedOnCity = vi.fn(async () => vi.fn())
 export const onDossierResolvedOnCity = vi.fn(async () => vi.fn())
 export const onCaptureResolvedOnCity = vi.fn(async () => vi.fn())
+export const getCityNodeEnergy = vi.fn(async () => 10)
+export const MAX_ENERGY = 10
+export const ENERGY_REGEN_INTERVAL = 900

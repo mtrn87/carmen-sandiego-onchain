@@ -36,6 +36,9 @@ import {
   cityNodeRequestCapture,
   onCityNodeEvents,
   buildLocationTransactions,
+  getCityNodeEnergy,
+  MAX_ENERGY,
+  ENERGY_REGEN_INTERVAL,
 } from '../services/contractService'
 import { decryptClue } from '../utils/ecies'
 import scenariosData from '../data/scenarios.json'
@@ -204,6 +207,11 @@ export const useGameStore = create((set, get) => ({
   // gas (UI-only element)
   gas: 100,
   gasFlash: false,
+
+  // energy (on-chain CityNode resource)
+  energy: { current: MAX_ENERGY, max: MAX_ENERGY },
+  energyNextRegen: null, // timestamp (ms) of next energy regen point
+  _energyPollInterval: null,
 
   // on-chain state
   missionId: null,
@@ -422,14 +430,35 @@ export const useGameStore = create((set, get) => ({
         console.warn('Failed to load evidence count:', err)
       }
 
+      // Restore persisted progress from localStorage
+      const saved = loadProgress()
+      const restoredState = {}
+      if (saved) {
+        if (saved.discoveredCityIds?.length > 0) restoredState.discoveredCityIds = saved.discoveredCityIds
+        if (saved.visitedCityIds?.length > 0) restoredState.visitedCityIds = saved.visitedCityIds
+        if (saved.cityTrail?.length > 0) restoredState.cityTrail = saved.cityTrail
+        if (saved.discoveryScanCount > 0) restoredState.discoveryScanCount = saved.discoveryScanCount
+        if (saved.scannedLocations?.length > 0) restoredState.scannedLocations = saved.scannedLocations
+        if (saved.blocksElapsed > 0) restoredState.blocksElapsed = saved.blocksElapsed
+        if (saved.currentCityId) restoredState.currentCityId = saved.currentCityId
+        if (saved.evidence?.length > 0) restoredState.evidence = saved.evidence
+        if (saved.cityEvidence?.length > 0) restoredState.cityEvidence = saved.cityEvidence
+        if (saved.walletFragments?.length > 0) {
+          restoredState.walletFragments = saved.walletFragments
+          restoredState.walletFragmentCount = saved.walletFragmentCount || saved.walletFragments.length
+          restoredState.walletCaptureAvailable = (restoredState.walletFragmentCount || 0) >= 3
+        }
+        if (saved.evidenceCount > 0) restoredState.evidenceCount = saved.evidenceCount
+      }
+
       set({
         missionId,
         missionData: mission,
         missionEvents: events,
         lastKnownLocation: getLastKnownLocationFromEvents(events),
-        walletFragmentCount,
-        walletCaptureAvailable: walletFragmentCount >= 3,
-        evidenceCount,
+        walletFragmentCount: restoredState.walletFragmentCount ?? walletFragmentCount,
+        walletCaptureAvailable: restoredState.walletCaptureAvailable ?? (walletFragmentCount >= 3),
+        evidenceCount: restoredState.evidenceCount ?? evidenceCount,
         currentMission: {
           id: `mission-${missionId}`,
           title: `Mission #${missionId}`,
@@ -437,8 +466,10 @@ export const useGameStore = create((set, get) => ({
           status: statusMap[mission.status] || 'active',
         },
         clues: decryptedClues,
+        blocksElapsed: blocksUsed,
         // Don't set briefingDone here — let completeBriefing handle it
         // so the user always sees the briefing screen on new sessions
+        ...restoredState,
       })
 
       const state = get()
@@ -640,6 +671,7 @@ export const useGameStore = create((set, get) => ({
               ],
             }
           })
+          saveProgress(get())
         } catch (err) {
           console.error('Fragment decryption failed:', err)
           set((s) => ({
@@ -662,6 +694,7 @@ export const useGameStore = create((set, get) => ({
             { text: `> On-chain evidence count: ${event.evidenceCount}`, color: 'cyan', type: 'system' },
           ],
         }))
+        saveProgress(get())
       })
       newUnsubs.push(unsubEvidence)
 
@@ -1352,15 +1385,58 @@ export const useGameStore = create((set, get) => ({
         loc.transactions = buildLocationTransactions(chainId, i, anomalyTxRefs, locations.length, cwObj, cLocIdx)
       })
 
+      // Fetch player energy from CityNode
+      const playerAddr = get().walletAddress
+      let currentEnergy = MAX_ENERGY
+      if (playerAddr) {
+        try {
+          currentEnergy = await getCityNodeEnergy(chainId, playerAddr)
+        } catch {
+          // fallback to max
+        }
+      }
+
       set({
         currentCityInfo: cityInfo,
         cityLocations: locations,
         cityAnomalyTxRefs: anomalyTxRefs,
         citySuspectWallets: suspectWallets,
         gameplayLoading: false,
+        energy: { current: currentEnergy, max: MAX_ENERGY },
+        ...(currentEnergy < MAX_ENERGY ? {
+          energyNextRegen: Date.now() + ENERGY_REGEN_INTERVAL * 1000,
+        } : { energyNextRegen: null }),
         ...(saved?.scannedLocations ? { scannedLocations: saved.scannedLocations } : {}),
         ...(saved?.blocksElapsed ? { blocksElapsed: saved.blocksElapsed } : {}),
       })
+
+      // Start energy polling (every 30s)
+      const prevPollId = get()._energyPollInterval
+      if (prevPollId) clearInterval(prevPollId)
+      const energyPollId = setInterval(async () => {
+        const addr = get().walletAddress
+        const cId = get().currentCityId
+        if (!addr || !cId) return
+        try {
+          const e = await getCityNodeEnergy(cId, addr)
+          const prev = get().energy
+          set({
+            energy: { current: e, max: MAX_ENERGY },
+            ...(e < MAX_ENERGY ? {
+              energyNextRegen: Date.now() + ENERGY_REGEN_INTERVAL * 1000,
+            } : { energyNextRegen: null }),
+          })
+          // Terminal feedback when energy regenerates
+          if (e > prev.current) {
+            set((s) => ({
+              terminalLines: [...s.terminalLines,
+                { text: `> ENERGY REGENERATED: ${e}/${MAX_ENERGY}`, color: 'cyan', type: 'system' },
+              ],
+            }))
+          }
+        } catch { /* ignore */ }
+      }, 30000)
+      set({ _energyPollInterval: energyPollId })
 
       const city = CITY_MAP[chainId]
       set((s) => ({
@@ -1373,7 +1449,7 @@ export const useGameStore = create((set, get) => ({
       }))
 
       // Set up CityNode event listeners for real-time updates
-      const { _cityNodeUnsub, walletAddress: playerAddr } = get()
+      const { _cityNodeUnsub } = get()
       if (_cityNodeUnsub) _cityNodeUnsub()
       if (playerAddr) {
         const unsub = await onCityNodeEvents(chainId, playerAddr, {
