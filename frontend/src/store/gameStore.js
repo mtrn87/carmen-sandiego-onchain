@@ -14,6 +14,13 @@ import {
   onWalletFragmentReceived,
   onWalletCaseBuilt,
   onEvidenceCollected,
+  onPlayerRegistered,
+  onMissionStarted,
+  onCarmenLocationCommitted,
+  onTokenURISet,
+  onClueResolvedOnCity,
+  onDossierResolvedOnCity,
+  onCaptureResolvedOnCity,
   getMissionFragmentCount,
   getMissionEvidenceCount,
   CITY_MAP,
@@ -228,6 +235,7 @@ export const useGameStore = create((set, get) => ({
   showPlotModal: false,
   lastKnownLocation: null,
   terminalLines: [],
+  missionNFTTokenId: null,
   isInvestigating: false,
   showClueModal: false,
   activeClue: null,
@@ -735,6 +743,135 @@ export const useGameStore = create((set, get) => ({
         }))
       })
       newUnsubs.push(unsubFail)
+
+      // Listen for MissionStarted (VRF callback completed)
+      const unsubMissionStarted = await onMissionStarted(missionId, (event) => {
+        set((s) => ({
+          missionEvents: [...s.missionEvents, {
+            name: 'MissionStarted',
+            block: event.startBlock,
+            color: 'cyan',
+            data: {
+              missionId: event.missionId,
+              player: `${event.player.slice(0, 8)}...${event.player.slice(-4)}`,
+              startBlock: event.startBlock,
+            },
+          }],
+          terminalLines: [
+            ...s.terminalLines,
+            { text: `> MISSION #${event.missionId} INITIALIZED — VRF confirmed.`, color: 'cyan', type: 'system' },
+            { text: `> Start block: ${event.startBlock}. Investigation is GO.`, color: 'green', type: 'alert' },
+          ],
+        }))
+      })
+      newUnsubs.push(unsubMissionStarted)
+
+      // Listen for CarmenLocationCommitted (informational)
+      const unsubLocationCommit = await onCarmenLocationCommitted(missionId, (event) => {
+        set((s) => ({
+          missionEvents: [...s.missionEvents, {
+            name: 'CarmenLocationCommitted',
+            block: 'latest',
+            color: 'muted',
+            data: {
+              missionId: event.missionId,
+              targetHash: `${event.targetHash.slice(0, 14)}...`,
+            },
+          }],
+          terminalLines: [
+            ...s.terminalLines,
+            { text: `> INTEL: Carmen location hash committed: ${event.targetHash.slice(0, 14)}...`, color: 'muted', type: 'system' },
+          ],
+        }))
+      })
+      newUnsubs.push(unsubLocationCommit)
+
+      // Listen for TokenURISet (NFT metadata ready)
+      const unsubTokenURI = await onTokenURISet(missionId, (event) => {
+        set((s) => ({
+          missionNFTTokenId: event.tokenId,
+          missionEvents: [...s.missionEvents, {
+            name: 'TokenURISet',
+            block: 'latest',
+            color: 'cyan',
+            data: {
+              missionId: event.missionId,
+              tokenId: event.tokenId,
+            },
+          }],
+          terminalLines: [
+            ...s.terminalLines,
+            { text: `> NFT TROPHY #${event.tokenId} metadata set! View your trophy in profile.`, color: 'cyan', type: 'alert' },
+          ],
+        }))
+      })
+      newUnsubs.push(unsubTokenURI)
+
+      // Listen for ClueResolvedOnCity (cross-chain clue feedback)
+      const unsubClueResolved = await onClueResolvedOnCity((event) => {
+        const clueTypes = ['Text', 'Audio', 'Image']
+        set((s) => ({
+          missionEvents: [...s.missionEvents, {
+            name: 'ClueResolvedOnCity',
+            block: 'latest',
+            color: 'yellow',
+            data: {
+              cityNode: `${event.cityNode.slice(0, 10)}...`,
+              clueType: clueTypes[event.clueType] || 'Unknown',
+              clueDataHash: `${event.clueDataHash.slice(0, 14)}...`,
+            },
+          }],
+          terminalLines: [
+            ...s.terminalLines,
+            { text: `> CROSS-CHAIN: Clue resolved on CityNode ${event.cityNode.slice(0, 10)}...`, color: 'yellow', type: 'system' },
+          ],
+        }))
+      })
+      newUnsubs.push(unsubClueResolved)
+
+      // Listen for DossierResolvedOnCity (cross-chain dossier feedback)
+      const unsubDossierResolved = await onDossierResolvedOnCity((event) => {
+        set((s) => ({
+          missionEvents: [...s.missionEvents, {
+            name: 'DossierResolvedOnCity',
+            block: 'latest',
+            color: 'cyan',
+            data: {
+              cityNode: `${event.cityNode.slice(0, 10)}...`,
+              dossierHash: `${event.dossierHash.slice(0, 14)}...`,
+              confidence: event.confidence,
+            },
+          }],
+          terminalLines: [
+            ...s.terminalLines,
+            { text: `> CROSS-CHAIN: Dossier resolved — confidence: ${event.confidence}%.`, color: 'cyan', type: 'system' },
+          ],
+        }))
+      })
+      newUnsubs.push(unsubDossierResolved)
+
+      // Listen for CaptureResolvedOnCity (cross-chain capture feedback)
+      const unsubCaptureResolved = await onCaptureResolvedOnCity((event) => {
+        const status = event.success ? 'CAPTURE CONFIRMED' : 'CAPTURE FAILED'
+        const color = event.success ? 'green' : 'red'
+        set((s) => ({
+          missionEvents: [...s.missionEvents, {
+            name: 'CaptureResolvedOnCity',
+            block: 'latest',
+            color,
+            data: {
+              cityNode: `${event.cityNode.slice(0, 10)}...`,
+              success: event.success,
+              reasonCode: event.reasonCode,
+            },
+          }],
+          terminalLines: [
+            ...s.terminalLines,
+            { text: `> CROSS-CHAIN: ${status} on CityNode ${event.cityNode.slice(0, 10)}...`, color, type: 'alert' },
+          ],
+        }))
+      })
+      newUnsubs.push(unsubCaptureResolved)
 
       set({ _unsubscribers: newUnsubs })
     } catch (error) {

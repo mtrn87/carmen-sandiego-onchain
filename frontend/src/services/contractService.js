@@ -621,6 +621,178 @@ export async function onCarmenMoved(missionId, callback) {
 }
 
 /**
+ * Listen for PlayerRegistered events for a specific player address.
+ * @param {string} playerAddress
+ * @param {Function} callback - ({ player, publicKey }) => void
+ * @returns {Function} unsubscribe function
+ */
+export async function onPlayerRegistered(playerAddress, callback) {
+  try {
+    const contract = await getReadContract()
+    if (!contract.filters?.PlayerRegistered) return () => {}
+    const filter = contract.filters.PlayerRegistered(playerAddress)
+    const handler = (player, publicKey) => {
+      callback({ player, publicKey })
+    }
+    contract.on(filter, handler)
+    return () => contract.off(filter, handler)
+  } catch {
+    return () => {}
+  }
+}
+
+/**
+ * Listen for MissionStarted events for a specific mission.
+ * Emitted after VRF callback assigns Carmen's starting location.
+ * @param {number|bigint} missionId
+ * @param {Function} callback - ({ missionId, player, startBlock }) => void
+ * @returns {Function} unsubscribe function
+ */
+export async function onMissionStarted(missionId, callback) {
+  try {
+    const contract = await getReadContract()
+    if (!contract.filters?.MissionStarted) return () => {}
+    const filter = contract.filters.MissionStarted(missionId)
+    const handler = (mId, player, startBlock) => {
+      callback({
+        missionId: Number(mId),
+        player,
+        startBlock: Number(startBlock),
+      })
+    }
+    contract.on(filter, handler)
+    return () => contract.off(filter, handler)
+  } catch {
+    return () => {}
+  }
+}
+
+/**
+ * Listen for CarmenLocationCommitted events for a specific mission.
+ * Informational — commit hash of Carmen's location.
+ * @param {number|bigint} missionId
+ * @param {Function} callback - ({ missionId, targetHash }) => void
+ * @returns {Function} unsubscribe function
+ */
+export async function onCarmenLocationCommitted(missionId, callback) {
+  try {
+    const contract = await getReadContract()
+    if (!contract.filters?.CarmenLocationCommitted) return () => {}
+    const filter = contract.filters.CarmenLocationCommitted(missionId)
+    const handler = (mId, targetHash) => {
+      callback({
+        missionId: Number(mId),
+        targetHash,
+      })
+    }
+    contract.on(filter, handler)
+    return () => contract.off(filter, handler)
+  } catch {
+    return () => {}
+  }
+}
+
+/**
+ * Listen for TokenURISet events for a specific mission.
+ * Emitted when NFT metadata is ready after mission completion.
+ * @param {number|bigint} missionId
+ * @param {Function} callback - ({ missionId, tokenId }) => void
+ * @returns {Function} unsubscribe function
+ */
+export async function onTokenURISet(missionId, callback) {
+  try {
+    const contract = await getReadContract()
+    if (!contract.filters?.TokenURISet) return () => {}
+    const filter = contract.filters.TokenURISet(missionId)
+    const handler = (mId, tokenId) => {
+      callback({
+        missionId: Number(mId),
+        tokenId: Number(tokenId),
+      })
+    }
+    contract.on(filter, handler)
+    return () => contract.off(filter, handler)
+  } catch {
+    return () => {}
+  }
+}
+
+/**
+ * Listen for ClueResolvedOnCity events.
+ * Cross-chain feedback when a clue is resolved on a CityNode.
+ * @param {Function} callback - ({ cityNode, requestId, clueType, clueDataHash }) => void
+ * @returns {Function} unsubscribe function
+ */
+export async function onClueResolvedOnCity(callback) {
+  try {
+    const contract = await getReadContract()
+    if (!contract.filters?.ClueResolvedOnCity) return () => {}
+    const handler = (cityNode, requestId, clueType, clueDataHash) => {
+      callback({
+        cityNode,
+        requestId: Number(requestId),
+        clueType: Number(clueType),
+        clueDataHash,
+      })
+    }
+    contract.on("ClueResolvedOnCity", handler)
+    return () => contract.off("ClueResolvedOnCity", handler)
+  } catch {
+    return () => {}
+  }
+}
+
+/**
+ * Listen for DossierResolvedOnCity events.
+ * Cross-chain feedback when a dossier is resolved on a CityNode.
+ * @param {Function} callback - ({ cityNode, requestId, dossierHash, confidence }) => void
+ * @returns {Function} unsubscribe function
+ */
+export async function onDossierResolvedOnCity(callback) {
+  try {
+    const contract = await getReadContract()
+    if (!contract.filters?.DossierResolvedOnCity) return () => {}
+    const handler = (cityNode, requestId, dossierHash, confidence) => {
+      callback({
+        cityNode,
+        requestId: Number(requestId),
+        dossierHash,
+        confidence: Number(confidence),
+      })
+    }
+    contract.on("DossierResolvedOnCity", handler)
+    return () => contract.off("DossierResolvedOnCity", handler)
+  } catch {
+    return () => {}
+  }
+}
+
+/**
+ * Listen for CaptureResolvedOnCity events.
+ * Cross-chain feedback when a capture attempt is resolved on a CityNode.
+ * @param {Function} callback - ({ cityNode, requestId, success, reasonCode }) => void
+ * @returns {Function} unsubscribe function
+ */
+export async function onCaptureResolvedOnCity(callback) {
+  try {
+    const contract = await getReadContract()
+    if (!contract.filters?.CaptureResolvedOnCity) return () => {}
+    const handler = (cityNode, requestId, success, reasonCode) => {
+      callback({
+        cityNode,
+        requestId: Number(requestId),
+        success,
+        reasonCode: Number(reasonCode),
+      })
+    }
+    contract.on("CaptureResolvedOnCity", handler)
+    return () => contract.off("CaptureResolvedOnCity", handler)
+  } catch {
+    return () => {}
+  }
+}
+
+/**
  * Fetch historical events for a mission from the GameMaster contract.
  * Returns all events in chronological order.
  * @param {number|bigint} missionId
