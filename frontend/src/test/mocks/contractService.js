@@ -17,6 +17,7 @@ export const SEPOLIA_CHAIN_ID = 11155111
 
 export const registerPlayer = vi.fn(async () => ({ hash: '0xreg123' }))
 export const isPlayerRegistered = vi.fn(async () => false)
+export const getPlayerOnChainPublicKey = vi.fn(async () => null)
 export const getPlayerActiveMission = vi.fn(async () => 0n)
 export const startMission = vi.fn(async () => ({ hash: '0xstart456', status: 1 }))
 export const submitInvestigation = vi.fn(async () => ({ hash: '0xinv789' }))

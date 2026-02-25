@@ -3,6 +3,8 @@ import {
   isPlayerRegistered,
   getPlayerOnChainPublicKey,
   getPlayerActiveMission,
+  registerPlayer as registerPlayerOnChain,
+  startMission as startMissionOnChain,
   submitInvestigation as submitInvestigationOnChain,
   getMission,
   getMissionClues,
@@ -41,7 +43,7 @@ import {
   MAX_ENERGY,
   ENERGY_REGEN_INTERVAL,
 } from '../services/contractService'
-import { decryptClue } from '../utils/ecies'
+import { decryptClue, getPublicKeyHex } from '../utils/ecies'
 import scenariosData from '../data/scenarios.json'
 import { CITY_POOL_MAP, pickStartingCity, pickRevealedCities } from '../data/cityRegistry'
 import { getCarmenWallet, getCarmenLocationIdx } from '../data/walletPool'
