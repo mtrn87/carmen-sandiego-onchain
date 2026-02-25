@@ -29,6 +29,9 @@ import {
   cityNodeRequestCapture,
   onCityNodeEvents,
   buildLocationTransactions,
+  getCityNodeEnergy,
+  MAX_ENERGY,
+  ENERGY_REGEN_INTERVAL,
 } from '../services/contractService'
 import { decryptClue } from '../utils/ecies'
 import scenariosData from '../data/scenarios.json'
@@ -197,6 +200,11 @@ export const useGameStore = create((set, get) => ({
   // gas (UI-only element)
   gas: 100,
   gasFlash: false,
+
+  // energy (on-chain CityNode resource)
+  energy: { current: MAX_ENERGY, max: MAX_ENERGY },
+  energyNextRegen: null, // timestamp (ms) of next energy regen point
+  _energyPollInterval: null,
 
   // on-chain state
   missionId: null,
@@ -1215,15 +1223,58 @@ export const useGameStore = create((set, get) => ({
         loc.transactions = buildLocationTransactions(chainId, i, anomalyTxRefs, locations.length, cwObj, cLocIdx)
       })
 
+      // Fetch player energy from CityNode
+      const playerAddr = get().walletAddress
+      let currentEnergy = MAX_ENERGY
+      if (playerAddr) {
+        try {
+          currentEnergy = await getCityNodeEnergy(chainId, playerAddr)
+        } catch {
+          // fallback to max
+        }
+      }
+
       set({
         currentCityInfo: cityInfo,
         cityLocations: locations,
         cityAnomalyTxRefs: anomalyTxRefs,
         citySuspectWallets: suspectWallets,
         gameplayLoading: false,
+        energy: { current: currentEnergy, max: MAX_ENERGY },
+        ...(currentEnergy < MAX_ENERGY ? {
+          energyNextRegen: Date.now() + ENERGY_REGEN_INTERVAL * 1000,
+        } : { energyNextRegen: null }),
         ...(saved?.scannedLocations ? { scannedLocations: saved.scannedLocations } : {}),
         ...(saved?.blocksElapsed ? { blocksElapsed: saved.blocksElapsed } : {}),
       })
+
+      // Start energy polling (every 30s)
+      const prevPollId = get()._energyPollInterval
+      if (prevPollId) clearInterval(prevPollId)
+      const energyPollId = setInterval(async () => {
+        const addr = get().walletAddress
+        const cId = get().currentCityId
+        if (!addr || !cId) return
+        try {
+          const e = await getCityNodeEnergy(cId, addr)
+          const prev = get().energy
+          set({
+            energy: { current: e, max: MAX_ENERGY },
+            ...(e < MAX_ENERGY ? {
+              energyNextRegen: Date.now() + ENERGY_REGEN_INTERVAL * 1000,
+            } : { energyNextRegen: null }),
+          })
+          // Terminal feedback when energy regenerates
+          if (e > prev.current) {
+            set((s) => ({
+              terminalLines: [...s.terminalLines,
+                { text: `> ENERGY REGENERATED: ${e}/${MAX_ENERGY}`, color: 'cyan', type: 'system' },
+              ],
+            }))
+          }
+        } catch { /* ignore */ }
+      }, 30000)
+      set({ _energyPollInterval: energyPollId })
 
       const city = CITY_MAP[chainId]
       set((s) => ({
@@ -1236,7 +1287,7 @@ export const useGameStore = create((set, get) => ({
       }))
 
       // Set up CityNode event listeners for real-time updates
-      const { _cityNodeUnsub, walletAddress: playerAddr } = get()
+      const { _cityNodeUnsub } = get()
       if (_cityNodeUnsub) _cityNodeUnsub()
       if (playerAddr) {
         const unsub = await onCityNodeEvents(chainId, playerAddr, {
