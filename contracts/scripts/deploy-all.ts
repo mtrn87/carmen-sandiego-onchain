@@ -32,12 +32,12 @@ const CITY_DEFS: CityDef[] = [
       { name: "Chochin Market", description: "Token swaps masking asset movements.", category: 2, fakeLevel: 1, riskLevel: 4 },
     ],
     anomalies: [
-      { from: "0xdEaD000000000000000000000000000000000001", to: "0xdEaD000000000000000000000000000000000002", methodSig: "0xa9059cbb", value: ethers.parseEther("0.5"), anomalyType: 0 }, // UNUSUAL_GAS
-      { from: "0xdEaD000000000000000000000000000000000003", to: "0xdEaD000000000000000000000000000000000004", methodSig: "0x095ea7b3", value: ethers.parseEther("1.0"), anomalyType: 4 }, // BRIDGE_USAGE
+      { from: "0xdead000000000000000000000000000000000001", to: "0xdead000000000000000000000000000000000002", methodSig: "0xa9059cbb", value: ethers.parseEther("0.5"), anomalyType: 0 }, // UNUSUAL_GAS
+      { from: "0xdead000000000000000000000000000000000003", to: "0xdead000000000000000000000000000000000004", methodSig: "0x095ea7b3", value: ethers.parseEther("1.0"), anomalyType: 4 }, // BRIDGE_USAGE
     ],
     suspects: [
-      { wallet: "0xCA12E500000000000000000000000000000F0001", suspicionLevel: 80, tagsBitmap: 0b1101 },
-      { wallet: "0xCA12E500000000000000000000000000000F0002", suspicionLevel: 45, tagsBitmap: 0b0010 },
+      { wallet: "0xca12e500000000000000000000000000000f0001", suspicionLevel: 80, tagsBitmap: 0b1101 },
+      { wallet: "0xca12e500000000000000000000000000000f0002", suspicionLevel: 45, tagsBitmap: 0b0010 },
     ],
   },
   {
@@ -53,12 +53,12 @@ const CITY_DEFS: CityDef[] = [
       { name: "Notre-Dame Gate", description: "Base traffic converges at this relay.", category: 0, fakeLevel: 1, riskLevel: 2 },
     ],
     anomalies: [
-      { from: "0xdEaD000000000000000000000000000000000005", to: "0xdEaD000000000000000000000000000000000006", methodSig: "0x23b872dd", value: ethers.parseEther("2.0"), anomalyType: 2 }, // PRECISE_VALUE
-      { from: "0xdEaD000000000000000000000000000000000007", to: "0xdEaD000000000000000000000000000000000008", methodSig: "0xa9059cbb", value: ethers.parseEther("0.1"), anomalyType: 3 }, // RECURRING_COUNTERPARTY
+      { from: "0xdead000000000000000000000000000000000005", to: "0xdead000000000000000000000000000000000006", methodSig: "0x23b872dd", value: ethers.parseEther("2.0"), anomalyType: 2 }, // PRECISE_VALUE
+      { from: "0xdead000000000000000000000000000000000007", to: "0xdead000000000000000000000000000000000008", methodSig: "0xa9059cbb", value: ethers.parseEther("0.1"), anomalyType: 3 }, // RECURRING_COUNTERPARTY
     ],
     suspects: [
-      { wallet: "0xCA12E500000000000000000000000000000F0003", suspicionLevel: 70, tagsBitmap: 0b0111 },
-      { wallet: "0xCA12E500000000000000000000000000000F0004", suspicionLevel: 55, tagsBitmap: 0b1010 },
+      { wallet: "0xca12e500000000000000000000000000000f0003", suspicionLevel: 70, tagsBitmap: 0b0111 },
+      { wallet: "0xca12e500000000000000000000000000000f0004", suspicionLevel: 55, tagsBitmap: 0b1010 },
     ],
   },
   {
@@ -74,12 +74,12 @@ const CITY_DEFS: CityDef[] = [
       { name: "Bondi Beach Market", description: "Unusual swaps mask the stolen assets.", category: 2, fakeLevel: 1, riskLevel: 2 },
     ],
     anomalies: [
-      { from: "0xdEaD000000000000000000000000000000000009", to: "0xdEaD00000000000000000000000000000000000A", methodSig: "0xa9059cbb", value: ethers.parseEther("0.3"), anomalyType: 1 }, // BURST_NONCE
-      { from: "0xdEaD00000000000000000000000000000000000B", to: "0xdEaD00000000000000000000000000000000000C", methodSig: "0x095ea7b3", value: ethers.parseEther("5.0"), anomalyType: 5 }, // CREATE2_DEPLOY
+      { from: "0xdead000000000000000000000000000000000009", to: "0xdead00000000000000000000000000000000000a", methodSig: "0xa9059cbb", value: ethers.parseEther("0.3"), anomalyType: 1 }, // BURST_NONCE
+      { from: "0xdead00000000000000000000000000000000000b", to: "0xdead00000000000000000000000000000000000c", methodSig: "0x095ea7b3", value: ethers.parseEther("5.0"), anomalyType: 5 }, // CREATE2_DEPLOY
     ],
     suspects: [
-      { wallet: "0xCA12E500000000000000000000000000000F0005", suspicionLevel: 90, tagsBitmap: 0b1111 },
-      { wallet: "0xCA12E500000000000000000000000000000F0006", suspicionLevel: 35, tagsBitmap: 0b0001 },
+      { wallet: "0xca12e500000000000000000000000000000f0005", suspicionLevel: 90, tagsBitmap: 0b1111 },
+      { wallet: "0xca12e500000000000000000000000000000f0006", suspicionLevel: 35, tagsBitmap: 0b0001 },
     ],
   },
 ];
@@ -246,7 +246,7 @@ async function main() {
       // Deploy CityNode
       // gameMaster = deployer address (for cross-chain, deployer acts as GM for resolve calls)
       const factory = new ethers.ContractFactory(cityNodeArtifact.abi, cityNodeArtifact.bytecode, wallet);
-      const cityNode = await factory.deploy(city.name, city.countryCode, city.chainId, city.cityId, wallet.address);
+      const cityNode = await factory.deploy(city.name, city.countryCode, city.chainId, city.cityId, wallet.address, ethers.ZeroAddress);
       await cityNode.waitForDeployment();
       const cityNodeAddress = await cityNode.getAddress();
       cityNodeAddresses[city.name] = cityNodeAddress;
@@ -272,8 +272,8 @@ async function main() {
         const txRef = {
           refId: (i * 10) + j + 1,
           txHashLike: ethers.keccak256(ethers.toUtf8Bytes(`${city.name}-anomaly-${j}`)),
-          from: anom.from,
-          to: anom.to,
+          from: ethers.getAddress(anom.from),
+          to: ethers.getAddress(anom.to),
           methodSigLike: anom.methodSig,
           blockLike: 1000000 + j,
           valueLike: anom.value,
@@ -288,7 +288,7 @@ async function main() {
       for (let j = 0; j < city.suspects.length; j++) {
         const sus = city.suspects[j];
         const suspect = {
-          wallet: sus.wallet,
+          wallet: ethers.getAddress(sus.wallet),
           suspicionLevel: sus.suspicionLevel,
           txRefIds: [(i * 10) + j + 1], // link to anomaly
           tagsBitmap: sus.tagsBitmap,

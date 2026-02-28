@@ -11,7 +11,7 @@ import { useGameStore } from '../store/gameStore'
 import { getEthereumAddressFromPrivy, getUserInfoFromPrivy } from '../utils/privyProvider'
 import { saveAuthSession, clearAuthSession } from '../utils/authPersistence'
 import { initializePlayerRegistry, getPlayerData } from '../services/creService'
-import { initializeExternalProvider } from '../services/contractService'
+import { initializeExternalProvider, getSigner } from '../services/contractService'
 import styles from './LoginPage.module.css'
 
 const BOOT_LINES = [
@@ -101,9 +101,9 @@ export default function LoginPage() {
     }
   }, [logout, disconnectWallet])
 
-  // Sync with Privy when user logs in
+  // Sync with Privy when user logs in (wait for wallets to be available)
   useEffect(() => {
-    if (user && !isConnected) {
+    if (user && !isConnected && wallets?.length > 0) {
       (async () => {
         try {
           console.log('[LoginPage] Syncing Privy user...', user)
@@ -128,13 +128,22 @@ export default function LoginPage() {
 
           // Initialize Privy wallet provider for signing transactions
           const privyWallet = wallets.find(w => w.address?.toLowerCase() === address.toLowerCase()) || wallets[0]
+          let signerAddress = address
           if (privyWallet) {
             try {
               // Switch to Sepolia before getting the provider
               await privyWallet.switchChain(11155111)
               const eip1193 = await privyWallet.getEthereumProvider()
               initializeExternalProvider(eip1193)
+              // Get the REAL signer address (may differ from Privy user.wallet.address)
+              const signer = await getSigner()
+              signerAddress = await signer.getAddress()
               console.log('[LoginPage] Privy EIP-1193 provider initialized on Sepolia')
+              console.log('[LoginPage] Actual signer address:', signerAddress)
+              if (signerAddress.toLowerCase() !== address.toLowerCase()) {
+                console.warn('[LoginPage] Signer address differs from Privy address!', { privy: address, signer: signerAddress })
+                address = signerAddress
+              }
             } catch (provErr) {
               console.warn('[LoginPage] Could not get Privy provider:', provErr.message)
             }
@@ -147,15 +156,33 @@ export default function LoginPage() {
           }
           await initializePlayerRegistry(playerRegistryAddress)
 
-          // Save session
+          // Auto-fund player wallet (gasless UX — relayer sends testnet ETH)
+          const paymasterUrl = import.meta.env.VITE_RELAYER_URL || import.meta.env.VITE_PAYMASTER_URL || 'http://localhost:3001'
+          if (paymasterUrl) {
+            try {
+              const faucetRes = await fetch(`${paymasterUrl}/faucet`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address }),
+              })
+              const faucetData = await faucetRes.json()
+              if (faucetData.success) {
+                console.log('[LoginPage] Paymaster:', faucetData.skipped ? 'wallet already funded' : `funded ${faucetData.amount} ETH`)
+              }
+            } catch (faucetErr) {
+              console.warn('[LoginPage] Paymaster unavailable:', faucetErr.message)
+            }
+          }
+
+          // Save session (use actual signer address for on-chain lookups)
           const userInfo = getUserInfoFromPrivy(user)
           connectWallet(address)
           localStorage.setItem('wallet_address', address)
           saveAuthSession(address, userInfo, null, null)
 
           // Check if player exists (simple read, no CRE)
-          console.log('[LoginPage] Checking if player exists...')
-          
+          console.log('[LoginPage] Checking if player exists for:', address)
+
           // Try to use the registered address if available (for returning players)
           const addressToCheck = localStorage.getItem('player_registered_address') || address
           const playerData = await getPlayerData(addressToCheck)

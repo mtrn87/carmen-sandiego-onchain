@@ -36,6 +36,9 @@ cre-workflows/dist/
 cre-workflows/**/tmp.js
 cre-workflows/**/tmp.wasm
 cre-workflows/**/*.wasm
+cre-workflows/**/.cre_build_tmp.*
+cre-workflows/**/bun.lock
+cre-workflows/data/*.backup.json
 
 # Coverage
 coverage/
@@ -50,8 +53,8 @@ CLAUDE.md
 
 # Build scripts and utilities
 generate-diagrams.js
-scripts/
-chainlink-functions/
+scripts/deploy-*
+scripts/simulate-*
 
 # Documentation (generated)
 DECENTRALIZED_DEPLOYMENT.md

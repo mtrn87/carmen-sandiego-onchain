@@ -89,7 +89,7 @@ Each component has its own README with setup instructions:
 ### 1. Prerequisites
 - Node.js v20+
 - Testnet ETH on Sepolia, Arbitrum Sepolia, Base Sepolia
-- API keys: OpenAI, ElevenLabs, Alchemy/Infura, Privy
+- API keys: Alchemy/Infura, Privy (OpenAI and ElevenLabs planned for CRE v2)
 
 ### 2. Clone & Install
 ```bash

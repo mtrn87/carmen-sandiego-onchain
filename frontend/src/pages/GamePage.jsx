@@ -14,7 +14,7 @@ import LeaderboardModal from '../components/LeaderboardModal'
 import { useWallets } from '@privy-io/react-auth'
 import { useGameStore } from '../store/gameStore'
 import { clearAuthSession } from '../utils/authPersistence'
-import { initializeExternalProvider } from '../services/contractService'
+import { initializeExternalProvider, getSigner, getCCIPStatus } from '../services/contractService'
 import styles from './GamePage.module.css'
 
 export default function GamePage() {
@@ -40,6 +40,7 @@ export default function GamePage() {
   } = useGameStore()
   const { wallets } = useWallets()
   const [showMap, setShowMap] = useState(false)
+  const [ccipStatus, setCcipStatus] = useState(null)
 
   const handleLogout = useCallback(async () => {
     try {
@@ -53,6 +54,7 @@ export default function GamePage() {
   }, [logout, disconnectWallet, navigate])
 
   // Initialize Privy wallet provider (handles page refresh on /game)
+  const { connectWallet } = useGameStore()
   useEffect(() => {
     if (!wallets.length) return
     const wallet = wallets[0]
@@ -61,12 +63,21 @@ export default function GamePage() {
         await wallet.switchChain(11155111)
         const eip1193 = await wallet.getEthereumProvider()
         initializeExternalProvider(eip1193)
+        // Ensure we use the actual signer address (may differ from Privy display)
+        const signer = await getSigner()
+        const signerAddr = await signer.getAddress()
         console.log('[GamePage] Privy EIP-1193 provider initialized on Sepolia')
+        const stored = localStorage.getItem('wallet_address')
+        if (stored && stored.toLowerCase() !== signerAddr.toLowerCase()) {
+          console.warn('[GamePage] Updating wallet address to signer:', signerAddr)
+          localStorage.setItem('wallet_address', signerAddr)
+          connectWallet(signerAddr)
+        }
       } catch (err) {
         console.warn('[GamePage] Could not get Privy provider:', err.message)
       }
     })()
-  }, [wallets])
+  }, [wallets, connectWallet])
 
   // redirect to login if not connected
   useEffect(() => {
@@ -81,6 +92,12 @@ export default function GamePage() {
       initGame()
     }
   }, [isConnected, initGame])
+
+  // Fetch Chainlink CCIP cross-chain messaging status
+  useEffect(() => {
+    if (!isConnected) return
+    getCCIPStatus().then(setCcipStatus).catch(() => setCcipStatus(null))
+  }, [isConnected])
 
   if (!isConnected) return null
 
@@ -144,11 +161,18 @@ export default function GamePage() {
       {/* leaderboard modal — opened from terminal /leaderboard command */}
       {showLeaderboard && <LeaderboardModal onClose={closeLeaderboard} />}
 
-      {/* top bar — agent info + logout */}
+      {/* top bar — agent info + CCIP status + logout */}
       <div className={styles.topBar}>
         <span className={styles.agentInfo}>
           {playerNickname || (walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : '')}
         </span>
+        {ccipStatus && (
+          <span className={styles.ccipStatus} title={`CCIP: ${ccipStatus.destinationCount} chains, ${ccipStatus.totalMessages} messages sent`}>
+            {ccipStatus.configured
+              ? `Cross-chain sync: ACTIVE (${ccipStatus.destinationCount} chains)`
+              : 'Cross-chain sync: STANDBY'}
+          </span>
+        )}
         <button className={styles.logoutBtn} onClick={handleLogout}>
           LOGOUT
         </button>

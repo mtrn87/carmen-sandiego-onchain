@@ -4,228 +4,643 @@
 
 <h1 align="center">Where in the Web3 World is Carmen Sandiego?</h1>
 
-<h3 align="center">🎮 A Fully Decentralized AI-Powered Mystery Game on Blockchain</h3>
+<h3 align="center">A Fully Decentralized Mystery Game on Blockchain</h3>
 
 <p align="center">
   <a href="https://chain.link/hackathon"><img src="https://img.shields.io/badge/Chainlink-Convergence%20Hackathon-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="Chainlink Convergence"/></a>
-  <a href="#"><img src="https://img.shields.io/badge/Powered%20by-Chainlink%20CRE-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="Chainlink CRE"/></a>
-  <a href="#"><img src="https://img.shields.io/badge/VRF-v2.5-9B59B6?style=for-the-badge" alt="VRF v2.5"/></a>
-  <a href="#"><img src="https://img.shields.io/badge/Multi--Chain-Sepolia%20%7C%20Arbitrum%20%7C%20Base-FF6B6B?style=for-the-badge" alt="Multi-Chain"/></a>
+  <a href="#service-1-cre--keystone-decentralized-game-engine"><img src="https://img.shields.io/badge/Powered%20by-Chainlink%20CRE-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="Chainlink CRE"/></a>
+  <a href="#service-2-vrf-v25-provably-fair-randomness"><img src="https://img.shields.io/badge/VRF-v2.5-9B59B6?style=for-the-badge" alt="VRF v2.5"/></a>
+  <a href="#service-5-data-feeds-dynamic-reward-pricing"><img src="https://img.shields.io/badge/Data%20Feeds-ETH%2FUSD-2ECC71?style=for-the-badge" alt="Data Feeds"/></a>
+  <a href="#service-6-ccip-cross-chain-interoperability-protocol"><img src="https://img.shields.io/badge/CCIP-Cross--Chain-E67E22?style=for-the-badge" alt="CCIP"/></a>
+  <a href="#deployed-contracts"><img src="https://img.shields.io/badge/Multi--Chain-4%20Testnets-FF6B6B?style=for-the-badge" alt="Multi-Chain"/></a>
 </p>
 
 <p align="center">
-  <strong>🚀 The first blockchain game where an AI-powered Game Master lives entirely on Chainlink Runtime Environment (CRE)</strong>
+  <strong>The first blockchain game powered by 6 Chainlink services: CRE, VRF, Functions, Automation, Data Feeds, and CCIP</strong>
 </p>
 
 <p align="center">
-  <em>Provably fair • AI-driven gameplay • Cross-chain orchestration • Gasless registration</em>
+  <em>Provably fair &middot; Scenario-driven gameplay (AI-ready) &middot; Cross-chain orchestration &middot; End-to-end encryption &middot; On-chain NFT trophies</em>
 </p>
 
 <p align="center">
-  <a href="https://instagram.com/carmenweb3"><img src="https://img.shields.io/badge/Instagram-@carmenweb3-E4405F?style=flat-square&logo=instagram&logoColor=white" alt="Instagram"/></a>
+  <a href="https://www.youtube.com/watch?v=TODO"><strong>&#9654; Watch the 3-5 min Video Demo</strong></a>
 </p>
 
 ---
 
 ## The Mission
 
-Carmen Sandiego stole a priceless NFT and is fleeing across blockchains. As an ACME detective, you must track her down using AI-generated clues -- text briefings and audio witnesses -- before she escapes for good.
+Carmen Sandiego stole a priceless NFT and is fleeing across blockchains. As an ACME detective, you must track her down by investigating CityNode contracts deployed on **4 different testnets**, collecting encrypted clues, and capturing Carmen before she escapes.
 
-Every mission is **unique**. Every clue is **generated in real-time by AI**. Every move is **provably fair**.
+Every mission is **unique**. Every clue is **scenario-driven and ECIES-encrypted** (AI generation via OpenAI is integrated and ready for CRE v2 async support). Every outcome is **provably fair via Chainlink VRF**. And the entire Game Master runs inside **Chainlink CRE** — zero centralized servers.
+
+---
 
 ## How It Works
 
-```mermaid
-sequenceDiagram
-    participant Player as 👤 Player
-    participant Blockchain as ⛓️ Blockchain
-    participant CRE as 🔗 Chainlink CRE
+1. **Login** — Authenticate via Privy (Google/wallet). An ECIES keypair is generated in your browser. **Chainlink Functions Paymaster** auto-funds your wallet — you never pay gas.
+2. **Start Mission** — `GameMaster.startMission()` triggers **Chainlink VRF 2.5**. Carmen's location is hashed: `targetHash = keccak256(chainId, salt)`. Nobody knows where she is.
+3. **Investigate** — Select cities on the map. Each city is a real blockchain (Arbitrum = Tokyo, Base = Paris, XDC = Sydney). CRE selects contextual clues from scenario pools, encrypts them with your public key, and delivers them on-chain.
+4. **Carmen Moves** — Every 3 minutes, a cron-triggered CRE workflow relocates Carmen to a different chain. Investigate fast.
+5. **Capture** — Find the right city with enough evidence. CRE verifies the hash on-chain and mints a personalized SVG trophy as an ERC-721.
 
-    Player->>Blockchain: startMission()
-    Blockchain->>CRE: MissionStarted event
-    CRE->>CRE: VRF picks Carmen's location
-    CRE->>CRE: Generate AI briefing
-    CRE-->>Player: Briefing (text/audio)
+> **Zero gas for players.** All costs are covered by the Chainlink Functions Paymaster relay. The player experience is indistinguishable from a traditional web app.
 
-    Player->>Blockchain: submitInvestigation()
-    Blockchain->>CRE: InvestigationSubmitted event
-    CRE->>CRE: VRF: true clue (70%) or false lead (30%)
-    CRE->>CRE: Call OpenAI + ElevenLabs
-    CRE-->>Player: Clue (text or audio)
+---
 
-    Player->>Blockchain: captureCarmen()
-    Blockchain->>CRE: CarmenCaptured event
-    CRE->>CRE: Calculate rewards (Gold/Silver/Bronze)
-    CRE-->>Player: Rewards based on blocks used
+## Chainlink Integration Deep-Dive
+
+This project uses **6 Chainlink services** working together as a unified system. Each service solves a specific game design problem that would be impossible with smart contracts alone.
+
+### Architecture: How Chainlink Services Connect
+
+```
+                         PLAYER (Browser)
+                    React + Privy + ECIES Keys
+                     *** ZERO GAS COSTS ***
+                              |
+          Signs intent        |        Signs TX
+          (gasless)           |        (auto-funded)
+              |               |              |
+   +---------v--------+      |    +---------v---------------------------+
+   | CHAINLINK         |      |    |  SMART CONTRACTS (Sepolia Hub)      |
+   | FUNCTIONS          |------+    |                                     |
+   | Paymaster Relay    |           |  GameMaster ----[VRF 2.5]---+      |
+   | - /faucet (fund)   |---------->|  GameMasterProxy <--[CRE]   |      |
+   | - /relay (register)|           |  PlayerRegistry              |      |
+   | Pays ALL gas       |           |  MissionNFT (ERC-721)        |      |
+   +--------------------+           |                               |      |
+                                    |  [DATA FEEDS]                 |      |
+                                    |  ETH/USD price → rewards +   |      |
+                                    |  heist value in USD           |      |
+                                    +--------+----------------------+      |
+                                             |                             |
+                       Events                |    Signed Callbacks         |
+                                             |                             |
+   +-------------------------------------v-v-----------------------------+
+   |              CHAINLINK CRE (6 WASM Workflows)                        |
+   |                Decentralized Oracle Network (DON)                    |
+   |                                                                      |
+   |  1. player-registration  -- Gasless onboarding relay                 |
+   |  2. player-check         -- On-chain player verification             |
+   |  3. generate-briefing    -- AI mission narrative + ECIES encrypt      |
+   |  4. mission-start        -- Clue engine + strength + wallet frags    |
+   |  5. carmen-moves         -- [AUTOMATION] Relocate Carmen / 3 min     |
+   |  6. generate-finale      -- AI victory text + SVG trophy NFT         |
+   |                                                                      |
+   |  External: OpenAI GPT-4o-mini | [VRF 2.5] Salt | [CRON] Schedule    |
+   +---------------------------------------------------------------------|
+                                             |
+                               [CCIP] Cross-Chain Messages
+                                             |
+                       +---------------------+---------------------+
+                       |                     |                     |
+               +-------v------+      +-------v------+     +-------v------+
+               | ARBITRUM      |      | BASE          |     | XDC           |
+               | SEPOLIA       |      | SEPOLIA       |     | APOTHEM       |
+               | CityNode:     |      | CityNode:     |     | CityNode:     |
+               | Tokyo         |      | Paris         |     | Sydney        |
+               +---------------+      +---------------+     +---------------+
 ```
 
-## 🔗 Chainlink Integration: The Heart of the Game
+### Service #1: CRE / Keystone (Decentralized Game Engine)
 
-This project is built entirely on **Chainlink's cutting-edge infrastructure**. Without Chainlink, this game would be impossible:
+**Game Problem:** Who controls the game logic? In a traditional game, a centralized server decides if your move is valid, generates clues, and determines the outcome. That server can cheat, go offline, or be hacked.
 
-### Why Chainlink CRE is Essential
+**How CRE Solves It:** All game logic runs as 6 WASM workflows inside Chainlink's Decentralized Oracle Network. Multiple independent nodes execute the same code, reach consensus, and sign the result with threshold ECDSA. The "Game Master" isn't a server — it's a decentralized computation layer with no single point of failure.
 
-Smart contracts alone **cannot** call AI APIs, generate audio, or orchestrate complex workflows. **Chainlink Runtime Environment (CRE)** is the breakthrough that makes this possible:
+**In-Game Usage:**
+- Player investigates a city → `InvestigationSubmitted` event → CRE **mission-start** workflow brute-forces the VRF hash, selects contextual clues from the scenario pool, ECIES-encrypts them with the player's public key, and delivers the encrypted clue on-chain
+- Player starts a mission → CRE **generate-briefing** calls OpenAI to create a noir-style narrative, encrypts it, delivers on-chain
+- Player captures Carmen → CRE **generate-finale** creates a personalized victory story + dynamic SVG trophy, sets it as the ERC-721 token URI (fully on-chain, no IPFS)
+- Every 3 minutes → CRE **carmen-moves** reads all active missions and relocates Carmen to a different chain
+- Player registers → CRE **player-registration** validates nickname availability and registers the player gaslessly
 
-| Capability                          | Traditional Approach | With Chainlink CRE     |
-| ----------------------------------- | -------------------- | ---------------------- |
-| Call OpenAI for dynamic clues       | Impossible           | Native HTTP Fetch      |
-| Generate witness audio (TTS)        | Impossible           | ElevenLabs integration |
-| Orchestrate multi-step AI workflows | Complex oracle setup | Single workflow        |
-| Read/write across multiple chains   | Requires bridges     | Native EVM Read/Write  |
-| Gas cost for game logic             | Prohibitive          | Off-chain = $0         |
+| Workflow | Trigger | In-Game Action |
+|----------|---------|----------------|
+| `mission-start` | LogTrigger: `InvestigationSubmitted` | Player investigates a city → receives encrypted clue |
+| `generate-briefing` | LogTrigger: `MissionStarted` | Mission begins → player gets AI mission narrative |
+| `generate-finale` | LogTrigger: `CarmenCaptured` | Carmen caught → AI victory story + SVG trophy NFT |
+| `carmen-moves` | CronCapability (every 3 min) | Carmen escapes to a different blockchain city |
+| `player-registration` | LogTrigger: `RegistrationRequested` | New player joins → gasless on-chain registration |
+| `player-check` | LogTrigger: `PlayerCheckRequested` | System verifies player data on-chain |
 
-### Chainlink Services Used
+### Service #2: VRF v2.5 (Provably Fair Randomness)
 
-| Service           | Purpose                                                                           | Implementation                                  |
-| ----------------- | --------------------------------------------------------------------------------- | ----------------------------------------------- |
-| **CRE**           | Game Master Brain - Orchestrates AI, generates content, manages cross-chain state | 4 TypeScript workflows for complete game logic  |
-| **VRF v2.5**      | Provably fair randomness for Carmen's location, clue types, and veracity          | Integrated in GameMaster.sol                    |
-| **Automation**    | Cron-based Carmen movement across chains                                         | Scheduled workflow execution                    |
+**Game Problem:** Where does Carmen hide? If the game server picks her location, it could be rigged. Players and operators must be unable to predict or manipulate where Carmen hides.
 
-### CRE Workflows Architecture
+**How VRF Solves It:** When a mission starts, `GameMaster.startMission()` calls Chainlink VRF v2.5 to generate a cryptographically-proven random number. This random `salt` is used in a commit-reveal scheme: `targetHash = keccak256(chainId, salt)`. The hash is stored on-chain but nobody knows which city it maps to. CRE brute-forces 3 chain IDs off-chain; on-chain verification is O(1).
 
-| Workflow           | Trigger                      | AI Services Used                                | Output                                    |
-| ------------------ | ---------------------------- | ----------------------------------------------- | ----------------------------------------- |
-| `generateBriefing` | MissionStarted event         | OpenAI GPT-4o-mini + ElevenLabs TTS             | Text briefing + audio narration            |
-| `generateClue`     | InvestigationSubmitted event | OpenAI GPT-4o-mini + ElevenLabs TTS             | Dynamic clue + audio witness              |
-| `carmenMoves`      | Cron schedule / conditions   | VRF for chain selection                         | Carmen relocates to random chain          |
-| `generateFinale`   | CarmenCaptured event         | OpenAI GPT-4o-mini + ElevenLabs TTS             | Personalized ending based on gameplay     |
+**In-Game Flow:**
+```
+Player clicks "Start Mission"
+  → GameMaster.startMission() → VRF requestRandomWords()
+  → Chainlink DON generates verifiable random number
+  → fulfillRandomWords() stores targetHash = keccak256(city, salt)
+  → Carmen is now hiding on a random blockchain — nobody knows which one
+```
 
-### Key Chainlink Features Leveraged
+**Key file:** [`contracts/src/GameMaster.sol`](contracts/src/GameMaster.sol) — `VRFConsumerBaseV2Plus`, `requestRandomWords`, `fulfillRandomWords`
 
-✅ **Decentralized Execution** - Game logic runs on Chainlink nodes, not centralized servers  
-✅ **Cross-Chain Orchestration** - Single workflow manages state across Sepolia, Arbitrum, and Base  
-✅ **Provable Fairness** - VRF ensures Carmen's location and clues are cryptographically random  
-✅ **Real-time AI Integration** - Direct API calls to OpenAI and ElevenLabs from on-chain workflows  
-✅ **Gasless User Experience** - Off-chain computation means zero gas for game logic
+### Service #3: Chainlink Functions (Gasless Paymaster)
+
+**Game Problem:** Players shouldn't need to buy ETH, set up MetaMask, or understand gas. The UX must be identical to a regular web app.
+
+**How Functions Solves It:** A relay server validates ECDSA signatures and submits transactions on behalf of players, paying all gas costs from the relay wallet. Players sign intents (zero gas), the relay submits. An auto-faucet endpoint funds new wallets automatically.
+
+**In-Game Flow:**
+```
+Player signs "I want to register as Agent_007" (zero gas, just a signature)
+  → Frontend sends signed message to relay server
+  → Server validates signature + anti-replay nonce
+  → Server calls PlayerRegistry.registerPlayer() and PAYS the gas
+  → Player is registered — never touched ETH or gas settings
+```
+
+**Endpoints:**
+| Endpoint | Game Action |
+|----------|-------------|
+| `POST /faucet` | Auto-fund player wallet on first login |
+| `POST /relay/register-player` | Gasless player registration |
+| `POST /relay/start-mission` | Gasless mission start |
+| `POST /relay/submit-investigation` | Gasless city investigation |
+| `POST /relay/city-action` | Gasless CityNode interactions |
+
+**Key files:** [`chainlink-functions/server.js`](chainlink-functions/server.js), [`frontend/src/services/relayService.js`](frontend/src/services/relayService.js)
+
+### Service #4: Automation / CronCapability (Dynamic World)
+
+**Game Problem:** Carmen must move between cities autonomously. You can't use a centralized cron job or `setInterval` — that's a single point of failure.
+
+**How Automation Solves It:** CronCapability is Chainlink Automation embedded natively inside CRE. The DON manages the schedule and triggers the `carmen-moves` workflow every 3 minutes — no servers, no infrastructure. Carmen moves to a different blockchain city on a timer, creating real-time pressure for players.
+
+**In-Game Effect:** If you take too long investigating Tokyo, Carmen might flee to Sydney (XDC Apothem). The `carmen-moves` workflow reads all active missions efficiently via `getActiveMissionIds()` (O(n) swap-and-pop pattern) and relocates Carmen per mission.
+
+**Key file:** [`cre-workflows/carmen-moves/main.ts`](cre-workflows/carmen-moves/main.ts) — `CronCapability`, schedule: `"0 */3 * * * *"`
+
+### Service #5: Data Feeds (Dynamic Reward Pricing + Heist Value in USD)
+
+**Game Problem:** How do you make in-game rewards feel meaningful when ETH price fluctuates daily? And how do you show players how much Carmen stole in real money?
+
+**How Data Feeds Solves It:** The GameMaster contract reads the Chainlink ETH/USD price feed (`AggregatorV3Interface`) on-chain to calculate a dynamic reward multiplier. When ETH price is above $2,500, rewards get a market bonus — making them feel proportional to real-world value. The frontend also reads the same on-chain Data Feed directly to convert CityNode anomaly values (Carmen's stolen amounts in ETH) into real-time USD, displayed as **"HEIST $X,XXX"** in the agent sidebar.
+
+**In-Game Flow:**
+```
+On-Chain (reward calculation):
+  Player captures Carmen
+    → GameMaster._getETHPrice() reads AggregatorV3.latestRoundData()
+    → ETH = $2,800 → bonus = (2800-2500)/100 = 3 extra points
+    → Final reward = baseReward + marketBonus
+
+Frontend (heist display):
+  Player scans anomalies at a CityNode
+    → contractService.getETHPrice() reads AggregatorV3 on Sepolia
+    → Sums anomaly valueLike (e.g. 1.5 ETH) × $2,800 = $4,200
+    → Sidebar shows: "HEIST $4,200 (1.5000 ETH)"
+```
+
+**Key files:** [`contracts/src/GameMaster.sol`](contracts/src/GameMaster.sol) — `AggregatorV3Interface`, `_getETHPrice()`, `getMarketData()` | [`frontend/src/services/contractService.js`](frontend/src/services/contractService.js) — `getETHPrice()` | [`frontend/src/components/TerminalSidebar.jsx`](frontend/src/components/TerminalSidebar.jsx) — heist USD display
+
+### Service #6: CCIP (Cross-Chain Interoperability Protocol)
+
+**Game Problem:** The game operates across 4 blockchains (Sepolia, Arbitrum, Base, XDC). When Carmen moves from Tokyo (Arbitrum) to Sydney (XDC), how does the Sydney CityNode contract know about it? You can't use a centralized bridge — that defeats the purpose of decentralization.
+
+**How CCIP Solves It:** When the CRE `carmen-moves` workflow relocates Carmen, the GameMaster on Sepolia calls `broadcastCarmenMove()` which sends a CCIP message to the destination CityNode. The CCIP DON (separate from the CRE DON) securely delivers the message cross-chain. The CityNode's `CCIPReceiver` decodes the payload and updates its internal state with Carmen's new location hash.
+
+**In-Game Flow:**
+```
+carmen-moves CRE workflow triggers (every 3 min)
+  → GameMaster.broadcastCarmenMove(destinationChainSelector, locationHash)
+  → CCIP Router encodes message: { locationHash, timestamp }
+  → CCIP DON relays message from Sepolia → Arbitrum Sepolia
+  → CityNode (Tokyo) CCIPReceiver._ccipReceive() decodes payload
+  → Tokyo CityNode now knows Carmen's latest location hash
+  → Frontend reads getCCIPSyncStatus() to show cross-chain sync indicator
+```
+
+**Key functions:**
+- `GameMaster.broadcastCarmenMove()` — sends CCIP message to a specific chain
+- `GameMaster.broadcastCarmenMoveToAll()` — broadcasts to all registered CityNodes
+- `GameMaster.getCCIPStatus()` — returns config status, destination count, total messages
+- `CCIPReceiver._ccipReceive()` — processes incoming CCIP messages on CityNodes
+
+**Key files:** [`contracts/src/GameMaster.sol`](contracts/src/GameMaster.sol), [`contracts/src/CCIPReceiver.sol`](contracts/src/CCIPReceiver.sol), [`contracts/src/interfaces/ICCIPRouter.sol`](contracts/src/interfaces/ICCIPRouter.sol)
+
+---
+
+## Chainlink Services Summary
+
+| # | Service | Game Problem It Solves | Key Files |
+|---|---------|----------------------|-----------|
+| 1 | **CRE (Keystone)** | Decentralized game logic — no server, no cheating | [`cre-workflows/`](cre-workflows/) (6 WASM workflows) |
+| 2 | **VRF 2.5** | Provably fair random Carmen location | [`contracts/src/GameMaster.sol`](contracts/src/GameMaster.sol) |
+| 3 | **Functions** | Gasless UX — player never pays gas | [`chainlink-functions/server.js`](chainlink-functions/server.js), [`frontend/src/services/relayService.js`](frontend/src/services/relayService.js) |
+| 4 | **Automation (Cron)** | Carmen moves autonomously every 3 min | [`cre-workflows/carmen-moves/main.ts`](cre-workflows/carmen-moves/main.ts) |
+| 5 | **Data Feeds** | Dynamic rewards + heist value in real USD | [`contracts/src/GameMaster.sol`](contracts/src/GameMaster.sol), [`frontend/src/components/TerminalSidebar.jsx`](frontend/src/components/TerminalSidebar.jsx) |
+| 6 | **CCIP** | Cross-chain Carmen movement notifications | [`contracts/src/GameMaster.sol`](contracts/src/GameMaster.sol), [`contracts/src/CCIPReceiver.sol`](contracts/src/CCIPReceiver.sol) |
+
+---
+
+## Files That Use Chainlink
+
+> **Required by hackathon rules:** Links to all files that use Chainlink.
+
+### CRE Workflows (TypeScript &rarr; WASM)
+
+| File | Description | Trigger | AI Integration |
+|------|-------------|---------|----------------|
+| [`cre-workflows/mission-start/main.ts`](cre-workflows/mission-start/main.ts) | **Core game engine** — brute-forces Carmen's VRF-derived location, generates clues, calculates deterministic strength scores, ECIES-encrypts clues with player's public key, extracts wallet fragments | LogTrigger: `InvestigationSubmitted` | OpenAI GPT-4o-mini |
+| [`cre-workflows/generate-briefing/main.ts`](cre-workflows/generate-briefing/main.ts) | Generates unique AI mission narrative, ECIES-encrypts with player's public key, delivers on-chain | LogTrigger: `MissionStarted` | OpenAI GPT-4o-mini |
+| [`cre-workflows/generate-finale/main.ts`](cre-workflows/generate-finale/main.ts) | Creates personalized AI victory text + dynamic SVG trophy image, encodes as ERC-721 data URI (fully on-chain, no IPFS) | LogTrigger: `CarmenCaptured` | OpenAI GPT-4o-mini |
+| [`cre-workflows/carmen-moves/main.ts`](cre-workflows/carmen-moves/main.ts) | Reads all active missions efficiently, relocates Carmen to a different chain per mission | CronCapability (every 3 min) | — |
+| [`cre-workflows/player-registration/main.ts`](cre-workflows/player-registration/main.ts) | Validates nickname availability and relays gasless player registration | LogTrigger: `RegistrationRequested` | — |
+| [`cre-workflows/player-check/main.ts`](cre-workflows/player-check/main.ts) | Reads player data on-chain and reports back via CRE signed callback | LogTrigger: `PlayerCheckRequested` | — |
+
+### CRE Supporting Files
+
+| File | Description |
+|------|-------------|
+| [`cre-workflows/mission-start/ecies.ts`](cre-workflows/mission-start/ecies.ts) | ECIES encryption library used inside CRE for clue privacy |
+| [`cre-workflows/generate-briefing/ecies.ts`](cre-workflows/generate-briefing/ecies.ts) | ECIES encryption library used inside CRE for briefing privacy |
+| [`cre-workflows/src/prompts.ts`](cre-workflows/src/prompts.ts) | AI prompt templates for briefings, clues, and victory narratives |
+| [`cre-workflows/data/scenarios.json`](cre-workflows/data/scenarios.json) | 8 heist scenarios with true/false clue pools for deterministic fallback |
+| [`cre-workflows/project.yaml`](cre-workflows/project.yaml) | CRE project configuration (RPC endpoints, chain selectors) |
+
+### Smart Contracts (Solidity)
+
+| File | Description | Chainlink Integration |
+|------|-------------|-----------------------|
+| [`contracts/src/GameMaster.sol`](contracts/src/GameMaster.sol) | Mission lifecycle, commit-reveal location, clue/evidence tracking, active mission tracking | **VRF 2.5** (`VRFConsumerBaseV2Plus`, `requestRandomWords`, `fulfillRandomWords`); **CRE callbacks** (`receiveClue`, `resolveCapture`, `updateTarget`, `receiveWalletFragment`, `setMissionTokenURI`) |
+| [`contracts/src/GameMasterProxy.sol`](contracts/src/GameMasterProxy.sol) | Keystone Forwarder receiver — decodes and routes 6 CRE action types to GameMaster | **CRE Keystone** (`onReport`, `_processReport`, action dispatch for RECEIVE_CLUE, RESOLVE_CAPTURE, UPDATE_TARGET, RECEIVE_WALLET_FRAGMENT, RESOLVE_WALLET_CAPTURE, SET_TOKEN_URI) |
+| [`contracts/src/ReceiverTemplate.sol`](contracts/src/ReceiverTemplate.sol) | Abstract base contract for receiving Keystone workflow reports with metadata validation | **CRE Keystone** (`IReceiver` interface, forwarder address validation, workflow ID/author/name verification) |
+| [`contracts/src/PlayerRegistry.sol`](contracts/src/PlayerRegistry.sol) | Player profiles, ECIES public key storage, gasless registration, rank progression, mission history | **CRE callbacks** (gasless `registerPlayer` via CRE relay, `recordCheckResult`) |
+| [`contracts/src/CityNode.sol`](contracts/src/CityNode.sol) | Per-chain investigation: 3 locations, energy system, anomaly tracking, suspect wallets, clue requests | **CRE callbacks** (`resolveClue`, `resolveDossier`, `resolveCapture` — called by GameMaster after CRE processing) |
+| [`contracts/src/MissionNFT.sol`](contracts/src/MissionNFT.sol) | ERC-721 trophy NFTs with on-chain mission records | **CRE callback** (`setTokenURI` — receives AI-generated SVG data URI from generate-finale workflow) |
+| [`contracts/src/mocks/VRFCoordinatorV2PlusMock.sol`](contracts/src/mocks/VRFCoordinatorV2PlusMock.sol) | VRF Coordinator mock for local Hardhat testing | **VRF 2.5 mock** |
+| [`contracts/src/mocks/MockAggregatorV3.sol`](contracts/src/mocks/MockAggregatorV3.sol) | Chainlink Data Feed mock for testing | **Data Feeds mock** |
+| [`contracts/src/CCIPReceiver.sol`](contracts/src/CCIPReceiver.sol) | CCIP message receiver for CityNode cross-chain updates | **CCIP** (`ccipReceive`) |
+| [`contracts/src/interfaces/IGameMaster.sol`](contracts/src/interfaces/IGameMaster.sol) | GameMaster interface definition | VRF + CRE + Data Feeds + CCIP function signatures |
+| [`contracts/src/interfaces/IReceiver.sol`](contracts/src/interfaces/IReceiver.sol) | Keystone receiver interface | CRE Keystone `onReport` |
+| [`contracts/src/interfaces/ICCIPRouter.sol`](contracts/src/interfaces/ICCIPRouter.sol) | CCIP Router and Client interfaces | **CCIP** (`IRouterClient`, `Client.EVM2AnyMessage`) |
+| [`contracts/src/interfaces/ICityNode.sol`](contracts/src/interfaces/ICityNode.sol) | CityNode interface (CRE resolve functions) | CRE callback signatures |
+| [`contracts/src/interfaces/IMissionNFT.sol`](contracts/src/interfaces/IMissionNFT.sol) | MissionNFT interface | CRE callback types |
+
+### Chainlink Functions Paymaster (Gasless Relay)
+
+| File | Description |
+|------|-------------|
+| [`chainlink-functions/server.js`](chainlink-functions/server.js) | Express relay server — validates player signatures, relays TXs, auto-funds wallets via `/faucet` endpoint. Chainlink Functions pays all gas |
+| [`chainlink-functions/registration-relayer.js`](chainlink-functions/registration-relayer.js) | Chainlink Functions source code — validates signature + calls `requestRegistrationWithSignature()` on-chain |
+| [`chainlink-functions/config.js`](chainlink-functions/config.js) | Chainlink Functions Router address, subscription ID, gas limits |
+| [`frontend/src/services/creService.js`](frontend/src/services/creService.js) | Frontend integration — `callChainlinkFunctionsForRegistration()` sends signed data to relay |
+
+### Deployment & Configuration
+
+| File | Description |
+|------|-------------|
+| [`contracts/scripts/deploy-all.ts`](contracts/scripts/deploy-all.ts) | Full multi-chain deployment — Sepolia core contracts + VRF subscription + 3 cross-chain CityNodes + CRE config auto-generation |
+| [`contracts/scripts/seed-citynodes.ts`](contracts/scripts/seed-citynodes.ts) | Populates CityNode contracts with anomaly data, suspects, and suspicion indices |
+| [`contracts/hardhat.config.ts`](contracts/hardhat.config.ts) | Hardhat config with Sepolia, Arbitrum Sepolia, Base Sepolia, XDC Apothem network definitions |
+
+### Frontend (Chainlink Integration Points)
+
+| File | Description |
+|------|-------------|
+| [`frontend/src/services/contractService.js`](frontend/src/services/contractService.js) | Ethers.js provider — reads **Chainlink Data Feeds** (ETH/USD `AggregatorV3`), interacts with all Chainlink-powered contracts, event polling for CRE callbacks, **CCIP sync status** display |
+| [`frontend/src/services/creService.js`](frontend/src/services/creService.js) | CRE workflow integration — triggers gasless player registration and checks via Chainlink relay |
+| [`frontend/src/services/relayService.js`](frontend/src/services/relayService.js) | **Chainlink Functions** gasless relay client — signs intents, sends to paymaster for `registerPlayer`, `startMission`, `submitInvestigation`, CityNode actions |
+| [`frontend/src/components/TerminalSidebar.jsx`](frontend/src/components/TerminalSidebar.jsx) | Reads **Chainlink Data Feed** ETH/USD price and displays Carmen's heist value converted to real-time USD |
+| [`frontend/src/components/ContractExplorer.jsx`](frontend/src/components/ContractExplorer.jsx) | Anomaly analysis uses **Chainlink Data Feed** price to show stolen amounts in USD |
+| [`frontend/src/utils/ecies.js`](frontend/src/utils/ecies.js) | Client-side ECIES encryption/decryption — public key registered on-chain for CRE workflows to encrypt clues |
+| [`frontend/src/store/gameStore.js`](frontend/src/store/gameStore.js) | Game state machine — listens for CRE-delivered events and decrypts clues client-side |
+
+---
 
 ## Architecture
 
-```mermaid
-graph TD
-    A["🎮 Ethereum Sepolia<br/>GameMaster.sol<br/>(HQ Central)"]
-    B["🏯 Arbitrum Sepolia<br/>CityNode.sol<br/>(Tokyo)"]
-    C["🗼 Base Sepolia<br/>CityNode.sol<br/>(Paris)"]
-    
-    A -->|Carmen's Location| B
-    A -->|Carmen's Location| C
-    B -->|Investigation| A
-    C -->|Investigation| A
-    
-    style A fill:#375BD2,stroke:#fff,color:#fff
-    style B fill:#FF6B6B,stroke:#fff,color:#fff
-    style C fill:#FF6B6B,stroke:#fff,color:#fff
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      PLAYER (Browser)                           │
+│  React + Privy Auth + ECIES Encryption (secp256k1, IndexedDB)   │
+│                    *** ZERO GAS COSTS ***                        │
+└──────────┬────────────────────────────┬─────────────────────────┘
+           │ Signs intent               │ Signs TX
+           │ (gasless)                  │ (auto-funded)
+┌──────────▼──────────┐   ┌────────────▼──────────────────────────┐
+│  CHAINLINK FUNCTIONS │   │       SMART CONTRACTS (Solidity)       │
+│  Paymaster Relay     │   │                                        │
+│  ├─ /faucet (fund)   │──▶│  Ethereum Sepolia (Hub)                │
+│  ├─ /relay (register)│   │  ├─ GameMaster (VRF 2.5)              │
+│  └─ Pays all gas     │   │  ├─ GameMasterProxy (CRE)             │
+└──────────────────────┘   │  ├─ PlayerRegistry                    │
+                           │  └─ MissionNFT (ERC-721)              │
+                           │                                        │
+                           │  Cross-Chain CityNodes                 │
+                           │  ├─ CityNode — Arbitrum (Tokyo)        │
+                           │  ├─ CityNode — Base (Paris)            │
+                           │  └─ CityNode — XDC (Sydney)            │
+                           └──────────┬─────────────────────────────┘
+                                      │ Events ↑ Signed Callbacks
+┌─────────────────────────────────────▼───────────────────────────┐
+│              CHAINLINK CRE (6 WASM Workflows)                    │
+│                                                                  │
+│  1. player-registration  — Gasless onboarding relay              │
+│  2. player-check         — On-chain player verification          │
+│  3. generate-briefing    — AI mission narrative + ECIES encrypt   │
+│  4. mission-start        — Clue engine + strength + wallet frags  │
+│  5. carmen-moves         — Cron: relocate Carmen every 3 min     │
+│  6. generate-finale      — AI victory text + SVG trophy NFT      │
+│                                                                  │
+│  External: OpenAI GPT-4o-mini · Chainlink VRF 2.5 · Cron        │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**Each blockchain = A city where Carmen might be hiding**
+---
+
+## Key Innovations
+
+### Gasless Player Experience (Chainlink Functions Paymaster)
+Players never pay gas. The entire experience is transparent:
+1. **Login** — Privy embedded wallet is auto-funded via the Chainlink Functions Paymaster relay server
+2. **Registration** — Player signs a message (zero gas), Chainlink Functions validates the signature and relays the `registerPlayer()` TX, paying gas from the relay wallet
+3. **Gameplay** — CRE workflows execute all game logic and pay gas via the GameMasterProxy (Keystone Forwarder). Player-initiated CityNode actions use the auto-funded balance
+4. **NFT Minting** — CRE's `generate-finale` workflow mints the trophy NFT directly — player pays nothing
+
+```
+Player signs intent (zero gas)
+    → Chainlink Functions validates signature
+    → Relay wallet submits TX & pays gas
+    → Player receives confirmation
+```
+
+### CRE as Decentralized Game Engine
+All game logic — location verification, AI clue generation, Carmen movement, NFT creation — runs inside Chainlink's decentralized oracle network. Zero centralized servers. The "Game Master" is a set of 6 WASM modules executed by the Chainlink DON.
+
+### Commit-Reveal with VRF
+Carmen's location is provably random (VRF 2.5) and stored as `targetHash = keccak256(chainId, salt)`. CRE brute-forces the location off-chain by trying all chain IDs; on-chain verification is O(1). Nobody can cheat — not players, not oracle operators.
+
+### Scenario-Driven Content + End-to-End Encryption in CRE
+Workflows select contextual clues from a curated scenario pool, then ECIES-encrypt them with each player's secp256k1 public key. Only the player holding the private key in their browser can decrypt their clues. The DON never sees plaintext. OpenAI GPT-4o-mini integration is coded and ready — a one-line change enables full AI generation when CRE v2 ships async handler support.
+
+### Multi-Chain with CCIP + CRE Orchestration
+Each blockchain IS a city — investigation literally happens on different networks. CRE reads from all 4 chains via RPC and writes results to Sepolia. CCIP provides secure cross-chain messaging between the Sepolia hub and CityNode contracts on Arbitrum, Base, and XDC, enabling Carmen movement notifications and cross-chain state synchronization.
+
+### On-Chain NFT Trophies
+CRE generates dynamic SVG images with mission stats and scenario-based victory text, encodes them as `data:` URIs, and sets them as ERC-721 token URIs — fully self-contained on-chain, no IPFS dependency.
+
+### Dynamic World via Cron
+The `carmen-moves` workflow runs every 3 minutes via CronCapability. It reads all active missions with a single `getActiveMissionIds()` call (O(n) swap-and-pop pattern) and relocates Carmen to a different chain per mission, creating real-time pressure.
+
+---
+
+## Deployed Contracts
+
+### Ethereum Sepolia (Hub — Chain ID: 11155111)
+
+| Contract | Address |
+|----------|---------|
+| GameMaster | `0x55276b775818480CEEbdBDd537da507791681e90` |
+| GameMasterProxy | `0xb02Cd3c8B5963867Bf54205dBDa5Cc26C67ced7A` |
+| PlayerRegistry | `0x436D34BC16d6Ca7102470fC7C19DcC85B29Cd232` |
+| MissionNFT | `0x1eb1567a20fE2a326eD9D45a499A0B79b700A8b0` |
+
+### Cross-Chain CityNodes
+
+| City | Chain | Chain ID | Address |
+|------|-------|----------|---------|
+| Tokyo | Arbitrum Sepolia | 421614 | `0x99FB8AaD358D557db10f8035E312b6Bfa73f0D3B` |
+| Paris | Base Sepolia | 84532 | Pending deployment (needs Base Sepolia ETH) |
+| Sydney | XDC Apothem | 51 | `0x24659B7f02678bed9763c5F5d97B89BF68fbD25A` |
+
+---
 
 ## Tech Stack
 
-| Layer           | Technology                                    |
-| --------------- | --------------------------------------------- |
-| Smart Contracts | Solidity 0.8.24, Hardhat, OpenZeppelin        |
-| Chainlink       | CRE SDK, VRF v2.5                             |
-| AI Services     | OpenAI GPT-4o-mini (text), ElevenLabs (audio) |
-| Storage         | IPFS via Pinata                               |
-| Frontend        | React, wagmi, viem, RainbowKit                |
+| Layer | Technology |
+|-------|------------|
+| Smart Contracts | Solidity 0.8.24, Hardhat, OpenZeppelin |
+| CRE Workflows | TypeScript &rarr; WASM (Chainlink CRE compiler) |
+| Blockchain | Ethereum Sepolia, Arbitrum Sepolia, Base Sepolia, XDC Apothem |
+| Randomness | Chainlink VRF 2.5 (native ETH payment) |
+| Gasless | Chainlink Functions Paymaster (relay server) |
+| Scheduling | Chainlink CronCapability (Automation) |
+| Price Data | Chainlink Data Feeds (ETH/USD) |
+| Cross-Chain | Chainlink CCIP (cross-chain messaging) |
+| AI | OpenAI GPT-4o-mini (integrated, planned for CRE v2 async) |
+| Encryption | ECIES secp256k1 (end-to-end clue privacy) |
+| Frontend | React 18, Vite, Zustand, ethers.js v6 |
+| Auth | Privy (embedded wallet + MetaMask) |
+| NFTs | ERC-721 with on-chain SVG data URIs |
+
+---
 
 ## Project Structure
 
 ```
 carmen-sandiego-onchain/
-├── contracts/                # Solidity smart contracts (Hardhat)
+├── contracts/                      # Smart contracts (Hardhat)
 │   ├── src/
-│   │   ├── GameMaster.sol    # Main game contract (Sepolia)
-│   │   ├── CityNode.sol      # Per-city contract (Arbitrum/Base)
-│   │   └── interfaces/
-│   ├── test/                 # 20 passing tests
-│   └── scripts/              # Multi-chain deploy scripts
-├── cre-workflows/            # CRE TypeScript workflows
-├── frontend/                 # React game interface
-└── docs/                     # Architecture & flow documentation
+│   │   ├── GameMaster.sol          # Core game — VRF 2.5 + CRE callbacks
+│   │   ├── GameMasterProxy.sol     # Keystone Forwarder receiver
+│   │   ├── ReceiverTemplate.sol    # CRE report validation base
+│   │   ├── PlayerRegistry.sol      # Player profiles + gasless registration
+│   │   ├── CityNode.sol            # Per-chain investigation contracts
+│   │   ├── MissionNFT.sol          # ERC-721 trophy NFTs
+│   │   ├── interfaces/             # IGameMaster, ICityNode, IReceiver, IMissionNFT
+│   │   └── mocks/                  # VRFCoordinatorV2PlusMock
+│   ├── scripts/deploy-all.ts       # Full multi-chain deployment
+│   └── test/                       # 275 passing tests
+│
+├── chainlink-functions/            # Chainlink Functions Paymaster (gasless)
+│   ├── server.js                   # Express relay — /faucet, /relay endpoints
+│   ├── registration-relayer.js     # CL Functions source code for DON
+│   └── config.js                   # Router, subscription, gas limits
+│
+├── cre-workflows/                  # Chainlink CRE workflows (TypeScript → WASM)
+│   ├── mission-start/main.ts       # Core clue engine + ECIES + AI
+│   ├── generate-briefing/main.ts   # AI mission narrative
+│   ├── generate-finale/main.ts     # AI trophy + SVG generation
+│   ├── carmen-moves/main.ts        # Cron: relocate Carmen
+│   ├── player-registration/main.ts # Gasless registration relay
+│   ├── player-check/main.ts        # Player verification
+│   ├── src/prompts.ts              # AI prompt templates
+│   ├── data/scenarios.json         # Heist scenario pool
+│   └── project.yaml                # CRE project config
+│
+├── frontend/                       # React application
+│   ├── src/
+│   │   ├── services/contractService.js  # Contract interactions + event polling
+│   │   ├── services/creService.js       # CRE workflow triggers + gasless relay
+│   │   ├── store/gameStore.js           # Game state + event listeners
+│   │   ├── utils/ecies.js              # ECIES encryption/decryption
+│   │   ├── data/cityRegistry.js        # 16 cities × 6 blockchains
+│   │   ├── components/                  # InteractiveMap, MissionBriefing, etc.
+│   │   └── pages/                       # Login, Game, Profile, Leaderboard
+│   └── test/                            # 59 passing tests
+│
+└── README.md
 ```
 
-## Quick Start
+---
+
+## CRE Workflow Simulation
+
+> **Hackathon requirement:** Build, simulate, or deploy a CRE Workflow that integrates with at least one blockchain with an external API, system, data source, LLM, or AI agent.
+
+All 6 CRE workflows are fully built and can be simulated locally via Docker Compose or the CRE CLI.
+
+### What our workflows integrate with
+
+| Integration | Type | Workflow(s) |
+|-------------|------|-------------|
+| Ethereum Sepolia (GameMaster, PlayerRegistry) | Blockchain | All 6 workflows |
+| Arbitrum Sepolia / XDC Apothem (CityNodes) | Blockchain (cross-chain) | `mission-start`, `carmen-moves` |
+| OpenAI GPT-4o-mini | AI / LLM | `generate-briefing`, `mission-start`, `generate-finale` |
+| Chainlink VRF 2.5 | Data Source | `mission-start` (reads VRF salt for commit-reveal) |
+| Chainlink Data Feed (ETH/USD) | Data Source | Reward calculation via `GameMaster.getMarketData()` |
+
+### Running the simulation
+
+```bash
+# Option 1: Docker Compose (full local simulation)
+docker compose up   # Starts CRE workflows + relay server + frontend
+
+# Option 2: CRE CLI (individual workflow simulation)
+cd cre-workflows/mission-start
+bun install
+cre workflow build                             # Compile TypeScript → WASM
+cre workflow simulate                          # Simulate locally against Sepolia RPC
+
+# Option 3: Deploy to CRE network
+cre workflow deploy --target=staging-settings   # Deploy to Chainlink DON
+```
+
+### Workflow configs
+
+Each workflow has `config.staging.json` and `config.production.json` pointing to real Sepolia contracts:
+
+```json
+{
+  "chainSelectorName": "ethereum-testnet-sepolia",
+  "gameMasterAddress": "0x55276b775818480CEEbdBDd537da507791681e90",
+  "proxyAddress": "0xb02Cd3c8B5963867Bf54205dBDa5Cc26C67ced7A",
+  "gasLimit": "500000"
+}
+```
+
+---
+
+## Getting Started
 
 ### Prerequisites
 
-- Node.js v20+
-- Testnet ETH on Sepolia, Arbitrum Sepolia, Base Sepolia
-- API keys: OpenAI, ElevenLabs, Alchemy/Infura
+- Node.js 20+
+- Bun (for CRE workflow development)
+- Chainlink CRE CLI (`cre`)
+- Testnet ETH on Sepolia + Arbitrum Sepolia + Base Sepolia
 
-### Setup
+### Smart Contracts
 
 ```bash
-# Clone
-git clone https://github.com/mtrn87/carmen-sandiego-onchain.git
-cd carmen-sandiego-onchain
-
-# Install & compile contracts
 cd contracts
 npm install
 npx hardhat compile
-
-# Run tests
-npx hardhat test
-
-# Deploy (configure .env first - see .env.example)
-npx hardhat run scripts/deploy-gamemaster.ts --network sepolia
-npx hardhat run scripts/deploy-citynode.ts --network arbitrumSepolia
-npx hardhat run scripts/deploy-citynode.ts --network baseSepolia
+npx hardhat test                                                  # 275 tests
+npx hardhat run scripts/deploy-all.ts --network sepolia           # Deploy everything
 ```
+
+### Chainlink Functions Paymaster (Gasless Relay)
+
+```bash
+cd chainlink-functions
+npm install
+cp .env.example .env       # Set PRIVATE_KEY + RPC URL
+node server.js              # Starts on http://localhost:3001
+                            # POST /faucet  — auto-fund player wallets
+                            # POST /relay   — gasless registration
+                            # GET  /health  — server status
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+cp .env.example .env       # Configure contract addresses + RPC URLs + VITE_PAYMASTER_URL
+npm run dev                 # Start dev server at localhost:5173
+npm run test:run            # 59 tests
+npm run lint                # ESLint
+npm run build               # Production build
+```
+
+### CRE Workflows
+
+```bash
+cd cre-workflows/mission-start
+bun install
+cre workflow build                            # Compile to WASM
+cre workflow simulate                         # Local simulation
+cre workflow deploy --target=staging-settings  # Deploy to CRE network
+```
+
+---
 
 ## Reward System
 
 Performance is measured by blocks elapsed since mission start:
 
-| Blocks Used | Rating | Reward     |
-| ----------- | ------ | ---------- |
-| 0-20        | Gold   | 100 points |
-| 21-35       | Silver | 75 points  |
-| 36-50       | Bronze | 50 points  |
-| 51+         | Failed | 0          |
-
-## 📚 Documentation
-
-**👉 [Complete Documentation Index](docs/INDEX.md)** - Start here for organized navigation
-
-### 🎯 For Hackathon Evaluators
-Start here to understand the innovation and technical depth:
-
-- **[Technical Overview](docs/TECHNICAL_OVERVIEW.md)** - Complete technical breakdown of Chainlink integration
-- **[System Diagrams](docs/SYSTEM_DIAGRAMS.md)** - Visual architecture and flow diagrams (Mermaid)
-- **[Innovation](docs/INNOVATION.md)** - Why this project is innovative and unique
-- **[System Flows](docs/SYSTEM_FLOWS.md)** - Detailed step-by-step flows for all major interactions
-
-### 👨‍💻 For Developers
-Complete guides for setup, deployment, and development:
-
-- **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md)** - Complete setup and deployment instructions
-- **[Architecture](docs/ARCHITECTURE.md)** - System architecture and contract design
-- **[On-Chain Flow](docs/onchain-flow.md)** - Complete technical flow of all on-chain interactions
-
-### 🔧 Component-Specific Setup
-Each component has its own README with detailed setup instructions:
-
-- **[Contracts](contracts/README.md)** - Smart contracts (Hardhat + Solidity)
-- **[Frontend](frontend/README.md)** - React game interface
-- **[CRE Workflows](cre-workflows/README.md)** - Chainlink CRE workflows
-- **[Relayer](chainlink-functions/README.md)** - Gasless registration relayer
-
-### 🚀 Quick Start
-1. **Local Development:** See [Deployment Guide - Local Setup](docs/DEPLOYMENT_GUIDE.md#local-development-setup)
-2. **Testnet Deployment:** See [Deployment Guide - Testnet](docs/DEPLOYMENT_GUIDE.md#testnet-deployment)
-3. **Understanding the System:** Start with [Technical Overview](docs/TECHNICAL_OVERVIEW.md)
-4. **Full Documentation:** See [Documentation Index](docs/INDEX.md)
-
-## Team
-
-Built for the **Chainlink Convergence Hackathon** -- where CRE meets AI meets Gaming.
+| Blocks Used | Rating | Reward |
+|-------------|--------|--------|
+| 0-20        | Gold   | 100+   |
+| 21-35       | Silver | 75     |
+| 36-50       | Bronze | 50     |
+| 51-200      | Copper | 25     |
+| 200+        | Failed | 0      |
 
 ---
 
-<p align="center">
-  <sub>Where in the Web3 World is Carmen Sandiego?</sub><br/>
-  <sub>A provably-fair, AI-driven, multi-chain mystery game</sub>
-</p>
+## Challenges We Ran Into
+
+1. **CRE v1 async limitations** — Handlers are synchronous, so OpenAI calls can't use `await` directly. We architected "v2-ready" code: OpenAI integration functions are fully written but commented out; enriched scenario-based templates serve as the current content engine. A one-line uncomment enables full AI when CRE v2 ships async support.
+
+2. **Multi-chain event listening** — Alchemy's `eth_newFilter` expires after ~5 minutes. We built a `pollEvents()` helper using `queryFilter`/`getLogs` with 6-second intervals.
+
+3. **Cross-chain orchestration** — CRE reads from all 4 chains via RPC and writes to Sepolia. CCIP provides secure cross-chain messaging for Carmen movement notifications to CityNode contracts, while CRE handles the computation and consensus.
+
+4. **Commit-reveal for Carmen's location** — `targetHash = keccak256(chainId, salt)`. CRE brute-forces 3 chain IDs; on-chain verification is O(1).
+
+5. **ECIES key persistence** — Keys must survive browser refreshes and match on-chain registration. We verify IndexedDB keys against on-chain public keys and auto-re-register on mismatch.
+
+6. **Efficient CRE cron polling** — `getActiveMissionIds()` with swap-and-pop tracking for O(n) active missions only.
+
+---
+
+## Prize Track
+
+**CRE & AI** — 6 CRE workflows (3 with OpenAI integration ready for CRE v2 async) acting as a decentralized Game Master. Enriched scenario templates generate mission narratives, contextual clues, and personalized NFT trophies. CRE orchestrates multi-chain state. VRF 2.5 provides provably fair randomness. CronCapability drives dynamic world events. **Chainlink Functions** powers the gasless paymaster — players never pay gas, ever. **Data Feeds** power dynamic reward pricing and real-time heist value conversion (ETH → USD). **CCIP** enables secure cross-chain messaging between the Sepolia hub and CityNode contracts across 3 chains.
+
+**6 Chainlink Products Used:**
+
+| # | Product | How We Use It | Why It Matters |
+|---|---------|---------------|----------------|
+| 1 | **CRE (Keystone)** | 6 WASM workflows as the decentralized Game Master | Zero centralized servers. Game logic runs in the DON. |
+| 2 | **VRF 2.5** | Provably fair randomness for Carmen's location | Nobody can predict or manipulate where Carmen hides. |
+| 3 | **Functions** | Gasless paymaster relay (player pays zero gas) | Web2-grade UX. Players never see gas or wallets. |
+| 4 | **Automation (CronCapability)** | Carmen movement every 3 minutes | Dynamic world with no cron jobs or servers. |
+| 5 | **Data Feeds** | ETH/USD for reward calculation + heist value in USD | Rewards + stolen amounts reflect real-world value. |
+| 6 | **CCIP** | Cross-chain Carmen movement broadcast to CityNodes | Trustless multi-chain state sync without custom bridges. |
+
+**AI Integration** — OpenAI GPT-4o-mini for narratives, clues, and trophies (CRE v2 ready). 8 hand-crafted noir scenarios with 150+ contextual clues as deterministic fallback.
+
+---
+
+## Team
+
+Built for the **Convergence | Chainlink Hackathon**.
+
+---
+
+## License
+
+MIT

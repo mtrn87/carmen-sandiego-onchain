@@ -75,7 +75,8 @@ describe("CityNode", function () {
       COUNTRY_CODE,
       CHAIN_ID,
       CITY_ID,
-      gameMaster.address
+      gameMaster.address,
+      ethers.ZeroAddress  // CCIP Router (disabled in tests)
     )) as CityNode;
   });
 
@@ -437,7 +438,7 @@ describe("CityNode", function () {
     it("should reject if city not configured", async function () {
       const CityNodeFactory = await ethers.getContractFactory("CityNode");
       const freshNode = (await CityNodeFactory.deploy(
-        "Paris", "FR", 84532, 2, gameMaster.address
+        "Paris", "FR", 84532, 2, gameMaster.address, ethers.ZeroAddress
       )) as CityNode;
 
       await expect(
@@ -1249,6 +1250,212 @@ describe("CityNode", function () {
       await expect(cityNode.connect(otherUser).requestClue(0, 1))
         .to.emit(cityNode, "ClueRequested")
         .withArgs(2, otherUser.address, 0, 1);
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: scanAnomalies without seeded data
+  // ============================================================
+
+  describe("scanAnomalies Edge Cases", function () {
+    beforeEach(async function () {
+      await cityNode.connect(owner).setupLocations(sampleLocations);
+    });
+
+    it("should scan without emitting anomaly events when no tx refs exist", async function () {
+      await cityNode.connect(player).inspectLocation(0);
+
+      // No anomaly tx refs added, so scan should succeed but not emit anomaly events
+      await expect(cityNode.connect(player).scanAnomalies(0))
+        .to.not.emit(cityNode, "AnomalyTxLinked");
+
+      const [, , scans] = await cityNode.getPlayerProgress(player.address);
+      expect(scans).to.equal(1);
+    });
+
+    it("should scan with anomaly refs but no suspect wallets", async function () {
+      await cityNode.connect(owner).addAnomalyTxRef(makeTxRef(1));
+      // No suspect wallets added
+
+      await cityNode.connect(player).inspectLocation(0);
+
+      await expect(cityNode.connect(player).scanAnomalies(0))
+        .to.emit(cityNode, "AnomalyTxLinked")
+        .and.to.not.emit(cityNode, "SuspectWalletObserved");
+    });
+
+    it("should reject scan on location not inspected", async function () {
+      await cityNode.connect(owner).addAnomalyTxRef(makeTxRef(1));
+
+      // Try scanning without inspecting first
+      await expect(
+        cityNode.connect(player).scanAnomalies(0)
+      ).to.be.revertedWith("Inspect location first");
+    });
+
+    it("should reject scan on invalid location index", async function () {
+      await expect(
+        cityNode.connect(player).scanAnomalies(3)
+      ).to.be.revertedWith("Invalid location index");
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: View Functions
+  // ============================================================
+
+  describe("View Functions - Additional Coverage", function () {
+    it("should return all 3 locations via getLocations", async function () {
+      await cityNode.connect(owner).setupLocations(sampleLocations);
+
+      const locs = await cityNode.getLocations();
+      expect(locs.length).to.equal(3);
+      expect(locs[0].name).to.equal("Shibuya Crossing");
+      expect(locs[1].name).to.equal("Akihabara District");
+      expect(locs[2].name).to.equal("Tsukiji Market");
+    });
+
+    it("should return correct suspicion index after setup", async function () {
+      const reasonHash = ethers.keccak256(ethers.toUtf8Bytes("suspicious activity"));
+      await cityNode.connect(owner).setSuspicionIndex(85, reasonHash);
+
+      const [level, hash] = await cityNode.getSuspicionIndex();
+      expect(level).to.equal(85);
+      expect(hash).to.equal(reasonHash);
+    });
+
+    it("should return zeros for getEvidenceSummary on fresh player", async function () {
+      const [totalClues, bundleHash, confidence] = await cityNode.getEvidenceSummary(player.address);
+      expect(totalClues).to.equal(0);
+      expect(bundleHash).to.equal(ethers.ZeroHash);
+      expect(confidence).to.equal(0);
+    });
+
+    it("should return zeros for getPlayerProgress on fresh player", async function () {
+      const [bitmap, clues, scans] = await cityNode.getPlayerProgress(player.address);
+      expect(bitmap).to.equal(0);
+      expect(clues).to.equal(0);
+      expect(scans).to.equal(0);
+    });
+
+    it("should return default clue schema", async function () {
+      const [totalClues, types] = await cityNode.getClueSchema();
+      expect(totalClues).to.equal(3);
+      expect(types.length).to.equal(3);
+    });
+
+    it("should return updated clue schema after setClueSchema", async function () {
+      await cityNode.connect(owner).setClueSchema([0, 1]); // BEHAVIOR_FINGERPRINT, RELATIONSHIP
+      const [totalClues, types] = await cityNode.getClueSchema();
+      expect(totalClues).to.equal(2);
+      expect(types.length).to.equal(2);
+    });
+
+    it("should return empty departure hints for non-existent mission", async function () {
+      const hints = await cityNode.getDepartureHints(999);
+      expect(hints.length).to.equal(0);
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: requestDossier sequential IDs
+  // ============================================================
+
+  describe("requestDossier - Sequential IDs", function () {
+    it("should emit sequential dossier request IDs", async function () {
+      await cityNode.connect(owner).setupLocations(sampleLocations);
+
+      await expect(cityNode.connect(player).requestDossier())
+        .to.emit(cityNode, "DossierRequested")
+        .withArgs(1, player.address, CITY_ID);
+
+      await expect(cityNode.connect(otherUser).requestDossier())
+        .to.emit(cityNode, "DossierRequested")
+        .withArgs(2, otherUser.address, CITY_ID);
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: Admin Access Control
+  // ============================================================
+
+  describe("Admin Functions - Additional Access Control", function () {
+    it("should reject setupLocations from non-owner", async function () {
+      await expect(
+        cityNode.connect(player).setupLocations(sampleLocations)
+      ).to.be.revertedWith("Not owner");
+    });
+
+    it("should reject addAnomalyTxRef from non-owner", async function () {
+      await expect(
+        cityNode.connect(player).addAnomalyTxRef(makeTxRef(1))
+      ).to.be.revertedWith("Not owner");
+    });
+
+    it("should reject addSuspectWallet from non-owner", async function () {
+      const wallet = ethers.Wallet.createRandom().address;
+      await expect(
+        cityNode.connect(player).addSuspectWallet(makeSuspectWallet(wallet, 5))
+      ).to.be.revertedWith("Not owner");
+    });
+
+    it("should reject setSuspicionIndex from non-owner", async function () {
+      await expect(
+        cityNode.connect(player).setSuspicionIndex(50, ethers.ZeroHash)
+      ).to.be.revertedWith("Not owner");
+    });
+
+    it("should reject setHint from non-owner", async function () {
+      await expect(
+        cityNode.connect(player).setHint(0, 0, ethers.ZeroHash, 50)
+      ).to.be.revertedWith("Not owner");
+    });
+
+    it("should reject setClueSchema from non-owner", async function () {
+      await expect(
+        cityNode.connect(player).setClueSchema([0, 1])
+      ).to.be.revertedWith("Not owner");
+    });
+
+    it("should reject resetPlayerProgress from non-owner", async function () {
+      await expect(
+        cityNode.connect(player).resetPlayerProgress(player.address)
+      ).to.be.revertedWith("Not owner");
+    });
+
+    it("should reject transferOwnership from non-owner", async function () {
+      await expect(
+        cityNode.connect(player).transferOwnership(player.address)
+      ).to.be.revertedWith("Not owner");
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: Hint retrieval
+  // ============================================================
+
+  describe("Hint System", function () {
+    it("should return correct hint after setting", async function () {
+      const hintHash = ethers.keccak256(ethers.toUtf8Bytes("important hint"));
+      await cityNode.connect(owner).setHint(0, 0, hintHash, 75);
+
+      const [returnedHash, strength] = await cityNode.getHint(0, 0);
+      expect(returnedHash).to.equal(hintHash);
+      expect(strength).to.equal(75);
+    });
+
+    it("should return zero hint for unset slot", async function () {
+      const [hash, strength] = await cityNode.getHint(0, 0);
+      expect(hash).to.equal(ethers.ZeroHash);
+      expect(strength).to.equal(0);
+    });
+
+    it("should reject getHint with invalid location index", async function () {
+      await expect(cityNode.getHint(3, 0)).to.be.revertedWith("Invalid location index");
+    });
+
+    it("should reject getHint with invalid clue index", async function () {
+      await expect(cityNode.getHint(0, 3)).to.be.revertedWith("Invalid clue index");
     });
   });
 });

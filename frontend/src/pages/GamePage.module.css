@@ -85,6 +85,17 @@
   opacity: 0.7;
 }
 
+.ccipStatus {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 1px;
+  color: var(--green, #00ff88);
+  opacity: 0.8;
+  padding: 2px 8px;
+  border: 1px solid rgba(0, 255, 136, 0.2);
+  border-radius: 2px;
+}
+
 .logoutBtn {
   background: none;
   border: 1px solid rgba(255, 42, 109, 0.3);

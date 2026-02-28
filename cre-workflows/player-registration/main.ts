@@ -1,6 +1,7 @@
 /**
  * ================================================================
  *  CRE Workflow: player-registration
+ *  CHAINLINK SERVICE: CRE / Keystone (Decentralized Oracle Network)
  * ================================================================
  *
  *  PURPOSE:
@@ -8,13 +9,37 @@
  *    PlayerRegistry.sol when a player submits a registration request.
  *    The workflow validates the nickname and registers the player.
  *
- *  FLOW:
- *    1. Decode the RegistrationRequested(player, nickname) event
- *    2. Read on-chain: PlayerRegistry.isNicknameAvailable(nickname)
- *    3. Validate: nickname must be available
- *    4. EVM Write: PlayerRegistry.registerPlayer(player, nickname)
- *       - This emits PlayerRegistered event
- *       - Frontend listens for this event
+ *  CHAINLINK CRE INTEGRATION:
+ *    This workflow enables GASLESS player onboarding. The player signs
+ *    a message (zero gas), which is relayed to the PlayerRegistry
+ *    contract. The CRE DON validates the nickname, calls registerPlayer(),
+ *    and pays the gas — the player never spends a single wei.
+ *
+ *    WHY DECENTRALIZED:
+ *    - Registration validation runs inside the Chainlink DON, not a
+ *      centralized server. No single entity controls who can register.
+ *    - The DON's threshold signature ensures only validated registrations
+ *      are accepted by the PlayerRegistry contract.
+ *    - Combined with Chainlink Functions Paymaster for the initial
+ *      relay, this creates a fully gasless onboarding experience
+ *      that is indistinguishable from a traditional web app.
+ *
+ *  DATA FLOW:
+ *    1. Player signs registration intent (nickname + wallet address)
+ *    2. Chainlink Functions Paymaster relays the signed message on-chain
+ *    3. PlayerRegistry emits RegistrationRequested event
+ *    4. CRE DON detects the event via LogTrigger capability
+ *    5. DON nodes execute this WASM workflow:
+ *       a. Decode RegistrationRequested(player, nickname)
+ *       b. Read isNicknameAvailable(nickname) from PlayerRegistry
+ *       c. If available, call registerPlayer(player, nickname)
+ *    6. PlayerRegistry emits PlayerRegistered event
+ *    7. Frontend detects PlayerRegistered and updates UI
+ *
+ *  CHAINLINK SERVICES USED:
+ *    - CRE/Keystone: WASM execution, LogTrigger, consensus
+ *    - EVMClient: Reads nickname availability, writes registration
+ *    - Chainlink Functions: Paymaster relay for initial gasless TX
  *
  *  CONFIG:
  *    - chainId, rpcUrl, playerRegistryAddress, gasLimit

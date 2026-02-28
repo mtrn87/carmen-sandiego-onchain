@@ -3,9 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
 import {
   getPlayerGlobalProgress,
+  getPlayerIdentityCommits,
+  getPlayerCityClueCount,
   getPlayerMissionTrophies,
   CITY_MAP,
 } from '../services/contractService'
+import { ethers } from 'ethers'
 import styles from './ProfilePage.module.css'
 
 const REWARD_TIERS = {
@@ -31,6 +34,8 @@ export default function ProfilePage() {
   const [progress, setProgress] = useState(null)
   const [trophies, setTrophies] = useState([])
   const [stats, setStats] = useState(null)
+  const [identityCommits, setIdentityCommits] = useState([])
+  const [cityClues, setCityClues] = useState({})
 
   const targetAddress = address || walletAddress
 
@@ -41,13 +46,26 @@ export default function ProfilePage() {
       setLoading(true)
       setError(null)
       try {
-        const [progressData, playerTrophies] = await Promise.all([
+        const [progressData, playerTrophies, commits] = await Promise.all([
           getPlayerGlobalProgress(targetAddress),
           getPlayerMissionTrophies(targetAddress),
+          getPlayerIdentityCommits(targetAddress).catch(() => []),
         ])
 
         setProgress(progressData)
         setTrophies(playerTrophies)
+        setIdentityCommits(commits)
+
+        // Fetch per-city clue counts
+        const cityIds = Object.keys(CITY_MAP)
+        const clueResults = await Promise.all(
+          cityIds.map(async (id) => {
+            const nodeId = ethers.zeroPadValue(ethers.toBeHex(BigInt(id)), 32)
+            const count = await getPlayerCityClueCount(targetAddress, nodeId).catch(() => 0)
+            return [Number(id), count]
+          })
+        )
+        setCityClues(Object.fromEntries(clueResults.filter(([, c]) => c > 0)))
 
         // Compute stats from trophies
         const missionsCompleted = playerTrophies.length
@@ -209,6 +227,51 @@ export default function ProfilePage() {
                         />
                       </div>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── City Clue Breakdown ── */}
+              {Object.keys(cityClues).length > 0 && (
+                <div className={styles.section}>
+                  <h2 className={styles.sectionTitle}>&#9656; CITY CLUE BREAKDOWN</h2>
+                  <div className={styles.progressGroup}>
+                    {Object.entries(cityClues).map(([cityId, count]) => {
+                      const city = CITY_MAP[Number(cityId)]
+                      return (
+                        <div key={cityId} className={styles.progressItem}>
+                          <div className={styles.progressHeader}>
+                            <span className={styles.progressLabel}>
+                              {city?.name || `Chain ${cityId}`} ({city?.chain || cityId})
+                            </span>
+                            <span className={styles.progressValue}>{count} clues</span>
+                          </div>
+                          <div className={styles.progressTrack}>
+                            <div
+                              className={styles.progressFill}
+                              style={{ width: `${Math.min(100, count * 20)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Identity Commits ── */}
+              {identityCommits.length > 0 && (
+                <div className={styles.section}>
+                  <h2 className={styles.sectionTitle}>&#9656; IDENTITY COMMITS ({identityCommits.length})</h2>
+                  <div className={styles.missionList}>
+                    {identityCommits.map((hash, i) => (
+                      <div key={i} className={styles.missionRow}>
+                        <span className={styles.missionId}>#{i + 1}</span>
+                        <span className={styles.missionCity} style={{ fontFamily: 'monospace', fontSize: '0.8em' }}>
+                          {hash.slice(0, 18)}...{hash.slice(-8)}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

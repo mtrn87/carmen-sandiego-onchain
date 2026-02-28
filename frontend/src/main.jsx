@@ -25,7 +25,7 @@ const privyConfig = {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <PrivyProvider appId="cmlh3u02l00fnl50cr0btgldc" config={privyConfig}>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <App />
       </BrowserRouter>
     </PrivyProvider>

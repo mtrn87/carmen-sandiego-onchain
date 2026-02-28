@@ -113,6 +113,80 @@
   white-space: nowrap;
 }
 
+.marketDataRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(0, 240, 255, 0.06);
+}
+
+.marketLabel {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  letter-spacing: 1.5px;
+}
+
+.ethPrice {
+  font-size: 0.72rem;
+  color: var(--green);
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+.marketDivider {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  opacity: 0.4;
+}
+
+.rewardMultiplier {
+  font-size: 0.72rem;
+  color: var(--yellow);
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 6px rgba(255, 230, 0, 0.2);
+}
+
+/* ── heist value (Chainlink Data Feed) ── */
+.heistRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  padding: 4px 0 0;
+  animation: heistIn 0.4s ease;
+}
+
+.heistLabel {
+  font-size: 0.6rem;
+  color: var(--red, #f44);
+  letter-spacing: 2px;
+  min-width: 55px;
+  flex-shrink: 0;
+  font-weight: bold;
+}
+
+.heistValue {
+  font-size: 0.78rem;
+  color: var(--red, #f44);
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 8px rgba(255, 42, 109, 0.4);
+}
+
+.heistEth {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+@keyframes heistIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 /* ── tabs ── */
 .tabs {
   display: flex;

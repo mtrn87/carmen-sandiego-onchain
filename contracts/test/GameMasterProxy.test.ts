@@ -669,4 +669,125 @@ describe("GameMasterProxy", function () {
       }
     });
   });
+
+  // ============================================================
+  //    COVERAGE GAPS: CityNode operations access control
+  // ============================================================
+
+  describe("CityNode Operations Access Control", function () {
+    it("should reject resolveClueOnCity with zero cityNode address via CRE", async function () {
+      // The proxy is set as CRE oracle. Impersonate it to test CRE-only functions.
+      const proxyAddr = await proxy.getAddress();
+      await ethers.provider.send("hardhat_impersonateAccount", [proxyAddr]);
+      await ethers.provider.send("hardhat_setBalance", [proxyAddr, "0xDE0B6B3A7640000"]); // 1 ETH
+
+      const proxySigner = await ethers.getSigner(proxyAddr);
+
+      await expect(
+        gameMaster.connect(proxySigner).resolveClueOnCity(
+          ethers.ZeroAddress, 1, 0, ethers.ZeroHash, ethers.ZeroHash
+        )
+      ).to.be.revertedWith("Invalid city node");
+
+      await ethers.provider.send("hardhat_stopImpersonatingAccount", [proxyAddr]);
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: Proxy to non-active mission
+  // ============================================================
+
+  describe("Proxy Actions on Non-Active Missions", function () {
+    it("should reject ACTION_RECEIVE_CLUE for non-active mission via proxy", async function () {
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("clue"));
+      const data = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint256", "uint8", "bytes32", "string", "uint8"],
+        [999, 0, contentHash, "QmTest", 50]
+      );
+      const report = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint8", "bytes"],
+        [1, data]
+      );
+      const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "bytes10", "address"],
+        [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+      );
+
+      await expect(
+        proxy.connect(forwarder).onReport(metadata, report)
+      ).to.be.revertedWith("Mission not active");
+    });
+
+    it("should reject ACTION_UPDATE_TARGET for non-active mission via proxy", async function () {
+      const newHash = ethers.keccak256(ethers.toUtf8Bytes("target"));
+      const data = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint256", "bytes32"],
+        [999, newHash]
+      );
+      const report = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint8", "bytes"],
+        [3, data]
+      );
+      const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "bytes10", "address"],
+        [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+      );
+
+      await expect(
+        proxy.connect(forwarder).onReport(metadata, report)
+      ).to.be.revertedWith("Mission not active");
+    });
+
+    it("should reject ACTION_RECEIVE_WALLET_FRAGMENT for non-active mission via proxy", async function () {
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("frag"));
+      const data = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint256", "uint8", "uint8", "bytes32", "string"],
+        [999, 0, 5, contentHash, "QmFrag"]
+      );
+      const report = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["uint8", "bytes"],
+        [4, data]
+      );
+      const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["bytes32", "bytes10", "address"],
+        [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
+      );
+
+      await expect(
+        proxy.connect(forwarder).onReport(metadata, report)
+      ).to.be.revertedWith("Mission not active");
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: ReceiverTemplate admin functions
+  // ============================================================
+
+  describe("ReceiverTemplate Admin Functions", function () {
+    it("should allow owner to update forwarder address", async function () {
+      const newForwarder = ethers.Wallet.createRandom().address;
+      await expect(proxy.connect(owner).setForwarderAddress(newForwarder))
+        .to.emit(proxy, "ForwarderAddressUpdated")
+        .withArgs(forwarder.address, newForwarder);
+
+      expect(await proxy.getForwarderAddress()).to.equal(newForwarder);
+    });
+
+    it("should emit SecurityWarning when setting zero forwarder", async function () {
+      await expect(proxy.connect(owner).setForwarderAddress(ethers.ZeroAddress))
+        .to.emit(proxy, "SecurityWarning");
+    });
+
+    it("should reject setForwarderAddress from non-owner", async function () {
+      await expect(
+        proxy.connect(nonForwarder).setForwarderAddress(nonForwarder.address)
+      ).to.be.revertedWithCustomError(proxy, "OwnableUnauthorizedAccount");
+    });
+
+    it("should support ERC165 interface check", async function () {
+      // IReceiver interfaceId
+      const iReceiverSelector = "0x01ffc9a7"; // IERC165
+      expect(await proxy.supportsInterface(iReceiverSelector)).to.equal(true);
+    });
+  });
 });

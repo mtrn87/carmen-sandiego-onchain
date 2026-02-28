@@ -345,7 +345,7 @@ describe("GameMaster", function () {
       // deploy CityNode with gameMaster as its GM
       const CityNodeFactory = await ethers.getContractFactory("CityNode");
       cityNode = (await CityNodeFactory.deploy(
-        "Tokyo", "JP", ARBITRUM_SEPOLIA, 1, await gmAddress()
+        "Tokyo", "JP", ARBITRUM_SEPOLIA, 1, await gmAddress(), ethers.ZeroAddress
       )) as CityNode;
 
       // setup locations so players can interact
@@ -1546,6 +1546,890 @@ describe("GameMaster", function () {
       await expect(
         gm.connect(player).submitInvestigation(ARBITRUM_SEPOLIA)
       ).to.be.revertedWith("No active mission");
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: Reward Tiers (Silver and No Reward)
+  // ============================================================
+
+  describe("Reward Calculation - All Tiers", function () {
+    let gm2: GameMaster;
+    let vrfCoord2: any;
+
+    beforeEach(async function () {
+      const VRFMock = await ethers.getContractFactory("VRFCoordinatorV2PlusMock");
+      vrfCoord2 = await VRFMock.deploy(0, 0, 0);
+      const createSubTx = await vrfCoord2.createSubscription();
+      const createSubReceipt = await createSubTx.wait();
+      const subCreatedEvent = createSubReceipt?.logs.find((log: any) => {
+        try {
+          return vrfCoord2.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "SubscriptionCreated";
+        } catch { return false; }
+      });
+      const subId = vrfCoord2.interface.parseLog({
+        topics: [...subCreatedEvent!.topics], data: subCreatedEvent!.data
+      })!.args[0];
+      await vrfCoord2.fundSubscription(subId, 1000000);
+
+      const GMFactory = await ethers.getContractFactory("GameMaster");
+      gm2 = await GMFactory.deploy(
+        await vrfCoord2.getAddress(), subId, VRF_KEY_HASH, validChainIds, creOracle.address
+      ) as GameMaster;
+      await gm2.waitForDeployment();
+      await vrfCoord2.addConsumer(subId, await gm2.getAddress());
+
+      await gm2.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+    });
+
+    it("should give Silver reward (75) for 21-35 blocks", async function () {
+      await gm2.connect(player).startMission();
+      const missionId = await gm2.getPlayerActiveMission(player.address);
+      await vrfCoord2.fulfillRandomWordsWithOverride(missionId, await gm2.getAddress(), [42]);
+
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("clue"));
+      for (let i = 0; i < 3; i++) {
+        await gm2.connect(creOracle).receiveClue(missionId, 0, contentHash, "ipfs://Qm...", 50);
+      }
+
+      // Mine blocks to reach ~25 blocks (Silver range 21-35)
+      const mission = await gm2.getMission(missionId);
+      const startBlock = mission.startBlock;
+      const currentBlock = await ethers.provider.getBlockNumber();
+      const blocksNeeded = 25 - (currentBlock - Number(startBlock));
+      if (blocksNeeded > 0) {
+        await ethers.provider.send("hardhat_mine", ["0x" + blocksNeeded.toString(16)]);
+      }
+
+      const salt = await gm2.getMissionSalt(missionId);
+      let revealedChainId = 0n;
+      for (const cid of validChainIds) {
+        const hash = ethers.keccak256(ethers.solidityPacked(["uint256", "bytes32"], [cid, salt]));
+        if (hash === mission.targetHash) {
+          revealedChainId = BigInt(cid);
+          break;
+        }
+      }
+
+      const tx = await gm2.connect(creOracle).resolveCapture(missionId, revealedChainId, salt);
+      const receipt = await tx.wait();
+      const capturedEvent = receipt?.logs.find((log: any) => {
+        try {
+          return gm2.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "CarmenCaptured";
+        } catch { return false; }
+      });
+      const parsed = gm2.interface.parseLog({ topics: [...capturedEvent!.topics], data: capturedEvent!.data });
+      expect(parsed!.args[3]).to.equal(75n); // Silver reward
+    });
+
+    it("should give no reward (0) for > 50 blocks", async function () {
+      await gm2.connect(player).startMission();
+      const missionId = await gm2.getPlayerActiveMission(player.address);
+      await vrfCoord2.fulfillRandomWordsWithOverride(missionId, await gm2.getAddress(), [42]);
+
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("clue"));
+      for (let i = 0; i < 3; i++) {
+        await gm2.connect(creOracle).receiveClue(missionId, 0, contentHash, "ipfs://Qm...", 50);
+      }
+
+      await ethers.provider.send("hardhat_mine", ["0x40"]); // 64 blocks
+
+      const mission = await gm2.getMission(missionId);
+      const salt = await gm2.getMissionSalt(missionId);
+      let revealedChainId = 0n;
+      for (const cid of validChainIds) {
+        const hash = ethers.keccak256(ethers.solidityPacked(["uint256", "bytes32"], [cid, salt]));
+        if (hash === mission.targetHash) {
+          revealedChainId = BigInt(cid);
+          break;
+        }
+      }
+
+      const tx = await gm2.connect(creOracle).resolveCapture(missionId, revealedChainId, salt);
+      const receipt = await tx.wait();
+      const capturedEvent = receipt?.logs.find((log: any) => {
+        try {
+          return gm2.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "CarmenCaptured";
+        } catch { return false; }
+      });
+      const parsed = gm2.interface.parseLog({ topics: [...capturedEvent!.topics], data: capturedEvent!.data });
+      expect(parsed!.args[3]).to.equal(0n); // No reward
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: Admin Edge Cases
+  // ============================================================
+
+  describe("Admin Edge Cases", function () {
+    it("should reject setCREOracle from non-owner", async function () {
+      await expect(
+        gameMaster.connect(player).setCREOracle(player.address)
+      ).to.be.revertedWith("Only callable by owner");
+    });
+
+    it("should reject setMissionNFT with zero address", async function () {
+      await expect(
+        gameMaster.connect(owner).setMissionNFT(ethers.ZeroAddress)
+      ).to.be.revertedWith("Invalid address");
+    });
+
+    it("should emit MissionNFTSet event", async function () {
+      const NFTFactory = await ethers.getContractFactory("MissionNFT");
+      const nft = await NFTFactory.deploy(await gameMaster.getAddress());
+      await nft.waitForDeployment();
+
+      await expect(gameMaster.connect(owner).setMissionNFT(await nft.getAddress()))
+        .to.emit(gameMaster, "MissionNFTSet")
+        .withArgs(await nft.getAddress());
+    });
+
+    it("should reject setMissionNFT from non-owner", async function () {
+      await expect(
+        gameMaster.connect(player).setMissionNFT(player.address)
+      ).to.be.revertedWith("Only callable by owner");
+    });
+
+    it("should reject setValidChainIds from non-owner", async function () {
+      await expect(
+        gameMaster.connect(player).setValidChainIds([1, 2, 3])
+      ).to.be.revertedWith("Only callable by owner");
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: View Functions Edge Cases
+  // ============================================================
+
+  describe("View Functions Edge Cases", function () {
+    it("should return zero blocksUsed for non-existent mission", async function () {
+      expect(await gameMaster.getBlocksUsed(999)).to.equal(0);
+    });
+
+    it("should return empty clues for non-existent mission", async function () {
+      const clues = await gameMaster.getMissionClues(999);
+      expect(clues.length).to.equal(0);
+    });
+
+    it("should return empty wallet fragments for non-existent mission", async function () {
+      const frags = await gameMaster.getMissionWalletFragments(999);
+      expect(frags.length).to.equal(0);
+    });
+
+    it("should return 0 fragment count for non-existent mission", async function () {
+      expect(await gameMaster.getMissionFragmentCount(999)).to.equal(0);
+    });
+
+    it("should return 0 evidence count for non-existent mission", async function () {
+      expect(await gameMaster.getMissionEvidenceCount(999)).to.equal(0);
+    });
+
+    it("should return empty public key for unregistered player", async function () {
+      const key = await gameMaster.getPlayerPublicKey(player.address);
+      expect(key).to.equal("0x");
+    });
+
+    it("should return zero salt for non-existent mission", async function () {
+      expect(await gameMaster.getMissionSalt(999)).to.equal(ethers.ZeroHash);
+    });
+
+    it("should return empty identity commits for new player", async function () {
+      const commits = await gameMaster.getPlayerIdentityCommits(player.address);
+      expect(commits.length).to.equal(0);
+    });
+
+    it("should return 0 city clue count for new player", async function () {
+      const cityId = ethers.keccak256(ethers.toUtf8Bytes("city1"));
+      expect(await gameMaster.getPlayerCityClueCount(player.address, cityId)).to.equal(0);
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: receiveClue Edge Cases (with VRF)
+  // ============================================================
+
+  describe("receiveClue Edge Cases", function () {
+    let gm3: GameMaster;
+    let vrfCoord3: any;
+
+    beforeEach(async function () {
+      const VRFMock = await ethers.getContractFactory("VRFCoordinatorV2PlusMock");
+      vrfCoord3 = await VRFMock.deploy(0, 0, 0);
+      const createSubTx = await vrfCoord3.createSubscription();
+      const createSubReceipt = await createSubTx.wait();
+      const subCreatedEvent = createSubReceipt?.logs.find((log: any) => {
+        try {
+          return vrfCoord3.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "SubscriptionCreated";
+        } catch { return false; }
+      });
+      const subId = vrfCoord3.interface.parseLog({
+        topics: [...subCreatedEvent!.topics], data: subCreatedEvent!.data
+      })!.args[0];
+      await vrfCoord3.fundSubscription(subId, 1000000);
+
+      const GMFactory = await ethers.getContractFactory("GameMaster");
+      gm3 = await GMFactory.deploy(
+        await vrfCoord3.getAddress(), subId, VRF_KEY_HASH, validChainIds, creOracle.address
+      ) as GameMaster;
+      await gm3.waitForDeployment();
+      await vrfCoord3.addConsumer(subId, await gm3.getAddress());
+    });
+
+    it("should accept clue with strength=0", async function () {
+      await gm3.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm3.connect(player).startMission();
+      const missionId = await gm3.getPlayerActiveMission(player.address);
+      await vrfCoord3.fulfillRandomWordsWithOverride(missionId, await gm3.getAddress(), [7]);
+
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("weak-clue"));
+      await gm3.connect(creOracle).receiveClue(missionId, 0, contentHash, "ipfs://weak", 0);
+
+      const clues = await gm3.getMissionClues(missionId);
+      expect(clues.length).to.equal(1);
+      expect(clues[0].strength).to.equal(0);
+      expect(await gm3.getMissionEvidenceCount(missionId)).to.equal(0);
+    });
+
+    it("should accept clue with strength=100", async function () {
+      await gm3.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm3.connect(player).startMission();
+      const missionId = await gm3.getPlayerActiveMission(player.address);
+      await vrfCoord3.fulfillRandomWordsWithOverride(missionId, await gm3.getAddress(), [7]);
+
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("strong-clue"));
+      await gm3.connect(creOracle).receiveClue(missionId, 0, contentHash, "ipfs://strong", 100);
+
+      expect(await gm3.getMissionEvidenceCount(missionId)).to.equal(1);
+    });
+
+    it("should reject clue with strength=101", async function () {
+      await gm3.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm3.connect(player).startMission();
+      const missionId = await gm3.getPlayerActiveMission(player.address);
+      await vrfCoord3.fulfillRandomWordsWithOverride(missionId, await gm3.getAddress(), [7]);
+
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("invalid-clue"));
+      await expect(
+        gm3.connect(creOracle).receiveClue(missionId, 0, contentHash, "ipfs://bad", 101)
+      ).to.be.revertedWith("Invalid strength");
+    });
+
+    it("should reject receiveClue for non-active mission", async function () {
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("clue"));
+      await expect(
+        gm3.connect(creOracle).receiveClue(999, 0, contentHash, "ipfs://Qm", 50)
+      ).to.be.revertedWith("Mission not active");
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: resolveCapture Edge Cases (with VRF)
+  // ============================================================
+
+  describe("resolveCapture Edge Cases", function () {
+    let gm4: GameMaster;
+    let vrfCoord4: any;
+
+    beforeEach(async function () {
+      const VRFMock = await ethers.getContractFactory("VRFCoordinatorV2PlusMock");
+      vrfCoord4 = await VRFMock.deploy(0, 0, 0);
+      const createSubTx = await vrfCoord4.createSubscription();
+      const createSubReceipt = await createSubTx.wait();
+      const subCreatedEvent = createSubReceipt?.logs.find((log: any) => {
+        try {
+          return vrfCoord4.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "SubscriptionCreated";
+        } catch { return false; }
+      });
+      const subId = vrfCoord4.interface.parseLog({
+        topics: [...subCreatedEvent!.topics], data: subCreatedEvent!.data
+      })!.args[0];
+      await vrfCoord4.fundSubscription(subId, 1000000);
+
+      const GMFactory = await ethers.getContractFactory("GameMaster");
+      gm4 = await GMFactory.deploy(
+        await vrfCoord4.getAddress(), subId, VRF_KEY_HASH, validChainIds, creOracle.address
+      ) as GameMaster;
+      await gm4.waitForDeployment();
+      await vrfCoord4.addConsumer(subId, await gm4.getAddress());
+    });
+
+    it("should reject resolveCapture with exactly 2 clues (need 3+)", async function () {
+      await gm4.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm4.connect(player).startMission();
+      const missionId = await gm4.getPlayerActiveMission(player.address);
+      await vrfCoord4.fulfillRandomWordsWithOverride(missionId, await gm4.getAddress(), [7]);
+
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("clue"));
+      await gm4.connect(creOracle).receiveClue(missionId, 0, contentHash, "ipfs://Qm1", 50);
+      await gm4.connect(creOracle).receiveClue(missionId, 1, contentHash, "ipfs://Qm2", 50);
+
+      const salt = await gm4.getMissionSalt(missionId);
+      const mission = await gm4.getMission(missionId);
+      let revealedChainId = 0n;
+      for (const cid of validChainIds) {
+        const hash = ethers.keccak256(ethers.solidityPacked(["uint256", "bytes32"], [cid, salt]));
+        if (hash === mission.targetHash) {
+          revealedChainId = BigInt(cid);
+          break;
+        }
+      }
+
+      await expect(
+        gm4.connect(creOracle).resolveCapture(missionId, revealedChainId, salt)
+      ).to.be.revertedWith("Need 3+ clues");
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: receiveWalletFragment Edge Cases (with VRF)
+  // ============================================================
+
+  describe("receiveWalletFragment Edge Cases", function () {
+    let gm5: GameMaster;
+    let vrfCoord5: any;
+
+    beforeEach(async function () {
+      const VRFMock = await ethers.getContractFactory("VRFCoordinatorV2PlusMock");
+      vrfCoord5 = await VRFMock.deploy(0, 0, 0);
+      const createSubTx = await vrfCoord5.createSubscription();
+      const createSubReceipt = await createSubTx.wait();
+      const subCreatedEvent = createSubReceipt?.logs.find((log: any) => {
+        try {
+          return vrfCoord5.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "SubscriptionCreated";
+        } catch { return false; }
+      });
+      const subId = vrfCoord5.interface.parseLog({
+        topics: [...subCreatedEvent!.topics], data: subCreatedEvent!.data
+      })!.args[0];
+      await vrfCoord5.fundSubscription(subId, 1000000);
+
+      const GMFactory = await ethers.getContractFactory("GameMaster");
+      gm5 = await GMFactory.deploy(
+        await vrfCoord5.getAddress(), subId, VRF_KEY_HASH, validChainIds, creOracle.address
+      ) as GameMaster;
+      await gm5.waitForDeployment();
+      await vrfCoord5.addConsumer(subId, await gm5.getAddress());
+    });
+
+    it("should accept fragment at boundary (startIndex=35, length=5)", async function () {
+      await gm5.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm5.connect(player).startMission();
+      const missionId = await gm5.getPlayerActiveMission(player.address);
+      await vrfCoord5.fulfillRandomWordsWithOverride(missionId, await gm5.getAddress(), [7]);
+
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("boundary-frag"));
+      await gm5.connect(creOracle).receiveWalletFragment(missionId, 35, 5, contentHash, "ipfs://bound");
+
+      const frags = await gm5.getMissionWalletFragments(missionId);
+      expect(frags.length).to.equal(1);
+    });
+
+    it("should reject fragment at startIndex=36, length=5 (out of bounds)", async function () {
+      await gm5.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm5.connect(player).startMission();
+      const missionId = await gm5.getPlayerActiveMission(player.address);
+      await vrfCoord5.fulfillRandomWordsWithOverride(missionId, await gm5.getAddress(), [7]);
+
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("oob-frag"));
+      await expect(
+        gm5.connect(creOracle).receiveWalletFragment(missionId, 36, 5, contentHash, "ipfs://oob")
+      ).to.be.revertedWith("Fragment out of bounds");
+    });
+
+    it("should reject fragment for non-active mission", async function () {
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("frag"));
+      await expect(
+        gm5.connect(creOracle).receiveWalletFragment(999, 0, 5, contentHash, "ipfs://Qm")
+      ).to.be.revertedWith("Mission not active");
+    });
+
+    it("should reject overlapping fragment (exact same range)", async function () {
+      await gm5.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm5.connect(player).startMission();
+      const missionId = await gm5.getPlayerActiveMission(player.address);
+      await vrfCoord5.fulfillRandomWordsWithOverride(missionId, await gm5.getAddress(), [7]);
+
+      const h1 = ethers.keccak256(ethers.toUtf8Bytes("frag-1"));
+      const h2 = ethers.keccak256(ethers.toUtf8Bytes("frag-2"));
+
+      // First fragment at positions 0-4
+      await gm5.connect(creOracle).receiveWalletFragment(missionId, 0, 5, h1, "ipfs://f1");
+
+      // Second fragment at same positions 0-4 should revert
+      await expect(
+        gm5.connect(creOracle).receiveWalletFragment(missionId, 0, 5, h2, "ipfs://f2")
+      ).to.be.revertedWith("Fragment overlaps");
+    });
+
+    it("should reject partially overlapping fragment", async function () {
+      await gm5.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm5.connect(player).startMission();
+      const missionId = await gm5.getPlayerActiveMission(player.address);
+      await vrfCoord5.fulfillRandomWordsWithOverride(missionId, await gm5.getAddress(), [7]);
+
+      const h1 = ethers.keccak256(ethers.toUtf8Bytes("frag-1"));
+      const h2 = ethers.keccak256(ethers.toUtf8Bytes("frag-2"));
+
+      // First fragment covers positions 5-9
+      await gm5.connect(creOracle).receiveWalletFragment(missionId, 5, 5, h1, "ipfs://f1");
+
+      // Second fragment at 8-12 overlaps at positions 8,9
+      await expect(
+        gm5.connect(creOracle).receiveWalletFragment(missionId, 8, 5, h2, "ipfs://f2")
+      ).to.be.revertedWith("Fragment overlaps");
+    });
+
+    it("should accept adjacent non-overlapping fragments", async function () {
+      await gm5.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm5.connect(player).startMission();
+      const missionId = await gm5.getPlayerActiveMission(player.address);
+      await vrfCoord5.fulfillRandomWordsWithOverride(missionId, await gm5.getAddress(), [7]);
+
+      const h1 = ethers.keccak256(ethers.toUtf8Bytes("frag-1"));
+      const h2 = ethers.keccak256(ethers.toUtf8Bytes("frag-2"));
+      const h3 = ethers.keccak256(ethers.toUtf8Bytes("frag-3"));
+
+      // Fragments at 0-4, 5-9, 10-14 are adjacent but non-overlapping
+      await gm5.connect(creOracle).receiveWalletFragment(missionId, 0, 5, h1, "ipfs://f1");
+      await gm5.connect(creOracle).receiveWalletFragment(missionId, 5, 5, h2, "ipfs://f2");
+      await gm5.connect(creOracle).receiveWalletFragment(missionId, 10, 5, h3, "ipfs://f3");
+
+      expect(await gm5.getMissionFragmentCount(missionId)).to.equal(3);
+    });
+
+    it("should reject fragment that overlaps by single position", async function () {
+      await gm5.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm5.connect(player).startMission();
+      const missionId = await gm5.getPlayerActiveMission(player.address);
+      await vrfCoord5.fulfillRandomWordsWithOverride(missionId, await gm5.getAddress(), [7]);
+
+      const h1 = ethers.keccak256(ethers.toUtf8Bytes("frag-1"));
+      const h2 = ethers.keccak256(ethers.toUtf8Bytes("frag-2"));
+
+      // Fragment at 0-4 (positions 0,1,2,3,4)
+      await gm5.connect(creOracle).receiveWalletFragment(missionId, 0, 5, h1, "ipfs://f1");
+
+      // Fragment at 4-8 overlaps at position 4
+      await expect(
+        gm5.connect(creOracle).receiveWalletFragment(missionId, 4, 5, h2, "ipfs://f2")
+      ).to.be.revertedWith("Fragment overlaps");
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: Chain ID Mapping O(1) Validation
+  // ============================================================
+
+  describe("Chain ID Mapping Validation", function () {
+    it("should validate chain IDs after setValidChainIds", async function () {
+      // gameMaster was deployed with [ARBITRUM_SEPOLIA, BASE_SEPOLIA]
+      // Verify via getValidCities, then update and verify again
+      await gameMaster.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+
+      // Update chain IDs to a different set
+      const NEW_CHAIN_1 = 11111;
+      const NEW_CHAIN_2 = 22222;
+      await gameMaster.connect(owner).setValidChainIds([NEW_CHAIN_1, NEW_CHAIN_2]);
+
+      // Old chain IDs should now be invalid
+      // We can verify via getValidCities
+      const cities = await gameMaster.getValidCities();
+      expect(cities.length).to.equal(2);
+      expect(cities[0]).to.equal(NEW_CHAIN_1);
+      expect(cities[1]).to.equal(NEW_CHAIN_2);
+    });
+
+    it("should reject old chain ID after setValidChainIds replaces them", async function () {
+      // Need a proper VRF mock to call startMission
+      const VRFMock = await ethers.getContractFactory("VRFCoordinatorV2PlusMock");
+      const vrfCoord7 = await VRFMock.deploy(0, 0, 0);
+      const createSubTx = await vrfCoord7.createSubscription();
+      const createSubReceipt = await createSubTx.wait();
+      const subCreatedEvent = createSubReceipt?.logs.find((log: any) => {
+        try {
+          return vrfCoord7.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "SubscriptionCreated";
+        } catch { return false; }
+      });
+      const subId = vrfCoord7.interface.parseLog({
+        topics: [...subCreatedEvent!.topics], data: subCreatedEvent!.data
+      })!.args[0];
+      await vrfCoord7.fundSubscription(subId, 1000000);
+
+      const GMFactory = await ethers.getContractFactory("GameMaster");
+      const gm7 = await GMFactory.deploy(
+        await vrfCoord7.getAddress(), subId, VRF_KEY_HASH, validChainIds, creOracle.address
+      ) as GameMaster;
+      await gm7.waitForDeployment();
+      await vrfCoord7.addConsumer(subId, await gm7.getAddress());
+
+      // Register and start mission
+      await gm7.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm7.connect(player).startMission();
+      const missionId = await gm7.getPlayerActiveMission(player.address);
+
+      // Fulfill VRF so mission is fully active
+      await vrfCoord7.fulfillRandomWordsWithOverride(missionId, await gm7.getAddress(), [42]);
+
+      // Update to completely different chain IDs
+      const NEW_CHAIN_1 = 99999;
+      const NEW_CHAIN_2 = 88888;
+      await gm7.connect(owner).setValidChainIds([NEW_CHAIN_1, NEW_CHAIN_2]);
+
+      // The old ARBITRUM_SEPOLIA should now be rejected
+      await expect(
+        gm7.connect(player).submitInvestigation(ARBITRUM_SEPOLIA)
+      ).to.be.revertedWith("Invalid city/chain");
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: resolveWalletCapture Edge Cases (with VRF)
+  // ============================================================
+
+  describe("resolveWalletCapture Edge Cases", function () {
+    let gm6: GameMaster;
+    let vrfCoord6: any;
+
+    beforeEach(async function () {
+      const VRFMock = await ethers.getContractFactory("VRFCoordinatorV2PlusMock");
+      vrfCoord6 = await VRFMock.deploy(0, 0, 0);
+      const createSubTx = await vrfCoord6.createSubscription();
+      const createSubReceipt = await createSubTx.wait();
+      const subCreatedEvent = createSubReceipt?.logs.find((log: any) => {
+        try {
+          return vrfCoord6.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "SubscriptionCreated";
+        } catch { return false; }
+      });
+      const subId = vrfCoord6.interface.parseLog({
+        topics: [...subCreatedEvent!.topics], data: subCreatedEvent!.data
+      })!.args[0];
+      await vrfCoord6.fundSubscription(subId, 1000000);
+
+      const GMFactory = await ethers.getContractFactory("GameMaster");
+      gm6 = await GMFactory.deploy(
+        await vrfCoord6.getAddress(), subId, VRF_KEY_HASH, validChainIds, creOracle.address
+      ) as GameMaster;
+      await gm6.waitForDeployment();
+      await vrfCoord6.addConsumer(subId, await gm6.getAddress());
+    });
+
+    it("should reject resolveWalletCapture for non-active mission", async function () {
+      await expect(
+        gm6.connect(creOracle).resolveWalletCapture(999, player.address, ARBITRUM_SEPOLIA, ethers.ZeroHash)
+      ).to.be.revertedWith("Mission not active");
+    });
+
+    it("should reject resolveWalletCapture with invalid reveal (wrong salt)", async function () {
+      await gm6.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm6.connect(player).startMission();
+      const missionId = await gm6.getPlayerActiveMission(player.address);
+      await vrfCoord6.fulfillRandomWordsWithOverride(missionId, await gm6.getAddress(), [7]);
+
+      for (let i = 0; i < 3; i++) {
+        const contentHash = ethers.keccak256(ethers.toUtf8Bytes(`frag-${i}`));
+        await gm6.connect(creOracle).receiveWalletFragment(missionId, i * 10, 5, contentHash, `ipfs://f${i}`);
+      }
+
+      const wrongSalt = ethers.keccak256(ethers.toUtf8Bytes("wrong-salt"));
+      await expect(
+        gm6.connect(creOracle).resolveWalletCapture(missionId, player.address, ARBITRUM_SEPOLIA, wrongSalt)
+      ).to.be.revertedWith("Invalid reveal");
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: updateTarget Edge Cases (with VRF)
+  // ============================================================
+
+  describe("updateTarget Edge Cases", function () {
+    let gm7: GameMaster;
+    let vrfCoord7: any;
+
+    beforeEach(async function () {
+      const VRFMock = await ethers.getContractFactory("VRFCoordinatorV2PlusMock");
+      vrfCoord7 = await VRFMock.deploy(0, 0, 0);
+      const createSubTx = await vrfCoord7.createSubscription();
+      const createSubReceipt = await createSubTx.wait();
+      const subCreatedEvent = createSubReceipt?.logs.find((log: any) => {
+        try {
+          return vrfCoord7.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "SubscriptionCreated";
+        } catch { return false; }
+      });
+      const subId = vrfCoord7.interface.parseLog({
+        topics: [...subCreatedEvent!.topics], data: subCreatedEvent!.data
+      })!.args[0];
+      await vrfCoord7.fundSubscription(subId, 1000000);
+
+      const GMFactory = await ethers.getContractFactory("GameMaster");
+      gm7 = await GMFactory.deploy(
+        await vrfCoord7.getAddress(), subId, VRF_KEY_HASH, validChainIds, creOracle.address
+      ) as GameMaster;
+      await gm7.waitForDeployment();
+      await vrfCoord7.addConsumer(subId, await gm7.getAddress());
+    });
+
+    it("should update target hash and verify old hash is replaced", async function () {
+      await gm7.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm7.connect(player).startMission();
+      const missionId = await gm7.getPlayerActiveMission(player.address);
+      await vrfCoord7.fulfillRandomWordsWithOverride(missionId, await gm7.getAddress(), [7]);
+
+      const oldMission = await gm7.getMission(missionId);
+      const oldHash = oldMission.targetHash;
+
+      const newHash = ethers.keccak256(ethers.toUtf8Bytes("new-location"));
+      await gm7.connect(creOracle).updateTarget(missionId, newHash);
+
+      const updatedMission = await gm7.getMission(missionId);
+      expect(updatedMission.targetHash).to.equal(newHash);
+      expect(updatedMission.targetHash).to.not.equal(oldHash);
+    });
+  });
+
+  // ============================================================
+  //    COVERAGE GAPS: CityNode resolveClueOnCity zero address
+  // ============================================================
+
+  describe("CityNode Integration - Zero Address Checks", function () {
+    it("should reject resolveDossierOnCity with zero cityNode", async function () {
+      await expect(
+        gameMaster.connect(creOracle).resolveDossierOnCity(
+          ethers.ZeroAddress, 1, ethers.ZeroHash, 50, ethers.ZeroHash
+        )
+      ).to.be.revertedWith("Invalid city node");
+    });
+
+    it("should reject resolveCaptureOnCity with zero cityNode", async function () {
+      await expect(
+        gameMaster.connect(creOracle).resolveCaptureOnCity(
+          ethers.ZeroAddress, 1, true, 0, ethers.ZeroHash
+        )
+      ).to.be.revertedWith("Invalid city node");
+    });
+  });
+
+  // ============================================================
+  //          CHAINLINK DATA FEED INTEGRATION
+  // ============================================================
+
+  describe("Chainlink Data Feed Integration", function () {
+    it("should allow owner to set price feed address", async function () {
+      const MockAggregator = await ethers.getContractFactory("MockAggregatorV3");
+      const mockFeed = await MockAggregator.deploy(300000000000, 8); // $3000 with 8 decimals
+      await mockFeed.waitForDeployment();
+
+      await expect(gameMaster.connect(owner).setEthUsdPriceFeed(await mockFeed.getAddress()))
+        .to.emit(gameMaster, "PriceFeedSet")
+        .withArgs(await mockFeed.getAddress());
+    });
+
+    it("should reject non-owner setting price feed", async function () {
+      const MockAggregator = await ethers.getContractFactory("MockAggregatorV3");
+      const mockFeed = await MockAggregator.deploy(300000000000, 8);
+      await mockFeed.waitForDeployment();
+
+      await expect(
+        gameMaster.connect(player).setEthUsdPriceFeed(await mockFeed.getAddress())
+      ).to.be.revertedWith("Only callable by owner");
+    });
+
+    it("should reject zero address for price feed", async function () {
+      await expect(
+        gameMaster.connect(owner).setEthUsdPriceFeed(ethers.ZeroAddress)
+      ).to.be.revertedWith("Invalid address");
+    });
+
+    it("should return default market data when no price feed is set", async function () {
+      const [ethPrice, multiplier] = await gameMaster.getMarketData();
+      expect(ethPrice).to.equal(0);
+      expect(multiplier).to.equal(10000); // 1.0x
+    });
+
+    it("should return correct market data when ETH > $2500", async function () {
+      const MockAggregator = await ethers.getContractFactory("MockAggregatorV3");
+      const mockFeed = await MockAggregator.deploy(300000000000, 8); // $3000
+      await mockFeed.waitForDeployment();
+
+      await gameMaster.connect(owner).setEthUsdPriceFeed(await mockFeed.getAddress());
+
+      const [ethPrice, multiplier] = await gameMaster.getMarketData();
+      expect(ethPrice).to.equal(300000000000);
+      // $3000: bonus = (3000-2500)/100 = 5 per 100 base
+      // bonusBps = (500 * 10000) / (100 * 100) = 500
+      expect(multiplier).to.equal(10500);
+    });
+
+    it("should return 1.0x multiplier when ETH <= $2500", async function () {
+      const MockAggregator = await ethers.getContractFactory("MockAggregatorV3");
+      const mockFeed = await MockAggregator.deploy(200000000000, 8); // $2000
+      await mockFeed.waitForDeployment();
+
+      await gameMaster.connect(owner).setEthUsdPriceFeed(await mockFeed.getAddress());
+
+      const [ethPrice, multiplier] = await gameMaster.getMarketData();
+      expect(ethPrice).to.equal(200000000000);
+      expect(multiplier).to.equal(10000); // 1.0x, no bonus
+    });
+
+    it("should apply market bonus to reward on capture (ETH > $2500)", async function () {
+      // Deploy with VRF mock for full mission flow
+      const VRFMock = await ethers.getContractFactory("VRFCoordinatorV2PlusMock");
+      const vrfCoordinator = await VRFMock.deploy(0, 0, 0);
+      const createSubTx = await vrfCoordinator.createSubscription();
+      const createSubReceipt = await createSubTx.wait();
+      const subCreatedEvent = createSubReceipt?.logs.find((log: any) => {
+        try {
+          return vrfCoordinator.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "SubscriptionCreated";
+        } catch { return false; }
+      });
+      const subId = vrfCoordinator.interface.parseLog({
+        topics: [...subCreatedEvent!.topics], data: subCreatedEvent!.data
+      })!.args[0];
+      await vrfCoordinator.fundSubscription(subId, 1000000);
+
+      const GMFactory = await ethers.getContractFactory("GameMaster");
+      const gm = await GMFactory.deploy(
+        await vrfCoordinator.getAddress(), subId, VRF_KEY_HASH, validChainIds, creOracle.address
+      ) as GameMaster;
+      await gm.waitForDeployment();
+      await vrfCoordinator.addConsumer(subId, await gm.getAddress());
+
+      // Set up mock price feed at $3000
+      const MockAggregator = await ethers.getContractFactory("MockAggregatorV3");
+      const mockFeed = await MockAggregator.deploy(300000000000, 8); // $3000
+      await mockFeed.waitForDeployment();
+      await gm.connect(owner).setEthUsdPriceFeed(await mockFeed.getAddress());
+
+      // Setup mission
+      await gm.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm.connect(player).startMission();
+      const missionId = await gm.getPlayerActiveMission(player.address);
+      const vrfWord = 42;
+      await vrfCoordinator.fulfillRandomWordsWithOverride(missionId, await gm.getAddress(), [vrfWord]);
+
+      // Deliver 3 clues
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("clue"));
+      for (let i = 0; i < 3; i++) {
+        await gm.connect(creOracle).receiveClue(Number(missionId), 0, contentHash, "ipfs://Qm...", 50);
+      }
+
+      // Find revealed chainId
+      const mission = await gm.getMission(missionId);
+      const salt = await gm.getMissionSalt(missionId);
+      let revealedChainId = 0n;
+      for (const cid of validChainIds) {
+        const hash = ethers.keccak256(ethers.solidityPacked(["uint256", "bytes32"], [cid, salt]));
+        if (hash === mission.targetHash) {
+          revealedChainId = BigInt(cid);
+          break;
+        }
+      }
+
+      // Capture should emit RewardCalculatedWithMarketData
+      // Base reward = 100 (Gold, within 20 blocks), bonus = (3000-2500)/100 = 5
+      // Final reward = 105
+      const tx = await gm.connect(creOracle).resolveCapture(missionId, revealedChainId, salt);
+      const receipt = await tx.wait();
+
+      // Check RewardCalculatedWithMarketData event
+      const rewardEvent = receipt?.logs.find((log: any) => {
+        try {
+          return gm.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "RewardCalculatedWithMarketData";
+        } catch { return false; }
+      });
+      expect(rewardEvent).to.not.be.undefined;
+      const parsed = gm.interface.parseLog({ topics: [...rewardEvent!.topics], data: rewardEvent!.data });
+      expect(parsed!.args.baseReward).to.equal(100);
+      expect(parsed!.args.ethPrice).to.equal(300000000000);
+      expect(parsed!.args.finalReward).to.equal(105); // 100 + 5 market bonus
+    });
+
+    it("should not apply market bonus when no price feed is set", async function () {
+      // Deploy with VRF mock
+      const VRFMock = await ethers.getContractFactory("VRFCoordinatorV2PlusMock");
+      const vrfCoordinator = await VRFMock.deploy(0, 0, 0);
+      const createSubTx = await vrfCoordinator.createSubscription();
+      const createSubReceipt = await createSubTx.wait();
+      const subCreatedEvent = createSubReceipt?.logs.find((log: any) => {
+        try {
+          return vrfCoordinator.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "SubscriptionCreated";
+        } catch { return false; }
+      });
+      const subId = vrfCoordinator.interface.parseLog({
+        topics: [...subCreatedEvent!.topics], data: subCreatedEvent!.data
+      })!.args[0];
+      await vrfCoordinator.fundSubscription(subId, 1000000);
+
+      const GMFactory = await ethers.getContractFactory("GameMaster");
+      const gm = await GMFactory.deploy(
+        await vrfCoordinator.getAddress(), subId, VRF_KEY_HASH, validChainIds, creOracle.address
+      ) as GameMaster;
+      await gm.waitForDeployment();
+      await vrfCoordinator.addConsumer(subId, await gm.getAddress());
+
+      // NO price feed set — should use base reward only
+
+      // Setup mission
+      await gm.connect(player).registerPlayer(MOCK_PUBLIC_KEY);
+      await gm.connect(player).startMission();
+      const missionId = await gm.getPlayerActiveMission(player.address);
+      await vrfCoordinator.fulfillRandomWordsWithOverride(missionId, await gm.getAddress(), [42]);
+
+      // Deliver 3 clues
+      const contentHash = ethers.keccak256(ethers.toUtf8Bytes("clue"));
+      for (let i = 0; i < 3; i++) {
+        await gm.connect(creOracle).receiveClue(Number(missionId), 0, contentHash, "ipfs://Qm...", 50);
+      }
+
+      // Find revealed chainId
+      const mission = await gm.getMission(missionId);
+      const salt = await gm.getMissionSalt(missionId);
+      let revealedChainId = 0n;
+      for (const cid of validChainIds) {
+        const hash = ethers.keccak256(ethers.solidityPacked(["uint256", "bytes32"], [cid, salt]));
+        if (hash === mission.targetHash) {
+          revealedChainId = BigInt(cid);
+          break;
+        }
+      }
+
+      const tx = await gm.connect(creOracle).resolveCapture(missionId, revealedChainId, salt);
+      const receipt = await tx.wait();
+
+      // Check RewardCalculatedWithMarketData event — ethPrice should be 0, reward = base only
+      const rewardEvent = receipt?.logs.find((log: any) => {
+        try {
+          return gm.interface.parseLog({ topics: [...log.topics], data: log.data })?.name === "RewardCalculatedWithMarketData";
+        } catch { return false; }
+      });
+      expect(rewardEvent).to.not.be.undefined;
+      const parsed = gm.interface.parseLog({ topics: [...rewardEvent!.topics], data: rewardEvent!.data });
+      expect(parsed!.args.baseReward).to.equal(100);
+      expect(parsed!.args.ethPrice).to.equal(0);
+      expect(parsed!.args.finalReward).to.equal(100); // No bonus
+    });
+
+    it("should update market bonus when price changes", async function () {
+      const MockAggregator = await ethers.getContractFactory("MockAggregatorV3");
+      const mockFeed = await MockAggregator.deploy(300000000000, 8); // $3000
+      await mockFeed.waitForDeployment();
+
+      await gameMaster.connect(owner).setEthUsdPriceFeed(await mockFeed.getAddress());
+
+      // Check at $3000
+      let [, multiplier] = await gameMaster.getMarketData();
+      expect(multiplier).to.equal(10500);
+
+      // Update price to $4000
+      await mockFeed.setPrice(400000000000);
+      [, multiplier] = await gameMaster.getMarketData();
+      // bonus = (4000-2500)/100 = 15, bonusBps = (1500 * 10000) / 10000 = 1500
+      expect(multiplier).to.equal(11500);
+
+      // Update price to $2000 (below threshold)
+      await mockFeed.setPrice(200000000000);
+      [, multiplier] = await gameMaster.getMarketData();
+      expect(multiplier).to.equal(10000); // No bonus
     });
   });
 });

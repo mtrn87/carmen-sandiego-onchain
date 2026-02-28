@@ -11,6 +11,49 @@ import { WALLET_POOL, pickTxWallets, getCarmenWalletIndex } from '../data/wallet
 import GameMasterArtifact from "../abi/GameMaster.json"
 import CityNodeArtifact from "../abi/CityNode.json"
 import MissionNFTArtifact from "../abi/MissionNFT.json"
+import {
+  relayRegisterPlayer,
+  relayStartMission,
+  relaySubmitInvestigation,
+  relayFlagTx as relayFlagTxService,
+  relayRequestClue as relayRequestClueService,
+  relayRequestDossier as relayRequestDossierService,
+  relayRequestCapture as relayCaptureService,
+  relayInspectLocation as relayInspectService,
+  relayScanAnomalies as relayScanService,
+} from "./relayService"
+
+// ============================================================
+//  Visual Logging for Video Demo
+// ============================================================
+
+const _cl = (tag, color, ...args) => {
+  const ts = new Date().toISOString().slice(11, 23)
+  console.log(
+    `%c[${ts}] %c${tag}`,
+    "color:#888;font-weight:bold",
+    `color:${color};font-weight:bold;font-size:11px`,
+    ...args
+  )
+}
+const bcRead   = (...a) => _cl("BLOCKCHAIN 📖 READ      ", "#3498db", ...a)
+const bcWrite  = (...a) => _cl("BLOCKCHAIN ✍️  WRITE     ", "#e67e22", ...a)
+const bcResult = (...a) => _cl("BLOCKCHAIN ✅ RESULT     ", "#27ae60", ...a)
+const bcEvent  = (...a) => _cl("BLOCKCHAIN ⚡ EVENT      ", "#f39c12", ...a)
+const bcChain  = (...a) => _cl("CHAINLINK  🔗 SERVICE    ", "#8e44ad", ...a)
+const bcCCIP   = (...a) => _cl("CHAINLINK  🌐 CCIP       ", "#2980b9", ...a)
+const bcVRF    = (...a) => _cl("CHAINLINK  🎲 VRF        ", "#16a085", ...a)
+const bcDF     = (...a) => _cl("CHAINLINK  📊 DATA FEED  ", "#c0392b", ...a)
+const bcCRE    = (...a) => _cl("CHAINLINK  ⚙️  CRE/WASM   ", "#d35400", ...a)
+const bcCity   = (...a) => _cl("CITYNODE   🏙️  CROSS-CHAIN", "#2c3e50", ...a)
+const bcWarn   = (...a) => _cl("BLOCKCHAIN ⚠️  WARN      ", "#e74c3c", ...a)
+
+// ============================================================
+//  Feature Flags
+// ============================================================
+
+/** When true, CityNode functions return mock data without attempting real contract calls. */
+const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true'
 
 // ============================================================
 //  Constants
@@ -203,6 +246,62 @@ function pollEvents(contract, filter, handler, intervalMs = 6000) {
   return () => { stopped = true; clearInterval(id) }
 }
 
+/**
+ * One-shot poll-based event watcher. Polls rapidly until the matcher returns
+ * a truthy value, then resolves with that value. Auto-stops on timeout.
+ * Used for requestClue/requestDossier/requestCapture where we wait for a
+ * single matching event after a transaction.
+ * @param {ethers.Contract} contract
+ * @param {object} filter - ethers event filter
+ * @param {Function} matcher - (parsedLog) => result|null — return non-null to resolve
+ * @param {number} timeoutMs - max wait time (default 60s)
+ * @param {number} intervalMs - polling interval (default 3s)
+ * @returns {Promise<any>} resolves with matcher result or rejects on timeout
+ */
+function pollOnce(contract, filter, matcher, timeoutMs = 60000, intervalMs = 3000) {
+  return new Promise((resolve, reject) => {
+    let lastBlock = -1
+    let stopped = false
+
+    const timeout = setTimeout(() => {
+      stopped = true
+      clearInterval(id)
+      reject(new Error(`pollOnce timeout (${timeoutMs / 1000}s)`))
+    }, timeoutMs)
+
+    const poll = async () => {
+      if (stopped) return
+      try {
+        const provider = contract.runner?.provider || contract.provider
+        const currentBlock = await provider.getBlockNumber()
+        const fromBlock = lastBlock === -1 ? currentBlock : lastBlock + 1
+        if (fromBlock > currentBlock) return
+        const events = await contract.queryFilter(filter, fromBlock, currentBlock)
+        lastBlock = currentBlock
+        for (const ev of events) {
+          try {
+            const parsed = contract.interface.parseLog(ev)
+            if (!parsed) continue
+            const result = matcher(parsed)
+            if (result) {
+              stopped = true
+              clearInterval(id)
+              clearTimeout(timeout)
+              resolve(result)
+              return
+            }
+          } catch { /* skip */ }
+        }
+      } catch (err) {
+        console.warn('[pollOnce] poll error:', err.message)
+      }
+    }
+
+    poll()
+    const id = setInterval(poll, intervalMs)
+  })
+}
+
 /** Reset cached provider/signer (call on wallet disconnect) */
 export function resetConnection() {
   _provider = null
@@ -275,11 +374,11 @@ export async function getCityNodeState(chainId, missionId) {
 
   try {
     const contract = getCityNodeReadContract(chainId)
-    const [cityName, nodeChainId, owner, creOracle, carmenPresent] = await Promise.all([
+    const [cityName, nodeChainId, owner, gameMasterAddr, carmenPresent] = await Promise.all([
       contract.cityName(),
       contract.chainId(),
       contract.owner(),
-      contract.creOracle(),
+      contract.gameMaster(),
       contract.getCarmenStatus(BigInt(missionId || 0)),
     ])
 
@@ -291,7 +390,7 @@ export async function getCityNodeState(chainId, missionId) {
       configured: true,
       nodeChainId: Number(nodeChainId),
       owner,
-      creOracle,
+      gameMaster: gameMasterAddr,
       carmenPresent: Boolean(carmenPresent),
     }
   } catch (error) {
@@ -353,12 +452,21 @@ export async function getGameMasterDebugState(walletAddress) {
 
 /**
  * Register player with ECIES public key.
+ * Tries gasless relay first; falls back to direct contract call.
  * @param {string} publicKeyHex - 0x-prefixed uncompressed public key (130 hex chars)
  */
 export async function registerPlayer(publicKeyHex) {
+  bcWrite(`GameMaster.registerPlayer(pubKey=${publicKeyHex.slice(0, 14)}...)`)
+  // Try relay (gasless)
+  const relayed = await relayRegisterPlayer(publicKeyHex)
+  if (relayed) { bcResult(`registerPlayer relayed ✓ tx: ${relayed.txHash?.slice(0, 18)}`); return relayed }
+  // Fallback: direct contract call (user pays gas)
+  bcWrite("Relay unavailable → direct contract call (user pays gas)")
   const contract = await getContract()
   const tx = await contract.registerPlayer(publicKeyHex)
-  return tx.wait()
+  const receipt = await tx.wait()
+  bcResult(`registerPlayer confirmed ✓ tx: ${receipt.hash.slice(0, 18)}`)
+  return receipt
 }
 
 /**
@@ -367,9 +475,12 @@ export async function registerPlayer(publicKeyHex) {
  * @returns {boolean}
  */
 export async function isPlayerRegistered(address) {
+  bcRead(`GameMaster.getPlayerPublicKey(${address.slice(0, 10)}...)`)
   const contract = await getReadContract()
   const pubKey = await contract.getPlayerPublicKey(address)
-  return pubKey && pubKey.length > 2 // "0x" is empty
+  const registered = pubKey && pubKey.length > 2
+  bcResult(`isPlayerRegistered = ${registered}`)
+  return registered
 }
 
 /**
@@ -389,29 +500,54 @@ export async function getPlayerOnChainPublicKey(address) {
  * @returns {bigint}
  */
 export async function getPlayerActiveMission(address) {
+  bcRead(`GameMaster.getPlayerActiveMission(${address.slice(0, 10)}...)`)
   const contract = await getReadContract()
-  return contract.getPlayerActiveMission(address)
+  const missionId = await contract.getPlayerActiveMission(address)
+  bcResult(`Active mission = ${missionId.toString()}${missionId === 0n ? " (none)" : ""}`)
+  return missionId
 }
 
 // ============================================================
 //  Mission Functions
 // ============================================================
 
-/** Start a new mission (triggers VRF). */
+/**
+ * Start a new mission (triggers VRF).
+ * Tries gasless relay first; falls back to direct contract call.
+ */
 export async function startMission() {
+  bcWrite("GameMaster.startMission() → triggers Chainlink VRF v2.5 for random city selection")
+  bcVRF("VRF v2.5 will generate random seed → keccak256(chainId, salt) = targetHash")
+  // Try relay (gasless)
+  const relayed = await relayStartMission()
+  if (relayed) { bcResult(`startMission relayed ✓ tx: ${relayed.txHash?.slice(0, 18)}`); return relayed }
+  // Fallback: direct contract call
+  bcWrite("Relay unavailable → direct contract call")
   const contract = await getContract()
   const tx = await contract.startMission()
-  return tx.wait()
+  const receipt = await tx.wait()
+  bcResult(`startMission confirmed ✓ tx: ${receipt.hash.slice(0, 18)}`)
+  return receipt
 }
 
 /**
  * Submit investigation for a city.
+ * Tries gasless relay first; falls back to direct contract call.
  * @param {number|bigint} chainId - The city's chain ID (421614, 84532, or 51)
  */
 export async function submitInvestigation(chainId) {
+  bcWrite(`GameMaster.submitInvestigation(chainId=${chainId}) → CRE WASM workflow evaluates evidence`)
+  bcCRE(`CRE will process: analyze clues → resolve investigation → emit events`)
+  // Try relay (gasless)
+  const relayed = await relaySubmitInvestigation(chainId)
+  if (relayed) { bcResult(`submitInvestigation relayed ✓ tx: ${relayed.txHash?.slice(0, 18)}`); return relayed }
+  // Fallback: direct contract call
+  bcWrite("Relay unavailable → direct contract call")
   const contract = await getContract()
   const tx = await contract.submitInvestigation(chainId)
-  return tx.wait()
+  const receipt = await tx.wait()
+  bcResult(`submitInvestigation confirmed ✓ tx: ${receipt.hash.slice(0, 18)}`)
+  return receipt
 }
 
 /**
@@ -420,15 +556,18 @@ export async function submitInvestigation(chainId) {
  * @returns {{ player, startBlock, targetHash, cluesReceived, investigationsCount, status }}
  */
 export async function getMission(missionId) {
+  bcRead(`GameMaster.getMission(${missionId})`)
   const contract = await getReadContract()
   const m = await contract.getMission(missionId)
+  const statusMap = { 0: "None", 1: "Active", 2: "Completed", 3: "Failed" }
+  bcResult(`Mission #${missionId}: status=${statusMap[Number(m.status)]}, clues=${Number(m.cluesReceived)}, investigations=${Number(m.investigationsCount)}`)
   return {
     player: m.player,
     startBlock: m.startBlock,
     targetHash: m.targetHash,
     cluesReceived: Number(m.cluesReceived),
     investigationsCount: Number(m.investigationsCount),
-    status: Number(m.status), // 0=None, 1=Active, 2=Completed, 3=Failed
+    status: Number(m.status),
   }
 }
 
@@ -456,9 +595,12 @@ export async function getMissionClues(missionId) {
 
 /** Get valid city chain IDs. */
 export async function getValidCities() {
+  bcRead("GameMaster.getValidCities()")
   const contract = await getReadContract()
   const cities = await contract.getValidCities()
-  return cities.map((c) => Number(c))
+  const ids = cities.map((c) => Number(c))
+  bcResult(`Valid cities: [${ids.join(", ")}] (${ids.length} chains)`)
+  return ids
 }
 
 /**
@@ -536,6 +678,73 @@ export async function getMissionEvidenceCount(missionId) {
 export async function deriveCarmenWallet(salt) {
   const contract = await getReadContract()
   return contract.deriveCarmenWallet(salt)
+}
+
+// ============================================================
+//  Chainlink Data Feed — ETH/USD Price
+// ============================================================
+
+/** Chainlink AggregatorV3Interface ABI (latestRoundData only) */
+const AGGREGATOR_V3_ABI = [
+  "function latestRoundData() external view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)",
+  "function decimals() external view returns (uint8)",
+]
+
+/** ETH/USD Price Feed on Sepolia */
+const ETH_USD_PRICE_FEED_SEPOLIA = "0x694AA1769357215DE4FAC081bf1f309aDC325306"
+
+/**
+ * Read ETH/USD price directly from Chainlink Data Feed on Sepolia.
+ * Falls back gracefully if the feed is unavailable.
+ * @returns {{ price: number, decimals: number, formatted: string, multiplier: number }}
+ */
+export async function getETHPrice() {
+  try {
+    bcDF(`Chainlink ETH/USD Price Feed (${ETH_USD_PRICE_FEED_SEPOLIA.slice(0, 10)}...)`)
+    bcDF("AggregatorV3.latestRoundData() — reading on-chain oracle price")
+    const provider = await getReadProvider()
+    const priceFeed = new ethers.Contract(ETH_USD_PRICE_FEED_SEPOLIA, AGGREGATOR_V3_ABI, provider)
+    const [, answer] = await priceFeed.latestRoundData()
+    const dec = await priceFeed.decimals()
+    const priceUsd = Number(answer) / 10 ** Number(dec)
+
+    // Calculate reward multiplier (mirrors contract logic)
+    let multiplier = 1.0
+    if (priceUsd > 2500) {
+      const bonus = (priceUsd - 2500) / 100
+      multiplier = 1.0 + bonus / 100
+    }
+
+    bcDF(`ETH/USD = $${priceUsd.toFixed(2)} | decimals=${Number(dec)} | reward multiplier=${multiplier.toFixed(4)}x`)
+    return {
+      price: priceUsd,
+      decimals: Number(dec),
+      formatted: priceUsd.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }),
+      multiplier,
+    }
+  } catch (err) {
+    bcWarn(`Failed to fetch ETH price from Chainlink Data Feed: ${err.message}`)
+    return { price: 0, decimals: 8, formatted: "$0", multiplier: 1.0 }
+  }
+}
+
+/**
+ * Read market data from GameMaster contract (if price feed is configured on-chain).
+ * @returns {{ ethPrice: bigint, multiplier: number }}
+ */
+export async function getMarketData() {
+  try {
+    bcDF("GameMaster.getMarketData() — on-chain Data Feed integration")
+    const contract = await getReadContract()
+    const [ethPrice, multiplierBps] = await contract.getMarketData()
+    bcDF(`On-chain market: ETH=${ethPrice.toString()} | multiplier=${Number(multiplierBps)/10000}x`)
+    return {
+      ethPrice,
+      multiplier: Number(multiplierBps) / 10000,
+    }
+  } catch {
+    return { ethPrice: 0n, multiplier: 1.0 }
+  }
 }
 
 /**
@@ -688,11 +897,10 @@ export async function onPlayerRegistered(playerAddress, callback) {
     const contract = await getReadContract()
     if (!contract.filters?.PlayerRegistered) return () => {}
     const filter = contract.filters.PlayerRegistered(playerAddress)
-    const handler = (player, publicKey) => {
-      callback({ player, publicKey })
-    }
-    contract.on(filter, handler)
-    return () => contract.off(filter, handler)
+    return pollEvents(contract, filter, (ev) => {
+      const decoded = contract.interface.parseLog(ev)
+      if (decoded) callback({ player: decoded.args[0], publicKey: decoded.args[1] })
+    })
   } catch {
     return () => {}
   }
@@ -710,15 +918,14 @@ export async function onMissionStarted(missionId, callback) {
     const contract = await getReadContract()
     if (!contract.filters?.MissionStarted) return () => {}
     const filter = contract.filters.MissionStarted(missionId)
-    const handler = (mId, player, startBlock) => {
-      callback({
-        missionId: Number(mId),
-        player,
-        startBlock: Number(startBlock),
+    return pollEvents(contract, filter, (ev) => {
+      const decoded = contract.interface.parseLog(ev)
+      if (decoded) callback({
+        missionId: Number(decoded.args[0]),
+        player: decoded.args[1],
+        startBlock: Number(decoded.args[2]),
       })
-    }
-    contract.on(filter, handler)
-    return () => contract.off(filter, handler)
+    })
   } catch {
     return () => {}
   }
@@ -736,14 +943,13 @@ export async function onCarmenLocationCommitted(missionId, callback) {
     const contract = await getReadContract()
     if (!contract.filters?.CarmenLocationCommitted) return () => {}
     const filter = contract.filters.CarmenLocationCommitted(missionId)
-    const handler = (mId, targetHash) => {
-      callback({
-        missionId: Number(mId),
-        targetHash,
+    return pollEvents(contract, filter, (ev) => {
+      const decoded = contract.interface.parseLog(ev)
+      if (decoded) callback({
+        missionId: Number(decoded.args[0]),
+        targetHash: decoded.args[1],
       })
-    }
-    contract.on(filter, handler)
-    return () => contract.off(filter, handler)
+    })
   } catch {
     return () => {}
   }
@@ -761,14 +967,13 @@ export async function onTokenURISet(missionId, callback) {
     const contract = await getReadContract()
     if (!contract.filters?.TokenURISet) return () => {}
     const filter = contract.filters.TokenURISet(missionId)
-    const handler = (mId, tokenId) => {
-      callback({
-        missionId: Number(mId),
-        tokenId: Number(tokenId),
+    return pollEvents(contract, filter, (ev) => {
+      const decoded = contract.interface.parseLog(ev)
+      if (decoded) callback({
+        missionId: Number(decoded.args[0]),
+        tokenId: Number(decoded.args[1]),
       })
-    }
-    contract.on(filter, handler)
-    return () => contract.off(filter, handler)
+    })
   } catch {
     return () => {}
   }
@@ -784,16 +989,16 @@ export async function onClueResolvedOnCity(callback) {
   try {
     const contract = await getReadContract()
     if (!contract.filters?.ClueResolvedOnCity) return () => {}
-    const handler = (cityNode, requestId, clueType, clueDataHash) => {
-      callback({
-        cityNode,
-        requestId: Number(requestId),
-        clueType: Number(clueType),
-        clueDataHash,
+    const filter = contract.filters.ClueResolvedOnCity()
+    return pollEvents(contract, filter, (ev) => {
+      const decoded = contract.interface.parseLog(ev)
+      if (decoded) callback({
+        cityNode: decoded.args[0],
+        requestId: Number(decoded.args[1]),
+        clueType: Number(decoded.args[2]),
+        clueDataHash: decoded.args[3],
       })
-    }
-    contract.on("ClueResolvedOnCity", handler)
-    return () => contract.off("ClueResolvedOnCity", handler)
+    })
   } catch {
     return () => {}
   }
@@ -809,16 +1014,16 @@ export async function onDossierResolvedOnCity(callback) {
   try {
     const contract = await getReadContract()
     if (!contract.filters?.DossierResolvedOnCity) return () => {}
-    const handler = (cityNode, requestId, dossierHash, confidence) => {
-      callback({
-        cityNode,
-        requestId: Number(requestId),
-        dossierHash,
-        confidence: Number(confidence),
+    const filter = contract.filters.DossierResolvedOnCity()
+    return pollEvents(contract, filter, (ev) => {
+      const decoded = contract.interface.parseLog(ev)
+      if (decoded) callback({
+        cityNode: decoded.args[0],
+        requestId: Number(decoded.args[1]),
+        dossierHash: decoded.args[2],
+        confidence: Number(decoded.args[3]),
       })
-    }
-    contract.on("DossierResolvedOnCity", handler)
-    return () => contract.off("DossierResolvedOnCity", handler)
+    })
   } catch {
     return () => {}
   }
@@ -834,16 +1039,63 @@ export async function onCaptureResolvedOnCity(callback) {
   try {
     const contract = await getReadContract()
     if (!contract.filters?.CaptureResolvedOnCity) return () => {}
-    const handler = (cityNode, requestId, success, reasonCode) => {
-      callback({
-        cityNode,
-        requestId: Number(requestId),
-        success,
-        reasonCode: Number(reasonCode),
+    const filter = contract.filters.CaptureResolvedOnCity()
+    return pollEvents(contract, filter, (ev) => {
+      const decoded = contract.interface.parseLog(ev)
+      if (decoded) callback({
+        cityNode: decoded.args[0],
+        requestId: Number(decoded.args[1]),
+        success: decoded.args[2],
+        reasonCode: Number(decoded.args[3]),
       })
-    }
-    contract.on("CaptureResolvedOnCity", handler)
-    return () => contract.off("CaptureResolvedOnCity", handler)
+    })
+  } catch {
+    return () => {}
+  }
+}
+
+/**
+ * Listen for MissionNFTSet events.
+ * Emitted when the GameMaster's MissionNFT contract address is updated.
+ * @param {Function} callback - ({ missionNFT }) => void
+ * @returns {Function} unsubscribe function
+ */
+export async function onMissionNFTSet(callback) {
+  try {
+    const contract = await getReadContract()
+    if (!contract.filters?.MissionNFTSet) return () => {}
+    const filter = contract.filters.MissionNFTSet()
+    return pollEvents(contract, filter, (ev) => {
+      const decoded = contract.interface.parseLog(ev)
+      if (decoded) callback({
+        missionNFT: decoded.args[0],
+      })
+    })
+  } catch {
+    return () => {}
+  }
+}
+
+/**
+ * Listen for TxFlagged events on a CityNode.
+ * Emitted when a player flags a suspicious transaction reference.
+ * @param {number} chainId - The city's chain ID
+ * @param {string} playerAddress - Filter by player address
+ * @param {Function} callback - ({ player, refId }) => void
+ * @returns {Function} unsubscribe function
+ */
+export async function onTxFlagged(chainId, playerAddress, callback) {
+  try {
+    const contract = getCityNodeGameplayContract(chainId)
+    if (!contract || !contract.filters?.TxFlagged) return () => {}
+    const filter = contract.filters.TxFlagged(playerAddress)
+    return pollEvents(contract, filter, (ev) => {
+      const decoded = contract.interface.parseLog(ev)
+      if (decoded) callback({
+        player: decoded.args[0],
+        refId: decoded.args[1],
+      })
+    })
   } catch {
     return () => {}
   }
@@ -1020,9 +1272,10 @@ const CHAIN_PARAMS = {
 
 /**
  * Get read-only CityNode gameplay contract via JsonRpcProvider.
- * Returns null if address or rpc not configured.
+ * Returns null if address or rpc not configured, or if MOCK_MODE is enabled.
  */
 function getCityNodeGameplayContract(chainId) {
+  if (MOCK_MODE) return null
   const address = CITY_NODE_ADDRESSES[chainId]
   const rpcUrl = CITY_NODE_RPC_URLS[chainId]
   if (!address || !rpcUrl) return null
@@ -1092,8 +1345,10 @@ async function getCityNodeWriteContract(chainId) {
 
 /**
  * Check if a CityNode contract is configured (address + rpc).
+ * Returns false when MOCK_MODE is enabled, forcing all functions to use mock data.
  */
 function isCityNodeConfigured(chainId) {
+  if (MOCK_MODE) return false
   return Boolean(CITY_NODE_ADDRESSES[chainId] && CITY_NODE_RPC_URLS[chainId])
 }
 
@@ -1182,8 +1437,9 @@ const MOCK_LOCATIONS = Object.fromEntries(
  * Calls cityInfo() + getSuspicionIndex(); falls back to mock.
  */
 export async function getCityNodeInfo(chainId) {
+  bcCity(`CityNode[${chainId}].cityInfo() + getSuspicionIndex()`)
   const contract = getCityNodeGameplayContract(chainId)
-  if (!contract) return _mockCityInfo(chainId)
+  if (!contract) { bcWarn(`CityNode[${chainId}] not configured — using mock`); return _mockCityInfo(chainId) }
 
   try {
     const [info, suspicion] = await Promise.all([
@@ -1199,7 +1455,7 @@ export async function getCityNodeInfo(chainId) {
       suspicionReasonHash: suspicion.reasonHash || suspicion[1],
     }
   } catch (err) {
-    console.warn(`[cityNode] getCityNodeInfo real call failed for chain ${chainId}, using mock:`, err.message)
+    if (!MOCK_MODE) bcWarn(`CityNode[${chainId}] cityInfo failed: ${err.message} — using mock`)
     return _mockCityInfo(chainId)
   }
 }
@@ -1238,7 +1494,7 @@ export async function getCityNodeLocations(chainId) {
       scanned: false,
     }))
   } catch (err) {
-    console.warn(`[cityNode] getLocations real call failed for chain ${chainId}, using mock:`, err.message)
+    if (!MOCK_MODE) console.warn(`[cityNode] getLocations real call failed for chain ${chainId}, using mock:`, err.message)
     return (MOCK_LOCATIONS[chainId] || []).map((loc, i) => ({
       ...loc,
       categoryLabel: CATEGORY_MAP[loc.category] || `Category ${loc.category}`,
@@ -1279,7 +1535,7 @@ export async function getCityNodeAnomalyTxRefs(chainId) {
       }
     })
   } catch (err) {
-    console.warn(`[cityNode] getAnomalyTxRefs real call failed for chain ${chainId}, using mock:`, err.message)
+    if (!MOCK_MODE) console.warn(`[cityNode] getAnomalyTxRefs real call failed for chain ${chainId}, using mock:`, err.message)
     return _mockAnomalyTxRefs(chainId)
   }
 }
@@ -1453,7 +1709,7 @@ export async function getCityNodeSuspectWallets(chainId) {
       tags: decodeTags(s.tagsBitmap),
     }))
   } catch (err) {
-    console.warn(`[cityNode] getSuspectWallets real call failed for chain ${chainId}, using mock:`, err.message)
+    if (!MOCK_MODE) console.warn(`[cityNode] getSuspectWallets real call failed for chain ${chainId}, using mock:`, err.message)
     return _mockSuspectWallets()
   }
 }
@@ -1540,8 +1796,9 @@ export async function getCityNodeEvidenceSummary(chainId, player) {
  * Direct tx — completes in one transaction (no oracle callback).
  */
 export async function cityNodeInspectLocation(chainId, locationIdx) {
+  bcCity(`CityNode[${chainId}].inspectLocation(idx=${locationIdx})`)
   if (!isCityNodeConfigured(chainId)) {
-    console.log(`[cityNode] inspectLocation(${locationIdx}) on chain ${chainId} — MOCK`)
+    if (MOCK_MODE) bcWarn(`CityNode[${chainId}] not configured — MOCK inspectLocation`)
     await new Promise((r) => setTimeout(r, 1500))
     return {
       hash: `0x${Math.random().toString(16).slice(2, 14)}...mock`,
@@ -1550,6 +1807,11 @@ export async function cityNodeInspectLocation(chainId, locationIdx) {
     }
   }
 
+  // Try relay (gasless)
+  const relayed = await relayInspectService(chainId, locationIdx)
+  if (relayed) return { hash: relayed.txHash, blockNumber: relayed.blockNumber, noteHash: ethers.ZeroHash }
+
+  // Fallback: direct contract call
   const contract = await getCityNodeWriteContract(chainId)
   const tx = await contract.inspectLocation(locationIdx)
   const receipt = await tx.wait()
@@ -1578,8 +1840,9 @@ export async function cityNodeInspectLocation(chainId, locationIdx) {
  * Direct tx — completes in one transaction.
  */
 export async function cityNodeScanAnomalies(chainId, locationIdx) {
+  bcCity(`CityNode[${chainId}].scanAnomalies(idx=${locationIdx})`)
   if (!isCityNodeConfigured(chainId)) {
-    console.log(`[cityNode] scanAnomalies(${locationIdx}) on chain ${chainId} — MOCK`)
+    if (MOCK_MODE) bcWarn(`CityNode[${chainId}] not configured — MOCK scanAnomalies`)
     await new Promise((r) => setTimeout(r, 2000))
     return {
       hash: `0x${Math.random().toString(16).slice(2, 14)}...mock`,
@@ -1589,6 +1852,11 @@ export async function cityNodeScanAnomalies(chainId, locationIdx) {
     }
   }
 
+  // Try relay (gasless)
+  const relayed = await relayScanService(chainId, locationIdx)
+  if (relayed) return { hash: relayed.txHash, blockNumber: relayed.blockNumber, anomaliesFound: 0, suspectsFound: 0 }
+
+  // Fallback: direct contract call
   const contract = await getCityNodeWriteContract(chainId)
   const tx = await contract.scanAnomalies(locationIdx)
   const receipt = await tx.wait()
@@ -1617,10 +1885,18 @@ export async function cityNodeScanAnomalies(chainId, locationIdx) {
  * Async tx — sends request, then waits for GM resolve event (ClueUnlocked or DeadEnd).
  */
 export async function cityNodeRequestClue(chainId, locationIdx, clueIndex, isStartingClue = false) {
+  bcCity(`CityNode[${chainId}].requestClue(loc=${locationIdx}, clue=${clueIndex})${isStartingClue ? " [STARTING CLUE]" : ""}`)
+  bcCRE("CRE WASM workflow will process: clue request → analyze → resolve clue on-chain")
   if (!isCityNodeConfigured(chainId)) {
-    console.log(`[cityNode] requestClue(${locationIdx}, ${clueIndex}) on chain ${chainId} — MOCK${isStartingClue ? ' [STARTING CLUE]' : ''}`)
+    if (MOCK_MODE) bcWarn(`CityNode[${chainId}] not configured — MOCK requestClue`)
     await new Promise((r) => setTimeout(r, 2500))
     return _mockClueResult(chainId, locationIdx, clueIndex, null, null, isStartingClue)
+  }
+
+  // Try relay (gasless) — returns basic result without event polling
+  const relayed = await relayRequestClueService(chainId, locationIdx, clueIndex)
+  if (relayed) {
+    return _mockClueResult(chainId, locationIdx, clueIndex, relayed.txHash, relayed.blockNumber, isStartingClue)
   }
 
   // Try real contract call; fall back to mock if GM is unreachable
@@ -1645,55 +1921,55 @@ export async function cityNodeRequestClue(chainId, locationIdx, clueIndex, isSta
     const readContract = getCityNodeGameplayContract(chainId)
     const CLUE_TYPE_NAMES = ["BEHAVIOR_FINGERPRINT", "RELATIONSHIP", "IDENTITY_COMMIT", "FUNDING_TRAIL", "TECHNICAL_SIGNATURE", "DEAD_END"]
 
-    return await new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        cleanup()
-        console.warn(`[cityNode] GM resolve timeout — using mock clue for location ${locationIdx}, clue ${clueIndex}`)
-        resolve(_mockClueResult(chainId, locationIdx, clueIndex, receipt.hash, receipt.blockNumber))
-      }, 15_000)
+    // Poll for both ClueUnlocked and DeadEnd events
+    const clueFilter = readContract.filters.ClueUnlocked?.() || readContract.filters["ClueUnlocked"]?.()
+    const deadEndFilter = readContract.filters.DeadEnd?.() || readContract.filters["DeadEnd"]?.()
 
-      let clueUnsub, deadEndUnsub
-      const cleanup = () => {
-        clearTimeout(timeout)
-        if (clueUnsub) readContract.off("ClueUnlocked", clueUnsub)
-        if (deadEndUnsub) readContract.off("DeadEnd", deadEndUnsub)
-      }
-
-      clueUnsub = (player, idx, ci, clueType, clueDataHash, anomalyRefId) => {
-        if (Number(idx) !== locationIdx || Number(ci) !== clueIndex) return
-        cleanup()
-        resolve({
-          hash: receipt.hash,
-          blockNumber: receipt.blockNumber,
-          requestId,
-          resolved: true,
-          clueType: CLUE_TYPE_NAMES[Number(clueType)] || `Type ${clueType}`,
-          clueData: `Clue resolved: ${clueDataHash.slice(0, 14)}...`,
-          anomalyRefId: anomalyRefId,
-          strength: 50 + Math.floor(Math.random() * 40),
-        })
-      }
-
-      deadEndUnsub = (player, idx, consolationHintHash) => {
-        if (Number(idx) !== locationIdx) return
-        cleanup()
-        resolve({
-          hash: receipt.hash,
-          blockNumber: receipt.blockNumber,
-          requestId,
-          resolved: true,
-          clueType: "DEAD_END",
-          clueData: "Dead end — no actionable intel at this position.",
-          anomalyRefId: consolationHintHash,
-          strength: 10,
-        })
-      }
-
-      readContract.on("ClueUnlocked", clueUnsub)
-      readContract.on("DeadEnd", deadEndUnsub)
-    })
+    try {
+      const result = await Promise.race([
+        // Poll for ClueUnlocked
+        ...(clueFilter ? [pollOnce(readContract, clueFilter, (parsed) => {
+          if (parsed.name !== "ClueUnlocked") return null
+          if (Number(parsed.args[1]) !== locationIdx || Number(parsed.args[2]) !== clueIndex) return null
+          return {
+            hash: receipt.hash,
+            blockNumber: receipt.blockNumber,
+            requestId,
+            resolved: true,
+            clueType: CLUE_TYPE_NAMES[Number(parsed.args[3])] || `Type ${parsed.args[3]}`,
+            clueData: `Clue resolved: ${parsed.args[4].slice(0, 14)}...`,
+            anomalyRefId: parsed.args[5],
+            strength: 50 + Math.floor(Math.random() * 40),
+          }
+        }, 15000, 3000)] : []),
+        // Poll for DeadEnd
+        ...(deadEndFilter ? [pollOnce(readContract, deadEndFilter, (parsed) => {
+          if (parsed.name !== "DeadEnd") return null
+          if (Number(parsed.args[1]) !== locationIdx) return null
+          return {
+            hash: receipt.hash,
+            blockNumber: receipt.blockNumber,
+            requestId,
+            resolved: true,
+            clueType: "DEAD_END",
+            clueData: "Dead end — no actionable intel at this position.",
+            anomalyRefId: parsed.args[2],
+            strength: 10,
+          }
+        }, 15000, 3000)] : []),
+        // Timeout fallback
+        new Promise((resolve) => setTimeout(() => {
+          if (!MOCK_MODE) console.warn(`[cityNode] GM resolve timeout — using mock clue for location ${locationIdx}, clue ${clueIndex}`)
+          resolve(_mockClueResult(chainId, locationIdx, clueIndex, receipt.hash, receipt.blockNumber))
+        }, 16000)),
+      ])
+      return result
+    } catch {
+      if (!MOCK_MODE) console.warn(`[cityNode] pollOnce failed — using mock clue`)
+      return _mockClueResult(chainId, locationIdx, clueIndex, receipt.hash, receipt.blockNumber)
+    }
   } catch (err) {
-    console.warn(`[cityNode] requestClue real call failed for chain ${chainId}, using mock:`, err.message)
+    if (!MOCK_MODE) console.warn(`[cityNode] requestClue real call failed for chain ${chainId}, using mock:`, err.message)
     await new Promise((r) => setTimeout(r, 2000))
     return _mockClueResult(chainId, locationIdx, clueIndex)
   }
@@ -1705,7 +1981,7 @@ export async function cityNodeRequestClue(chainId, locationIdx, clueIndex, isSta
  */
 export async function cityNodeFlagTx(chainId, refId) {
   if (!isCityNodeConfigured(chainId)) {
-    console.log(`[cityNode] flagTx(${refId}) on chain ${chainId} — MOCK`)
+    if (MOCK_MODE) console.debug(`[cityNode] flagTx(${refId}) on chain ${chainId} — MOCK`)
     await new Promise((r) => setTimeout(r, 1000))
     return { hash: `0x${Math.random().toString(16).slice(2, 14)}...mock` }
   }
@@ -1716,6 +1992,11 @@ export async function cityNodeFlagTx(chainId, refId) {
     bytes32RefId = ethers.zeroPadValue(ethers.toBeHex(BigInt(refId)), 32)
   }
 
+  // Try relay (gasless)
+  const relayed = await relayFlagTxService(chainId, bytes32RefId)
+  if (relayed) return { hash: relayed.txHash }
+
+  // Fallback: direct contract call
   const contract = await getCityNodeWriteContract(chainId)
   const tx = await contract.flagTx(bytes32RefId)
   const receipt = await tx.wait()
@@ -1728,7 +2009,7 @@ export async function cityNodeFlagTx(chainId, refId) {
  */
 export async function cityNodeRequestDossier(chainId) {
   if (!isCityNodeConfigured(chainId)) {
-    console.log(`[cityNode] requestDossier() on chain ${chainId} — MOCK`)
+    if (MOCK_MODE) console.debug(`[cityNode] requestDossier() on chain ${chainId} — MOCK`)
     await new Promise((r) => setTimeout(r, 3000))
     return {
       hash: `0x${Math.random().toString(16).slice(2, 14)}...mock`,
@@ -1745,6 +2026,22 @@ export async function cityNodeRequestDossier(chainId) {
     }
   }
 
+  // Try relay (gasless)
+  const relayed = await relayRequestDossierService(chainId)
+  if (relayed) {
+    return {
+      hash: relayed.txHash,
+      requestId: 0,
+      resolved: true,
+      summary: "Dossier request relayed (gasless). Awaiting CRE resolution.",
+      hypotheses: [],
+      gaps: [],
+      nextObjective: "Wait for cross-chain resolve.",
+      confidence: 0,
+    }
+  }
+
+  // Fallback: direct contract call
   const contract = await getCityNodeWriteContract(chainId)
   const tx = await contract.requestDossier()
   const receipt = await tx.wait()
@@ -1761,38 +2058,26 @@ export async function cityNodeRequestDossier(chainId) {
     } catch { /* skip */ }
   }
 
-  // Wait for DossierResolved (timeout 60s)
+  // Wait for DossierResolved (timeout 60s) via polling
   const readContract = getCityNodeGameplayContract(chainId)
+  const dossierFilter = readContract.filters.DossierResolved?.() || readContract.filters["DossierResolved"]?.()
 
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      cleanup()
-      reject(new Error("GM dossier resolve timeout (60s)"))
-    }, 60_000)
+  if (!dossierFilter) throw new Error("DossierResolved filter not available")
 
-    let handler
-    const cleanup = () => {
-      clearTimeout(timeout)
-      if (handler) readContract.off("DossierResolved", handler)
+  return pollOnce(readContract, dossierFilter, (parsed) => {
+    if (parsed.name !== "DossierResolved") return null
+    if (Number(parsed.args[0]) !== requestId) return null
+    return {
+      hash: receipt.hash,
+      requestId,
+      resolved: true,
+      summary: `Dossier compiled: ${parsed.args[2].slice(0, 14)}...`,
+      hypotheses: ["Evidence pattern analysis complete."],
+      gaps: [],
+      nextObjective: `Next objective hint: ${parsed.args[4].slice(0, 14)}...`,
+      confidence: Number(parsed.args[3]),
     }
-
-    handler = (evtRequestId, player, dossierHash, confidence, nextObjectiveHintHash) => {
-      if (Number(evtRequestId) !== requestId) return
-      cleanup()
-      resolve({
-        hash: receipt.hash,
-        requestId,
-        resolved: true,
-        summary: `Dossier compiled: ${dossierHash.slice(0, 14)}...`,
-        hypotheses: ["Evidence pattern analysis complete."],
-        gaps: [],
-        nextObjective: `Next objective hint: ${nextObjectiveHintHash.slice(0, 14)}...`,
-        confidence: Number(confidence),
-      })
-    }
-
-    readContract.on("DossierResolved", handler)
-  })
+  }, 60000, 3000)
 }
 
 /**
@@ -1801,7 +2086,7 @@ export async function cityNodeRequestDossier(chainId) {
  */
 export async function cityNodeRequestCapture(chainId, suspectWallet, evidenceBundleHash) {
   if (!isCityNodeConfigured(chainId)) {
-    console.log(`[cityNode] requestCapture(${suspectWallet}) on chain ${chainId} — MOCK`)
+    if (MOCK_MODE) console.debug(`[cityNode] requestCapture(${suspectWallet}) on chain ${chainId} — MOCK`)
     await new Promise((r) => setTimeout(r, 3500))
     const success = Math.random() > 0.4
     const reasonCodes = ["INSUFFICIENT_EVIDENCE", "WALLET_MISMATCH", "WRONG_CITY"]
@@ -1818,6 +2103,21 @@ export async function cityNodeRequestCapture(chainId, suspectWallet, evidenceBun
   }
 
   const bundleHash = evidenceBundleHash || ethers.ZeroHash
+
+  // Try relay (gasless)
+  const relayed = await relayCaptureService(chainId, suspectWallet, bundleHash)
+  if (relayed) {
+    return {
+      hash: relayed.txHash,
+      requestId: 0,
+      resolved: false,
+      success: false,
+      reasonCode: "PENDING",
+      gmNote: "Capture request relayed (gasless). Awaiting CRE resolution.",
+    }
+  }
+
+  // Fallback: direct contract call
   const contract = await getCityNodeWriteContract(chainId)
   const tx = await contract.requestCapture(suspectWallet, bundleHash)
   const receipt = await tx.wait()
@@ -1834,39 +2134,28 @@ export async function cityNodeRequestCapture(chainId, suspectWallet, evidenceBun
     } catch { /* skip */ }
   }
 
-  // Wait for CaptureResolved (timeout 60s)
+  // Wait for CaptureResolved (timeout 60s) via polling
   const REASON_CODE_NAMES = ["OK", "INSUFFICIENT_EVIDENCE", "WALLET_MISMATCH", "WRONG_CITY", "EXPIRED_REQUEST", "INVALID_BUNDLE"]
   const readContract = getCityNodeGameplayContract(chainId)
+  const captureFilter = readContract.filters.CaptureResolved?.() || readContract.filters["CaptureResolved"]?.()
 
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      cleanup()
-      reject(new Error("GM capture resolve timeout (60s)"))
-    }, 60_000)
+  if (!captureFilter) throw new Error("CaptureResolved filter not available")
 
-    let handler
-    const cleanup = () => {
-      clearTimeout(timeout)
-      if (handler) readContract.off("CaptureResolved", handler)
+  return pollOnce(readContract, captureFilter, (parsed) => {
+    if (parsed.name !== "CaptureResolved") return null
+    if (Number(parsed.args[0]) !== requestId) return null
+    const success = Boolean(parsed.args[3])
+    return {
+      hash: receipt.hash,
+      requestId,
+      resolved: true,
+      success,
+      reasonCode: REASON_CODE_NAMES[Number(parsed.args[4])] || `Code ${parsed.args[4]}`,
+      gmNote: success
+        ? "Target confirmed! Carmen Sandiego apprehended."
+        : `Capture failed: ${parsed.args[5].slice(0, 14)}...`,
     }
-
-    handler = (evtRequestId, player, wallet, success, reasonCode, gmNoteHash) => {
-      if (Number(evtRequestId) !== requestId) return
-      cleanup()
-      resolve({
-        hash: receipt.hash,
-        requestId,
-        resolved: true,
-        success: Boolean(success),
-        reasonCode: REASON_CODE_NAMES[Number(reasonCode)] || `Code ${reasonCode}`,
-        gmNote: success
-          ? "Target confirmed! Carmen Sandiego apprehended."
-          : `Capture failed: ${gmNoteHash.slice(0, 14)}...`,
-      })
-    }
-
-    readContract.on("CaptureResolved", handler)
-  })
+  }, 60000, 3000)
 }
 
 // ── CityNode Event Listeners ──
@@ -1962,6 +2251,24 @@ export async function getPlayerGlobalProgress(playerAddress) {
   }
 }
 
+/** Get player identity commit hashes from GameMaster. */
+export async function getPlayerIdentityCommits(playerAddress) {
+  const contract = await getReadContract()
+  const commits = await contract.getPlayerIdentityCommits(playerAddress)
+  return commits.map((c) => c)
+}
+
+/**
+ * Get the number of clues a player has collected on a specific city.
+ * @param {string} playerAddress
+ * @param {string} cityNodeId - bytes32 city node identifier
+ * @returns {number}
+ */
+export async function getPlayerCityClueCount(playerAddress, cityNodeId) {
+  const contract = await getReadContract()
+  return Number(await contract.getPlayerCityClueCount(playerAddress, cityNodeId))
+}
+
 /** Get the number of MissionNFT trophies owned by a player. */
 export async function getMissionNFTBalance(playerAddress) {
   const nft = await getMissionNFTContract()
@@ -2045,4 +2352,63 @@ export async function getPlayerMissionTrophies(playerAddress) {
   }
 
   return trophies
+}
+
+// ============================================================
+//  Chainlink CCIP — Cross-Chain Messaging Status
+// ============================================================
+
+/**
+ * Get the CCIP cross-chain messaging status from GameMaster.
+ * Returns whether CCIP is configured, how many destination chains are registered,
+ * and the total number of cross-chain messages sent.
+ *
+ * CCIP Flow:
+ * - GameMaster (Sepolia) broadcasts Carmen's location via CCIP Router
+ * - Messages travel cross-chain through the Chainlink CCIP DON
+ * - CityNodes (Arbitrum Sepolia, Base Sepolia) receive and update state
+ *
+ * @returns {{ configured: boolean, destinationCount: number, totalMessages: number }}
+ */
+export async function getCCIPStatus() {
+  try {
+    bcCCIP("GameMaster.getCCIPStatus() — cross-chain messaging status")
+    const contract = await getReadContract()
+    const [configured, destinationCount, totalMessages] = await contract.getCCIPStatus()
+    bcCCIP(`CCIP: configured=${configured}, destinations=${Number(destinationCount)}, messages sent=${Number(totalMessages)}`)
+    return {
+      configured,
+      destinationCount: Number(destinationCount),
+      totalMessages: Number(totalMessages),
+    }
+  } catch (err) {
+    bcWarn(`CCIP status unavailable: ${err.message}`)
+    return { configured: false, destinationCount: 0, totalMessages: 0 }
+  }
+}
+
+/**
+ * Get the CCIP sync status from a specific CityNode.
+ * Returns the latest Carmen location hash received via CCIP and metadata.
+ *
+ * @param {number} cityChainId - The chain ID of the CityNode.
+ * @returns {{ locationHash: string, lastUpdate: number, sourceChain: string, messagesReceived: number }}
+ */
+export async function getCCIPSyncStatus(cityChainId) {
+  try {
+    bcCCIP(`CityNode[${cityChainId}].getCCIPSyncStatus() — received cross-chain messages`)
+    const contract = getCityNodeReadContract(cityChainId)
+    if (!contract) return null
+    const [locationHash, lastUpdate, sourceChain, messagesReceived] = await contract.getCCIPSyncStatus()
+    bcCCIP(`CityNode[${cityChainId}] sync: msgs=${Number(messagesReceived)}, lastUpdate=block ${Number(lastUpdate)}, source=${sourceChain}`)
+    return {
+      locationHash,
+      lastUpdate: Number(lastUpdate),
+      sourceChain: sourceChain.toString(),
+      messagesReceived: Number(messagesReceived),
+    }
+  } catch (err) {
+    bcWarn(`CCIP sync status unavailable for chain ${cityChainId}: ${err.message}`)
+    return null
+  }
 }

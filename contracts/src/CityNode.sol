@@ -2,6 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {ICityNode} from "./interfaces/ICityNode.sol";
+import {CCIPReceiver} from "./CCIPReceiver.sol";
+import {Client} from "./interfaces/ICCIPRouter.sol";
 
 /**
  * @title CityNode
@@ -10,8 +12,12 @@ import {ICityNode} from "./interfaces/ICityNode.sol";
  *         scan anomalies, request clues, flag transactions, request dossiers,
  *         and attempt captures. GameMaster resolves async requests via callbacks.
  *         Includes an energy system that regenerates over time.
+ *
+ *         Inherits CCIPReceiver to accept cross-chain messages from GameMaster
+ *         via Chainlink CCIP. When GameMaster broadcasts Carmen's location update,
+ *         this contract receives it and updates its internal state trustlessly.
  */
-contract CityNode is ICityNode {
+contract CityNode is ICityNode, CCIPReceiver {
     // ============================================================
     //                     CONSTANTS
     // ============================================================
@@ -97,6 +103,22 @@ contract CityNode is ICityNode {
     // --- Clue schema ---
     ClueType[] private clueTypes;
 
+    // --- Chainlink CCIP state ---
+    // Tracks Carmen's location as received cross-chain from GameMaster via CCIP.
+    // The CCIP Router on the destination chain calls ccipReceive(), which delegates
+    // to _ccipReceive() below, updating these fields trustlessly.
+    bytes32 public ccipCarmenLocationHash;                        // Latest location hash received via CCIP
+    uint256 public ccipLastUpdateTimestamp;                        // Timestamp of last CCIP update
+    uint64 public ccipLastSourceChain;                            // Source chain selector of last update
+    uint256 public ccipMessagesReceived;                           // Total CCIP messages received
+    mapping(uint64 => bool) public ccipAllowedSourceChains;       // Whitelisted source chain selectors
+    mapping(address => bool) public ccipAllowedSenders;           // Whitelisted sender addresses (GameMaster)
+
+    // --- CCIP Events ---
+    event CarmenLocationUpdatedViaCCIP(uint64 indexed sourceChain, bytes32 locationHash, uint256 timestamp);
+    event CCIPSourceChainAllowed(uint64 indexed chainSelector, bool allowed);
+    event CCIPSenderAllowed(address indexed sender, bool allowed);
+
     // ============================================================
     //                      MODIFIERS
     // ============================================================
@@ -121,13 +143,28 @@ contract CityNode is ICityNode {
     //                     CONSTRUCTOR
     // ============================================================
 
+    /**
+     * @param _cityName Human-readable city name.
+     * @param _countryCode ISO country code.
+     * @param _chainId The chain ID this CityNode is deployed on.
+     * @param _cityId Unique city identifier.
+     * @param _gameMaster GameMaster contract address (for GM-only callbacks).
+     * @param _ccipRouter CCIP Router address on this chain. Pass address(0) to disable CCIP.
+     *                    Router addresses:
+     *                    - Arbitrum Sepolia: 0x2a9C5afB0d0e4BAb2BCdaE109EC4b0c4Be15a165
+     *                    - Base Sepolia: 0xD3b06cEbF099CE7DA4AcCf578aaebFDBd6e88a93
+     */
     constructor(
         string memory _cityName,
         string memory _countryCode,
         uint256 _chainId,
         uint256 _cityId,
-        address _gameMaster
-    ) {
+        address _gameMaster,
+        address _ccipRouter
+    ) CCIPReceiver(_ccipRouter == address(0) ? address(1) : _ccipRouter) {
+        // NOTE: If _ccipRouter is address(0), we pass a placeholder (address(1))
+        // to satisfy CCIPReceiver's non-zero requirement. CCIP receive will be
+        // effectively disabled since no real router will call from address(1).
         cityName = _cityName;
         countryCode = _countryCode;
         chainId = _chainId;
@@ -549,6 +586,60 @@ contract CityNode is ICityNode {
     }
 
     // ============================================================
+    //           CHAINLINK CCIP -- CROSS-CHAIN RECEIVER
+    // ============================================================
+    //
+    // When GameMaster broadcasts Carmen's location update via CCIP:
+    // 1. CCIP DON relays the message from Sepolia to this chain
+    // 2. The CCIP Router on this chain calls ccipReceive() (from CCIPReceiver base)
+    // 3. ccipReceive() validates the Router and delegates to _ccipReceive() below
+    // 4. _ccipReceive() decodes the payload and updates Carmen's location hash
+    //
+    // This enables trustless cross-chain game state sync without any off-chain relay.
+    //
+
+    /**
+     * @notice Handle incoming CCIP messages from GameMaster.
+     *         Decodes the payload to extract Carmen's location hash and timestamp,
+     *         then updates this CityNode's internal state.
+     * @param message The decoded CCIP message from the source chain.
+     */
+    function _ccipReceive(Client.Any2EVMMessage calldata message) internal override {
+        // Validate source chain is allowed
+        require(ccipAllowedSourceChains[message.sourceChainSelector], "Source chain not allowed");
+
+        // Validate sender is allowed (decode sender address from bytes)
+        address sender = abi.decode(message.sender, (address));
+        require(ccipAllowedSenders[sender], "Sender not allowed");
+
+        // Decode the Carmen move payload
+        (bytes32 locationHash, uint256 timestamp) = abi.decode(message.data, (bytes32, uint256));
+
+        // Update internal state
+        ccipCarmenLocationHash = locationHash;
+        ccipLastUpdateTimestamp = timestamp;
+        ccipLastSourceChain = message.sourceChainSelector;
+        ccipMessagesReceived++;
+
+        emit CarmenLocationUpdatedViaCCIP(message.sourceChainSelector, locationHash, timestamp);
+    }
+
+    /**
+     * @notice Get the current CCIP sync status for this CityNode.
+     * @return locationHash The latest Carmen location hash received via CCIP.
+     * @return lastUpdate Timestamp of the last CCIP update.
+     * @return sourceChain The source chain selector of the last update.
+     * @return messagesReceived Total number of CCIP messages received.
+     */
+    function getCCIPSyncStatus()
+        external
+        view
+        returns (bytes32 locationHash, uint256 lastUpdate, uint64 sourceChain, uint256 messagesReceived)
+    {
+        return (ccipCarmenLocationHash, ccipLastUpdateTimestamp, ccipLastSourceChain, ccipMessagesReceived);
+    }
+
+    // ============================================================
     //                  SETUP / ADMIN FUNCTIONS
     // ============================================================
 
@@ -651,5 +742,27 @@ contract CityNode is ICityNode {
         energyInitialized[player] = false;
         playerEnergy[player] = 0;
         lastEnergyUpdate[player] = 0;
+    }
+
+    /**
+     * @notice Allow or disallow a source chain for CCIP messages.
+     *         Sepolia chain selector: 16015286601757825753
+     * @param chainSelector The CCIP chain selector to allow/disallow.
+     * @param allowed Whether to allow messages from this chain.
+     */
+    function setCCIPAllowedSourceChain(uint64 chainSelector, bool allowed) external onlyOwner {
+        ccipAllowedSourceChains[chainSelector] = allowed;
+        emit CCIPSourceChainAllowed(chainSelector, allowed);
+    }
+
+    /**
+     * @notice Allow or disallow a sender address for CCIP messages.
+     *         This should be set to the GameMaster contract address on Sepolia.
+     * @param sender The sender address to allow/disallow.
+     * @param allowed Whether to allow messages from this sender.
+     */
+    function setCCIPAllowedSender(address sender, bool allowed) external onlyOwner {
+        ccipAllowedSenders[sender] = allowed;
+        emit CCIPSenderAllowed(sender, allowed);
     }
 }
