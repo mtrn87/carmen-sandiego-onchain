@@ -73,23 +73,30 @@ export default function LoginPage() {
     return () => clearInterval(interval)
   }, [])
 
-  const { user, login, logout } = usePrivy()
+  const { user, login, logout, ready: privyReady, createWallet } = usePrivy()
   const { wallets } = useWallets()
 
+  // if user is authenticated but has no wallet yet, create one automatically
+  useEffect(() => {
+    if (user && privyReady && wallets?.length === 0) {
+      createWallet().catch((err) => {
+        console.warn('[LoginPage] createWallet failed:', err.message)
+      })
+    }
+  }, [user, privyReady, wallets, createWallet])
+
   const handleConnect = useCallback(async () => {
+    if (user) return // already authenticated, sync is in progress
     setConnecting(true)
     try {
       console.log('Connecting with Privy...')
-      
-      // Privy login opens the social auth modal
       await login()
-      
       setConnecting(false)
     } catch (error) {
       console.error('Connection failed:', error)
       setConnecting(false)
     }
-  }, [login])
+  }, [login, user])
 
   const handleDisconnect = useCallback(async () => {
     try {
@@ -270,7 +277,28 @@ export default function LoginPage() {
           {/* action buttons */}
           {showButtons && (
             <div className={styles.actions}>
-              {!isConnected ? (
+              {/* privy authenticated + wallet present but game store still syncing */}
+              {user && wallets?.length > 0 && !isConnected ? (
+                <div className={styles.walletSection}>
+                  <GlitchText
+                    text="[ AUTHENTICATING AGENT... ]"
+                    className={styles.walletLabel}
+                  />
+                  <NeonButton variant="cyan" loading={true}>
+                    Connecting...
+                  </NeonButton>
+                </div>
+              ) : user && wallets?.length === 0 ? (
+                <div className={styles.walletSection}>
+                  <GlitchText
+                    text="[ CREATING AGENT WALLET... ]"
+                    className={styles.walletLabel}
+                  />
+                  <NeonButton variant="cyan" loading={true}>
+                    Preparing...
+                  </NeonButton>
+                </div>
+              ) : !user ? (
                 <>
                   <div className={styles.walletSection}>
                     <GlitchText

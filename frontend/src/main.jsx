@@ -13,7 +13,7 @@ const privyConfig = {
     accentColor: '#00ffff',
   },
   embeddedWallets: {
-    createOnLogin: 'users-can-choose',
+    createOnLogin: 'all-users',
   },
   externalWallets: {
     solana: {
