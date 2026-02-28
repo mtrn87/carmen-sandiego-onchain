@@ -73,8 +73,17 @@ interface IGameMaster {
     event WalletFragmentReceived(uint256 indexed missionId, uint8 fragmentIndex, uint8 startIndex, uint8 length, bytes32 contentHash, string ipfsPointer);
     event WalletCaseBuilt(uint256 indexed missionId, address indexed player, address submittedWallet, bool valid);
 
+    // --- Chainlink Data Feed Events ---
+    event PriceFeedSet(address indexed priceFeed);
+    event RewardCalculatedWithMarketData(uint256 indexed missionId, uint256 baseReward, int256 ethPrice, uint256 finalReward);
+
     // --- CityNode Integration Events ---
     event ClueResolvedOnCity(address indexed cityNode, uint256 indexed requestId, uint8 clueType, bytes32 clueDataHash);
     event DossierResolvedOnCity(address indexed cityNode, uint256 indexed requestId, bytes32 dossierHash, uint8 confidence);
     event CaptureResolvedOnCity(address indexed cityNode, uint256 indexed requestId, bool success, uint8 reasonCode);
+
+    // --- Chainlink CCIP Events ---
+    event CCIPRouterSet(address indexed router);
+    event CCIPCityNodeReceiverSet(uint64 indexed chainSelector, address indexed receiver);
+    event CarmenMoveBroadcast(bytes32 indexed messageId, uint64 indexed destinationChain, bytes32 locationHash, uint256 timestamp);
 }

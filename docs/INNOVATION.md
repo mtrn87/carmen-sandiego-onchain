@@ -6,7 +6,7 @@ Why this project represents a breakthrough in blockchain gaming and demonstrates
 
 ## Executive Summary
 
-Carmen Sandiego On-Chain is the **first blockchain game where Chainlink Runtime Environment (CRE) acts as the Game Master**, orchestrating AI-generated content, randomness, and cross-chain state management. This demonstrates that CRE enables complex, decentralized gaming experiences previously impossible with traditional smart contracts alone.
+Carmen Sandiego On-Chain is the **first blockchain game powered by 6 Chainlink services** — CRE, VRF v2.5, Functions, Automation, Data Feeds, and CCIP — working together as a unified decentralized game engine. CRE acts as the Game Master, orchestrating AI-generated content, randomness, and cross-chain state management. This demonstrates that the Chainlink ecosystem enables complex, decentralized gaming experiences previously impossible with smart contracts alone.
 
 ---
 
@@ -14,15 +14,17 @@ Carmen Sandiego On-Chain is the **first blockchain game where Chainlink Runtime 
 
 ### Traditional Smart Contract Limitations
 
-| Capability | Smart Contracts | With CRE |
-|-----------|-----------------|----------|
-| **Call AI APIs** | ❌ Impossible | ✅ Native HTTP fetch |
-| **Generate Audio** | ❌ Impossible | ✅ ElevenLabs integration |
-| **Complex Workflows** | ❌ Requires oracle setup | ✅ Built-in orchestration |
-| **Cross-Chain Writes** | ❌ Requires bridge | ✅ Native via Keystone |
-| **Off-Chain Computation** | ❌ Not possible | ✅ Zero gas cost |
-| **Conditional Logic** | ❌ Limited | ✅ Full Turing-complete |
-| **External Data** | ❌ Requires oracle | ✅ Direct HTTP fetch |
+| Capability | Smart Contracts Only | With Chainlink (6 Services) |
+|-----------|---------------------|----------------------------|
+| **Call AI APIs** | Not possible | CRE: Native HTTP fetch |
+| **Provable Randomness** | Not possible | VRF v2.5: Cryptographic proofs |
+| **Complex Workflows** | Requires oracle setup | CRE: Built-in orchestration |
+| **Cross-Chain Writes** | Requires bridge | CCIP: Native cross-chain messaging |
+| **Off-Chain Computation** | Not possible | CRE: Zero gas cost |
+| **Price Data** | Requires oracle | Data Feeds: Battle-tested price oracles |
+| **Gasless UX** | Not possible | Functions: Paymaster relay |
+| **Scheduled Actions** | Not possible | Automation: CronCapability |
+| **External Data** | Requires oracle | CRE: Direct HTTP fetch |
 
 ### Why This Matters
 
@@ -47,7 +49,7 @@ Carmen Sandiego On-Chain is the **first blockchain game where Chainlink Runtime 
 We made **CRE the Game Master** — the central intelligence that:
 1. Listens to on-chain events
 2. Executes complex off-chain logic
-3. Calls external APIs (OpenAI, ElevenLabs, IPFS)
+3. Calls external APIs (OpenAI integration ready for CRE v2 async; ElevenLabs and IPFS: Planned)
 4. Writes results back to blockchain via Keystone
 
 ### Why It's Innovative
@@ -78,8 +80,8 @@ When a player submits an investigation:
 1. **On-chain:** `submitInvestigation(chainId)` recorded
 2. **VRF:** Randomness determines clue type
 3. **CRE:** Listens for event, calls OpenAI for clue text
-4. **ElevenLabs:** Generates audio narration
-5. **IPFS:** Stores encrypted clue
+4. **ElevenLabs:** Planned — audio narration (not yet implemented)
+5. **IPFS:** Planned — content storage (not yet implemented; clues delivered via on-chain ECIES-encrypted hex)
 6. **Keystone:** Signs and routes report
 7. **On-chain:** `receiveClue()` stores clue hash
 8. **Frontend:** Decrypts and displays clue
@@ -198,10 +200,11 @@ const decryptedClue = eciesDecrypt(privateKey, encryptedClue)
 
 We created a **multi-chain game** where:
 1. **Sepolia:** Central GameMaster (HQ)
-2. **Arbitrum:** CityNode for Tokyo
-3. **Base:** CityNode for Paris
-4. **VRF:** Determines Carmen's location
-5. **CRE:** Moves Carmen between chains
+2. **Arbitrum Sepolia:** CityNode for Tokyo
+3. **Base Sepolia:** CityNode for Paris
+4. **XDC Apothem:** CityNode for Sydney
+5. **VRF:** Determines Carmen's location
+6. **CRE:** Moves Carmen between chains
 
 ### Why It's Innovative
 
@@ -243,9 +246,9 @@ Player on Sepolia:
 ### What We Did
 
 We integrated **AI-generated content** that:
-1. **OpenAI:** Generates unique briefings and clues
-2. **ElevenLabs:** Generates audio narration
-3. **IPFS:** Stores content immutably
+1. **OpenAI:** Integration ready for CRE v2 async; currently uses enriched scenario templates
+2. **ElevenLabs:** Planned — audio narration (not yet implemented)
+3. **IPFS:** Planned — content storage (not yet implemented)
 4. **CRE:** Orchestrates everything
 
 ### Why It's Innovative
@@ -257,7 +260,7 @@ Developer writes clue → Stored in database → Same for all players
 
 **Our Approach:** Dynamic AI content
 ```
-Player starts mission → CRE calls OpenAI → Unique clue generated → Stored on IPFS
+Player starts mission → CRE selects from scenario pool → Unique clue selected → Delivered on-chain (AI via OpenAI planned for CRE v2)
 ```
 
 ### Benefits
@@ -265,7 +268,7 @@ Player starts mission → CRE calls OpenAI → Unique clue generated → Stored 
 1. **Replayability:** Every mission is unique
 2. **Personalization:** Content tailored to player progress
 3. **Scalability:** No need to write thousands of clues
-4. **Immersion:** Audio narration enhances experience
+4. **Immersion:** Audio narration planned (ElevenLabs integration not yet implemented)
 
 ### Example
 
@@ -324,7 +327,69 @@ Player → Sign Message → Relayer Validates → Relayer Pays Gas
 
 ---
 
-## Innovation #7: Commit-Reveal Pattern for Fairness
+## Innovation #7: Dynamic Rewards with Data Feeds
+
+### What We Did
+
+We integrated **Chainlink Data Feeds** to:
+1. Read real-time ETH/USD prices on-chain
+2. Adjust mission rewards based on current ETH value
+3. Ensure rewards maintain real-world purchasing power
+
+### Why It's Innovative
+
+**Traditional Approach:** Fixed token rewards
+```
+Complete mission → Get 100 tokens (always the same, regardless of market)
+```
+
+**Our Approach:** Market-aware dynamic rewards
+```
+Complete mission → Read ETH/USD price → Calculate reward → Meaningful value
+```
+
+### Benefits
+
+1. **Fair Value:** Rewards track real-world prices
+2. **Market Awareness:** Game economy responds to crypto markets
+3. **Sustainability:** Reward costs predictable in USD terms
+4. **Chainlink Native:** Uses battle-tested price oracle infrastructure
+
+---
+
+## Innovation #8: Cross-Chain Messaging with CCIP
+
+### What We Did
+
+We integrated **Chainlink CCIP** to:
+1. Send secure cross-chain messages when Carmen moves
+2. Notify CityNode contracts on destination chains
+3. Synchronize game state across 4 blockchains
+
+### Why It's Innovative
+
+**Traditional Approach:** Custom bridges or centralized relayers
+```
+Server detects move → API calls to each chain → Trust the server
+(Centralized, vulnerable, expensive)
+```
+
+**Our Approach:** Chainlink CCIP
+```
+GameMaster → CCIP message → CityNode on destination chain
+(Decentralized, secure, verified by Chainlink DON)
+```
+
+### Benefits
+
+1. **Security:** CCIP messages are verified by the Chainlink DON
+2. **Decentralization:** No custom bridge or centralized relay
+3. **Reliability:** Battle-tested cross-chain infrastructure
+4. **Composability:** Standard CCIP interface for future chain additions
+
+---
+
+## Innovation #9: Commit-Reveal Pattern for Fairness
 
 ### What We Did
 
@@ -374,7 +439,7 @@ We implemented **commit-reveal** to prevent:
 | Feature | Carmen | Traditional |
 |---------|--------|------------|
 | **AI Integration** | Native CRE | Not possible |
-| **Audio** | ElevenLabs | Not possible |
+| **Audio** | Planned (ElevenLabs) | Not possible |
 | **Gas Cost** | $5/game | $50+/game |
 | **Gameplay Complexity** | High | Limited |
 | **Cross-Chain** | Native | Requires bridge |
@@ -458,9 +523,9 @@ We implemented **commit-reveal** to prevent:
 
 ### For Chainlink Ecosystem
 - **First major CRE game** in production
-- **Demonstrates CRE + VRF + Keystone** integration
+- **Demonstrates 6 Chainlink services** working together: CRE + VRF + Functions + Automation + Data Feeds + CCIP
 - **Proves economics** of decentralized game master
-- **Opens new use cases** for CRE
+- **Opens new use cases** for CRE in gaming and beyond
 
 ### For Web3 Adoption
 - **Removes wallet friction** (Google OAuth)
@@ -491,7 +556,7 @@ We implemented **commit-reveal** to prevent:
 - ✅ Instant wallet creation
 - ✅ Gasless registration
 - ✅ Seamless multi-chain
-- ✅ Audio narration
+- Planned: Audio narration (ElevenLabs)
 
 ---
 

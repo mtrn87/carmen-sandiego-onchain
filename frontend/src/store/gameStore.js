@@ -23,6 +23,8 @@ import {
   onClueResolvedOnCity,
   onDossierResolvedOnCity,
   onCaptureResolvedOnCity,
+  onMissionNFTSet,
+  onTxFlagged,
   getMissionFragmentCount,
   getMissionEvidenceCount,
   CITY_MAP,
@@ -895,6 +897,49 @@ export const useGameStore = create((set, get) => ({
       })
       newUnsubs.push(unsubCaptureResolved)
 
+      // Listen for MissionNFTSet (admin configuration event)
+      const unsubMissionNFTSet = await onMissionNFTSet((event) => {
+        set((s) => ({
+          missionEvents: [...s.missionEvents, {
+            name: 'MissionNFTSet',
+            block: 'latest',
+            color: 'muted',
+            data: {
+              missionNFT: `${event.missionNFT.slice(0, 10)}...${event.missionNFT.slice(-4)}`,
+            },
+          }],
+          terminalLines: [
+            ...s.terminalLines,
+            { text: `> CONFIG: MissionNFT contract updated: ${event.missionNFT.slice(0, 10)}...`, color: 'muted', type: 'system' },
+          ],
+        }))
+      })
+      newUnsubs.push(unsubMissionNFTSet)
+
+      // Listen for TxFlagged on each active CityNode
+      const { walletAddress, currentCityId } = get()
+      if (walletAddress && currentCityId) {
+        const chainId = resolveChainId(currentCityId)
+        const unsubTxFlagged = await onTxFlagged(chainId, walletAddress, (event) => {
+          set((s) => ({
+            missionEvents: [...s.missionEvents, {
+              name: 'TxFlagged',
+              block: 'latest',
+              color: 'yellow',
+              data: {
+                player: `${event.player.slice(0, 8)}...${event.player.slice(-4)}`,
+                refId: `${event.refId.slice(0, 14)}...`,
+              },
+            }],
+            terminalLines: [
+              ...s.terminalLines,
+              { text: `> TX FLAGGED: Reference ${event.refId.slice(0, 14)}... marked as suspicious.`, color: 'yellow', type: 'alert' },
+            ],
+          }))
+        })
+        newUnsubs.push(unsubTxFlagged)
+      }
+
       set({ _unsubscribers: newUnsubs })
     } catch (error) {
       console.error('Event listener setup failed:', error)
@@ -1111,38 +1156,45 @@ export const useGameStore = create((set, get) => ({
         const receipt = await startMissionOnChain()
         console.log('[completeBriefing] startMission TX:', receipt.hash)
 
-        // Poll for VRF fulfillment (targetHash != 0)
+        // Get mission ID from on-chain state
         const { walletAddress: addr } = get()
         let activeMissionId = await getPlayerActiveMission(addr)
         mId = Number(activeMissionId)
         set({ missionId: mId })
 
-        // Wait up to 90s for VRF
+        // Quick VRF check (2 attempts / 6s max) — proceed regardless for demo/hackathon
         let mission = await getMission(mId)
         let vrfAttempts = 0
-        while (mission.targetHash === '0x' + '0'.repeat(64) && vrfAttempts < 18) {
+        while (mission.targetHash === '0x' + '0'.repeat(64) && vrfAttempts < 2) {
           vrfAttempts++
           set((s) => ({
             terminalLines: [
               ...s.terminalLines.filter(l => !l.text.includes('Waiting for VRF')),
-              { text: `> Waiting for VRF randomness... (${vrfAttempts * 5}s)`, color: 'yellow', type: 'system' },
+              { text: `> Waiting for VRF randomness... (${vrfAttempts * 3}s)`, color: 'yellow', type: 'system' },
             ],
           }))
-          await new Promise(r => setTimeout(r, 5000))
+          await new Promise(r => setTimeout(r, 3000))
           mission = await getMission(mId)
         }
 
         if (mission.targetHash === '0x' + '0'.repeat(64)) {
-          throw new Error('VRF timeout — refresh and try again')
+          console.warn('[completeBriefing] VRF not fulfilled yet — proceeding without it (demo mode)')
+          set((s) => ({
+            terminalLines: [
+              ...s.terminalLines.filter(l => !l.text.includes('Waiting for VRF')),
+              { text: '> VRF pending — proceeding in demo mode.', color: 'yellow', type: 'system' },
+            ],
+          }))
+        } else {
+          set((s) => ({
+            terminalLines: [
+              ...s.terminalLines,
+              { text: `> Mission #${mId} ready! VRF fulfilled.`, color: 'green', type: 'system' },
+            ],
+          }))
         }
 
         set({ missionData: mission })
-        set((s) => ({
-          terminalLines: [
-            ...s.terminalLines,
-            { text: `> Mission #${mId} ready! VRF fulfilled.`, color: 'green', type: 'system' },
-          ],
-        }))
       }
 
       // Initialize city discovery and load starting city

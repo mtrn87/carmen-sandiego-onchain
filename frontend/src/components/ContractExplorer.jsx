@@ -10,6 +10,7 @@ import {
   getCityNodeAnomalyTxRefs,
   getCityNodeSuspectWallets,
   getCityNodeEvidenceSummary,
+  getETHPrice,
 } from '../services/contractService'
 import { getLocationNarratives as getRegistryNarratives, getLocationImages as getRegistryImages } from '../data/cityRegistry'
 import styles from './ContractExplorer.module.css'
@@ -20,7 +21,7 @@ function getLocationNarrative(chainId, locationIdx) {
 }
 
 // Build detective-style narrative from anomaly txRefs data
-function buildAnomalyNarrative(anomalyData) {
+function buildAnomalyNarrative(anomalyData, ethPriceUsd = 0) {
   if (!anomalyData || !Array.isArray(anomalyData) || anomalyData.length === 0) {
     return {
       title: 'Anomaly Scan Results',
@@ -46,11 +47,16 @@ function buildAnomalyNarrative(anomalyData) {
   const threatLevel = count >= 5 ? 'HIGH' : count >= 2 ? 'MEDIUM' : 'LOW'
   const threatColor = count >= 5 ? 'red' : count >= 2 ? 'yellow' : 'green'
 
+  // USD conversion via Chainlink Data Feed
+  const usdStr = ethPriceUsd > 0
+    ? ` (${(totalValue * ethPriceUsd).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} via Chainlink ETH/USD)`
+    : ''
+
   const typeStr = types.map((t) => t.toLowerCase()).join(', ')
   const lines = [
     `Scanner detected ${count} anomalous transaction${count > 1 ? 's' : ''} across this node.`,
     `Anomaly types: ${typeStr}.`,
-    `${wallets.length} unique wallet${wallets.length > 1 ? 's' : ''} involved — total flagged volume: ${totalValue.toFixed(4)} units.`,
+    `${wallets.length} unique wallet${wallets.length > 1 ? 's' : ''} involved — total flagged volume: ${totalValue.toFixed(4)} ETH${usdStr}.`,
   ]
 
   if (count >= 3) {
@@ -109,6 +115,14 @@ export default function ContractExplorer({ onOpenMap }) {
   const [readResults, setReadResults] = useState({})
   const [readLoading, setReadLoading] = useState({})
   const [readViewMode, setReadViewMode] = useState({}) // 'analysis' (default) | 'raw'
+
+  // ETH/USD price for anomaly USD conversion (Chainlink Data Feed)
+  const [ethPriceUsd, setEthPriceUsd] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    getETHPrice().then((data) => { if (!cancelled) setEthPriceUsd(data.price || 0) })
+    return () => { cancelled = true }
+  }, [])
 
   // CityNode mode: active whenever a city is selected (legacy mode is disabled)
   const isCityNodeMode = Boolean(currentCityId)
@@ -694,7 +708,7 @@ export default function ContractExplorer({ onOpenMap }) {
                   const narrative = method.name === 'getLocationMeta'
                     ? getLocationNarrative(currentCityId, currentLocationIdx ?? 0)
                     : method.name === 'getAnomalyTxRefs'
-                      ? buildAnomalyNarrative(readResults[method.name])
+                      ? buildAnomalyNarrative(readResults[method.name], ethPriceUsd)
                       : null
                   const mode = readViewMode[method.name] || 'analysis'
                   const showAnalysis = narrative && mode === 'analysis' && !hasError

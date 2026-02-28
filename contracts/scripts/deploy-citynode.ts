@@ -23,12 +23,14 @@ async function main() {
   const gameMaster = process.env.GAMEMASTER_ADDRESS || deployer.address;
 
   const CityNode = await ethers.getContractFactory("CityNode");
+  const ccipRouter = process.env.CCIP_ROUTER_ADDRESS || ethers.ZeroAddress;
   const cityNode = await CityNode.deploy(
     cityConfig.name,
     cityConfig.countryCode,
     cityConfig.chainId,
     cityConfig.cityId,
-    gameMaster
+    gameMaster,
+    ccipRouter
   );
 
   await cityNode.waitForDeployment();

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useGameStore } from '../store/gameStore'
+import { getETHPrice } from '../services/contractService'
 import styles from './TerminalSidebar.module.css'
 
 const COLOR_MAP = {
@@ -57,9 +58,37 @@ export default function TerminalSidebar() {
     toggleCaptureMode,
     citySuspectWallets,
     currentCityId,
+    cityAnomalyTxRefs,
   } = useGameStore()
 
   const missionEnded = currentMission?.status === 'completed' || currentMission?.status === 'failed'
+
+  // ETH/USD price from Chainlink Data Feed
+  const [ethPriceData, setEthPriceData] = useState({ price: 0, formatted: '---', multiplier: 1.0 })
+
+  // Carmen's heist value in USD (Chainlink Data Feed x anomaly values)
+  const heistValueUsd = (() => {
+    if (!cityAnomalyTxRefs || cityAnomalyTxRefs.length === 0 || !ethPriceData.price) return null
+    const totalEth = cityAnomalyTxRefs.reduce((sum, tx) => sum + parseFloat(tx.valueDisplay || '0'), 0)
+    if (totalEth === 0) return null
+    const usd = totalEth * ethPriceData.price
+    return {
+      eth: totalEth,
+      usd,
+      formatted: usd.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }),
+    }
+  })()
+
+  useEffect(() => {
+    let cancelled = false
+    const fetchPrice = async () => {
+      const data = await getETHPrice()
+      if (!cancelled) setEthPriceData(data)
+    }
+    fetchPrice()
+    const interval = setInterval(fetchPrice, 60_000) // refresh every 60s
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [])
 
   // auto scroll terminal to bottom
   useEffect(() => {
@@ -213,6 +242,20 @@ export default function TerminalSidebar() {
           <span className={styles.agentLabel}>MISSION</span>
           <span className={styles.missionValue}>{currentMission?.title || '\u2014'}</span>
         </div>
+        <div className={styles.marketDataRow}>
+          <span className={styles.marketLabel}>ETH</span>
+          <span className={styles.ethPrice}>{ethPriceData.formatted}</span>
+          <span className={styles.marketDivider}>|</span>
+          <span className={styles.marketLabel}>BONUS</span>
+          <span className={styles.rewardMultiplier}>{ethPriceData.multiplier.toFixed(1)}x</span>
+        </div>
+        {heistValueUsd && (
+          <div className={styles.heistRow}>
+            <span className={styles.heistLabel}>HEIST</span>
+            <span className={styles.heistValue}>{heistValueUsd.formatted}</span>
+            <span className={styles.heistEth}>({heistValueUsd.eth.toFixed(4)} ETH)</span>
+          </div>
+        )}
       </div>
 
       {/* tabs */}

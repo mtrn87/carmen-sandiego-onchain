@@ -1,8 +1,37 @@
 # ==========================================================================
 # CRE PROJECT SETTINGS FILE
+# Carmen Sandiego On-Chain — Chainlink CRE / Keystone Configuration
 # ==========================================================================
-# Project-specific settings for CRE CLI targets.
-# Each target defines cre-cli, account, and rpcs groups.
+#
+# This file configures the Chainlink Runtime Environment (CRE) for all
+# 6 WASM workflows that power the "Carmen Sandiego On-Chain" game.
+#
+# CHAINLINK CRE OVERVIEW:
+#   CRE (formerly Keystone) is Chainlink's compute platform that compiles
+#   TypeScript workflows into WASM modules and deploys them to a
+#   Decentralized Oracle Network (DON). The DON executes workflows in
+#   response to on-chain events or cron schedules, reaches consensus on
+#   results, and delivers signed reports back to the blockchain.
+#
+#   This project uses CRE as a DECENTRALIZED GAME ENGINE — all game logic
+#   runs inside the DON with zero centralized server dependency.
+#
+# WORKFLOWS DEPLOYED:
+#   1. mission-start        — Core clue engine (LogTrigger: InvestigationSubmitted)
+#   2. generate-briefing    — Mission narrative generator (LogTrigger: MissionStarted)
+#   3. generate-finale      — Victory NFT minter (LogTrigger: CarmenCaptured)
+#   4. carmen-moves          — Carmen relocation (CronCapability: every 3 min)
+#   5. player-registration  — Gasless onboarding (LogTrigger: RegistrationRequested)
+#   6. player-check         — Player verification (LogTrigger: PlayerCheckRequested)
+#
+# RPC CONFIGURATION:
+#   Each workflow reads from and writes to Ethereum Sepolia, where the
+#   GameMaster, GameMasterProxy, PlayerRegistry, and MissionNFT contracts
+#   are deployed. The EVMClient uses these RPC endpoints for callContract()
+#   (reads) and writeReport() (writes via Keystone Forwarder).
+#
+# PROJECT-SPECIFIC SETTINGS:
+#   Each target defines cre-cli, account, and rpcs groups.
 #
 # Example custom target:
 # my-target:

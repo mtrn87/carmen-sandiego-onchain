@@ -3,10 +3,12 @@ pragma solidity ^0.8.24;
 
 import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {IGameMaster} from "./interfaces/IGameMaster.sol";
 import {IMissionNFT} from "./interfaces/IMissionNFT.sol";
 import {ICityNode} from "./interfaces/ICityNode.sol";
+import {Client, IRouterClient} from "./interfaces/ICCIPRouter.sol";
 
 /**
  * @title GameMaster
@@ -31,7 +33,8 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
     uint256 public constant MAX_BLOCKS = 200;          // Max blocks before mission fails (~40 min on Sepolia)
     uint256 public constant MAX_INVESTIGATIONS = 10;   // Max investigation attempts
     uint8 public constant EVIDENCE_THRESHOLD = 65;     // Clue strength > this = evidence
-    uint256[] public validChainIds;                     // Chain IDs representing cities
+    uint256[] public validChainIds;                     // Chain IDs representing cities (array for VRF indexing)
+    mapping(uint256 => bool) private _validChainIdMap;  // O(1) chain ID lookup
 
     // --- Game State ---
     uint256 public nextMissionId;
@@ -49,6 +52,7 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
     mapping(uint256 => WalletFragment[]) public missionWalletFragments; // missionId => fragments
     mapping(uint256 => uint8) public missionFragmentCount;              // missionId => fragment count
     mapping(uint256 => uint8) public missionEvidenceCount;              // missionId => evidence count
+    mapping(uint256 => uint256) private _fragmentCoverage;              // missionId => bitmap of revealed hex positions (bits 0-39)
 
     // --- Player Registry ---
     mapping(address => bytes) public playerPublicKeys;                  // player => ECIES public key
@@ -59,11 +63,23 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
     // --- NFT ---
     IMissionNFT public missionNFT;  // Trophy NFT contract (set after deployment)
 
+    // --- Chainlink Data Feed ---
+    AggregatorV3Interface public ethUsdPriceFeed;   // ETH/USD price feed
+
     // --- CityNode integration ---
     mapping(address => mapping(bytes32 => uint8)) public playerCityClueCount;  // player => cityNodeId => clue count
     mapping(address => bytes32[]) public playerIdentityCommits;                // player => identity commit hashes
     mapping(uint256 => address) public captureRequestCity;                     // capture requestId => CityNode address
     mapping(address => uint8) public playerCitiesVisited;                      // player => number of cities visited
+
+    // --- Chainlink CCIP (Cross-Chain Interoperability Protocol) ---
+    // CCIP enables cross-chain messaging between GameMaster (Sepolia) and CityNodes
+    // (Arbitrum Sepolia, Base Sepolia). When Carmen moves, GameMaster broadcasts
+    // the new location hash to all CityNodes via CCIP, ensuring trustless sync.
+    IRouterClient public ccipRouter;                                           // CCIP Router contract
+    mapping(uint64 => address) public ccipCityNodeReceivers;                   // CCIP chain selector => CityNode address
+    uint64[] public ccipDestinationSelectors;                                  // Tracked destination chain selectors
+    uint256 public ccipMessageCount;                                           // Total CCIP messages sent
 
     // ============================================================
     //                      MODIFIERS
@@ -97,6 +113,9 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         vrfSubscriptionId = _vrfSubscriptionId;
         vrfKeyHash = _vrfKeyHash;
         validChainIds = _validChainIds;
+        for (uint256 i = 0; i < _validChainIds.length; i++) {
+            _validChainIdMap[_validChainIds[i]] = true;
+        }
         creOracle = _creOracle;
         nextMissionId = 1; // Start at 1 so 0 means "no mission"
     }
@@ -421,6 +440,15 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         require(missions[missionId].status == MissionStatus.Active, "Mission not active");
         require(startIndex + length <= 40, "Fragment out of bounds");
 
+        // Build a bitmask for the new fragment's positions
+        uint256 newMask = ((uint256(1) << length) - 1) << startIndex;
+
+        // Check for overlap with already-revealed positions
+        require(_fragmentCoverage[missionId] & newMask == 0, "Fragment overlaps");
+
+        // Mark these positions as revealed
+        _fragmentCoverage[missionId] |= newMask;
+
         WalletFragment memory fragment = WalletFragment({
             startIndex: startIndex,
             length: length,
@@ -567,6 +595,135 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
     }
 
     // ============================================================
+    //              CHAINLINK CCIP -- CROSS-CHAIN MESSAGING
+    // ============================================================
+    //
+    // CCIP (Cross-Chain Interoperability Protocol) enables GameMaster on Sepolia
+    // to broadcast Carmen's movements to CityNode contracts on other chains
+    // (Arbitrum Sepolia, Base Sepolia). This creates a trustless cross-chain
+    // game state synchronization layer.
+    //
+    // Flow:
+    // 1. CRE oracle calls broadcastCarmenMove() when Carmen relocates
+    // 2. GameMaster builds a CCIP message with the location hash + timestamp
+    // 3. CCIP Router sends the message to destination chain(s)
+    // 4. CityNode on the destination chain receives via CCIPReceiver._ccipReceive()
+    // 5. CityNode updates its internal state with Carmen's new location hash
+    //
+
+    /**
+     * @notice Broadcast Carmen's move to a specific CityNode via CCIP.
+     *         Sends encoded location data cross-chain so destination CityNodes
+     *         can update their state trustlessly via the CCIP DON.
+     * @param destinationChainSelector CCIP chain selector for the target chain.
+     * @param locationHash The commit hash of Carmen's new location.
+     * @return messageId The CCIP message ID for tracking delivery.
+     */
+    function broadcastCarmenMove(
+        uint64 destinationChainSelector,
+        bytes32 locationHash
+    ) external onlyCRE returns (bytes32 messageId) {
+        require(address(ccipRouter) != address(0), "CCIP Router not set");
+        address receiver = ccipCityNodeReceivers[destinationChainSelector];
+        require(receiver != address(0), "No receiver for chain");
+
+        // Encode the Carmen move payload: locationHash + timestamp
+        // CityNode._ccipReceive() decodes this to update its state
+        bytes memory payload = abi.encode(locationHash, block.timestamp);
+
+        // Build the CCIP message
+        Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(receiver),
+            data: payload,
+            tokenAmounts: new Client.EVMTokenAmount[](0), // No token transfers, pure messaging
+            extraArgs: "",                                  // Default gas limit
+            feeToken: address(0)                            // Pay fees in native ETH
+        });
+
+        // Get the fee and send the message
+        uint256 fee = ccipRouter.getFee(destinationChainSelector, ccipMessage);
+        require(address(this).balance >= fee, "Insufficient ETH for CCIP fee");
+
+        messageId = ccipRouter.ccipSend{value: fee}(destinationChainSelector, ccipMessage);
+        ccipMessageCount++;
+
+        emit CarmenMoveBroadcast(messageId, destinationChainSelector, locationHash, block.timestamp);
+    }
+
+    /**
+     * @notice Broadcast Carmen's move to ALL registered CityNode chains.
+     *         Iterates over all destination selectors and sends a CCIP message to each.
+     * @param locationHash The commit hash of Carmen's new location.
+     */
+    function broadcastCarmenMoveToAll(bytes32 locationHash) external onlyCRE {
+        require(address(ccipRouter) != address(0), "CCIP Router not set");
+        require(ccipDestinationSelectors.length > 0, "No destinations registered");
+
+        bytes memory payload = abi.encode(locationHash, block.timestamp);
+
+        for (uint256 i = 0; i < ccipDestinationSelectors.length; i++) {
+            uint64 selector = ccipDestinationSelectors[i];
+            address receiver = ccipCityNodeReceivers[selector];
+            if (receiver == address(0)) continue;
+
+            Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
+                receiver: abi.encode(receiver),
+                data: payload,
+                tokenAmounts: new Client.EVMTokenAmount[](0),
+                extraArgs: "",
+                feeToken: address(0)
+            });
+
+            uint256 fee = ccipRouter.getFee(selector, ccipMessage);
+            if (address(this).balance < fee) continue; // Skip if insufficient funds
+
+            bytes32 messageId = ccipRouter.ccipSend{value: fee}(selector, ccipMessage);
+            ccipMessageCount++;
+
+            emit CarmenMoveBroadcast(messageId, selector, locationHash, block.timestamp);
+        }
+    }
+
+    /**
+     * @notice Get the fee estimate for broadcasting Carmen's move to a chain.
+     * @param destinationChainSelector CCIP chain selector for the target chain.
+     * @param locationHash The location hash to send.
+     * @return fee The estimated fee in native ETH.
+     */
+    function getCCIPFee(
+        uint64 destinationChainSelector,
+        bytes32 locationHash
+    ) external view returns (uint256 fee) {
+        require(address(ccipRouter) != address(0), "CCIP Router not set");
+        address receiver = ccipCityNodeReceivers[destinationChainSelector];
+        require(receiver != address(0), "No receiver for chain");
+
+        bytes memory payload = abi.encode(locationHash, block.timestamp);
+
+        Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(receiver),
+            data: payload,
+            tokenAmounts: new Client.EVMTokenAmount[](0),
+            extraArgs: "",
+            feeToken: address(0)
+        });
+
+        return ccipRouter.getFee(destinationChainSelector, ccipMessage);
+    }
+
+    /**
+     * @notice Check whether CCIP cross-chain messaging is configured.
+     * @return configured True if CCIP Router is set and at least one destination exists.
+     * @return destinationCount Number of registered destination chains.
+     * @return totalMessages Total CCIP messages sent.
+     */
+    function getCCIPStatus() external view returns (bool configured, uint256 destinationCount, uint256 totalMessages) {
+        configured = address(ccipRouter) != address(0) && ccipDestinationSelectors.length > 0;
+        destinationCount = ccipDestinationSelectors.length;
+        totalMessages = ccipMessageCount;
+    }
+
+    // ============================================================
     //                   ADMIN FUNCTIONS
     // ============================================================
 
@@ -588,9 +745,55 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         emit MissionNFTSet(_missionNFT);
     }
 
+    function setEthUsdPriceFeed(address _priceFeed) external onlyOwner {
+        require(_priceFeed != address(0), "Invalid address");
+        ethUsdPriceFeed = AggregatorV3Interface(_priceFeed);
+        emit PriceFeedSet(_priceFeed);
+    }
+
+    /**
+     * @notice Set the CCIP Router address.
+     *         Sepolia Router: 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59
+     * @param _router The CCIP Router contract address.
+     */
+    function setCCIPRouter(address _router) external onlyOwner {
+        require(_router != address(0), "Invalid address");
+        ccipRouter = IRouterClient(_router);
+        emit CCIPRouterSet(_router);
+    }
+
+    /**
+     * @notice Register a CityNode as a CCIP receiver on a destination chain.
+     *         Chain selectors (CCIP-specific, not chain IDs):
+     *         - Sepolia: 16015286601757825753
+     *         - Arbitrum Sepolia: 3478487238524512106
+     *         - Base Sepolia: 10344971235874465080
+     * @param chainSelector The CCIP chain selector for the destination.
+     * @param receiver The CityNode contract address on the destination chain.
+     */
+    function setCCIPCityNodeReceiver(uint64 chainSelector, address receiver) external onlyOwner {
+        require(receiver != address(0), "Invalid address");
+
+        // Track new selectors
+        if (ccipCityNodeReceivers[chainSelector] == address(0)) {
+            ccipDestinationSelectors.push(chainSelector);
+        }
+
+        ccipCityNodeReceivers[chainSelector] = receiver;
+        emit CCIPCityNodeReceiverSet(chainSelector, receiver);
+    }
+
     function setValidChainIds(uint256[] calldata _chainIds) external onlyOwner {
         require(_chainIds.length >= 2, "Need at least 2 cities");
+        // Clear old mapping entries
+        for (uint256 i = 0; i < validChainIds.length; i++) {
+            _validChainIdMap[validChainIds[i]] = false;
+        }
         validChainIds = _chainIds;
+        // Populate new mapping entries
+        for (uint256 i = 0; i < _chainIds.length; i++) {
+            _validChainIdMap[_chainIds[i]] = true;
+        }
     }
 
     /**
@@ -633,7 +836,13 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         mission.status = MissionStatus.Completed;
 
         uint256 blocksUsed = block.number - mission.startBlock;
-        uint256 reward = _calculateReward(blocksUsed);
+        uint256 baseReward = _calculateReward(blocksUsed);
+
+        // Apply market bonus from Chainlink Data Feed
+        int256 ethPrice = _getETHPrice();
+        uint256 reward = _applyMarketBonus(baseReward, ethPrice);
+
+        emit RewardCalculatedWithMarketData(missionId, baseReward, ethPrice, reward);
 
         activePlayerMission[mission.player] = 0;
         _removeActiveMission(missionId);
@@ -675,10 +884,75 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         return 0;                           // Failed
     }
 
-    function _isValidChainId(uint256 chainId) internal view returns (bool) {
-        for (uint256 i = 0; i < validChainIds.length; i++) {
-            if (validChainIds[i] == chainId) return true;
+    /**
+     * @notice Fetch the latest ETH/USD price from Chainlink Data Feed.
+     *         Returns 0 if the price feed is not set (graceful fallback).
+     * @return price ETH price in USD (8 decimals from Chainlink).
+     */
+    function _getETHPrice() internal view returns (int256) {
+        if (address(ethUsdPriceFeed) == address(0)) return 0;
+        try ethUsdPriceFeed.latestRoundData() returns (
+            uint80, int256 answer, uint256, uint256, uint80
+        ) {
+            return answer;
+        } catch {
+            return 0;
         }
-        return false;
+    }
+
+    /**
+     * @notice Apply a market bonus based on ETH price.
+     *         If ETH > $2500, bonus = (price - 2500) / 100.
+     *         This creates a dynamic reward that scales with market conditions.
+     * @param baseReward The base reward from _calculateReward.
+     * @param ethPrice ETH price in 8 decimals (e.g. 300000000000 = $3000).
+     * @return finalReward The base reward plus any market bonus.
+     */
+    function _applyMarketBonus(uint256 baseReward, int256 ethPrice) internal pure returns (uint256) {
+        if (baseReward == 0 || ethPrice <= 0) return baseReward;
+
+        // Convert from 8 decimals to whole dollars
+        uint256 priceUsd = uint256(ethPrice) / 1e8;
+
+        if (priceUsd > 2500) {
+            uint256 bonus = (priceUsd - 2500) / 100;
+            return baseReward + bonus;
+        }
+
+        return baseReward;
+    }
+
+    /**
+     * @notice Public view to get the current ETH price and reward multiplier.
+     *         Used by the frontend to display market data.
+     * @return ethPrice The current ETH/USD price (8 decimals).
+     * @return multiplier The reward multiplier as basis points (10000 = 1.0x).
+     */
+    function getMarketData() external view returns (int256 ethPrice, uint256 multiplier) {
+        ethPrice = _getETHPrice();
+        if (ethPrice <= 0) return (0, 10000);
+        uint256 priceUsd = uint256(ethPrice) / 1e8;
+        if (priceUsd > 2500) {
+            uint256 bonusBps = ((priceUsd - 2500) * 10000) / (100 * 100);
+            return (ethPrice, 10000 + bonusBps);
+        }
+        return (ethPrice, 10000);
+    }
+
+    function _isValidChainId(uint256 chainId) internal view returns (bool) {
+        return _validChainIdMap[chainId];
+    }
+
+    /// @notice Accept ETH deposits to fund CCIP message fees.
+    receive() external payable {}
+
+    /// @notice Withdraw ETH from the contract (for recovering CCIP fee funds).
+    /// @param to The address to send the ETH to.
+    /// @param amount The amount of ETH (in wei) to withdraw.
+    function withdrawETH(address payable to, uint256 amount) external onlyOwner {
+        require(to != address(0), "Invalid recipient");
+        require(amount <= address(this).balance, "Insufficient balance");
+        (bool sent, ) = to.call{value: amount}("");
+        require(sent, "ETH transfer failed");
     }
 }

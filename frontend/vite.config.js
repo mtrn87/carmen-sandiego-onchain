@@ -8,6 +8,11 @@ export default defineConfig({
     global: 'globalThis',
     'process.env': '{}',
   },
+  resolve: {
+    alias: {
+      util: 'util/',
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',

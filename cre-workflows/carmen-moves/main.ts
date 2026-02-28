@@ -1,6 +1,7 @@
 /**
  * ================================================================
  *  CRE Workflow: carmen-moves
+ *  CHAINLINK SERVICE: CRE / Keystone + Automation (CronCapability)
  * ================================================================
  *
  *  PURPOSE:
@@ -9,24 +10,56 @@
  *    for the player — if they take too long investigating, Carmen
  *    relocates and previous clues become less useful.
  *
+ *  CHAINLINK CRE INTEGRATION:
+ *    This workflow combines TWO Chainlink services:
+ *
+ *    1. CRE/Keystone: Compiles this TypeScript to WASM and runs it
+ *       inside the Chainlink DON (Decentralized Oracle Network).
+ *       The DON reaches consensus on Carmen's new position and signs
+ *       the result with a threshold ECDSA signature.
+ *
+ *    2. Automation / CronCapability: Triggers this workflow every 3
+ *       minutes WITHOUT any external cron job, centralized scheduler,
+ *       or server. The Chainlink DON itself manages the schedule.
+ *       This is equivalent to Chainlink Automation's time-based
+ *       upkeep, but executed natively within CRE.
+ *
+ *    WHY DECENTRALIZED:
+ *    - Carmen's movement is NOT controlled by a game server. The DON
+ *      autonomously executes this workflow on schedule.
+ *    - The new position is deterministic (derived from the current
+ *      targetHash as entropy), so all DON nodes agree on the result.
+ *    - The GameMasterProxy only accepts signed reports from the
+ *      authorized CRE workflow — no one can fake Carmen's movement.
+ *    - If the game developer's infrastructure goes offline, Carmen
+ *      STILL moves. The DON operates independently.
+ *
+ *  DATA FLOW:
+ *    1. CronCapability fires every 3 minutes (schedule: "0 * /3 * * * *")
+ *    2. DON nodes execute this WASM workflow:
+ *       a. Read getActiveMissionIds() — single call, O(n) efficiency
+ *       b. Read getValidCities() once (shared across all missions)
+ *       c. For each active mission:
+ *          - Read mission state (targetHash) and salt
+ *          - Skip if VRF salt is zero (pending fulfillment)
+ *          - Brute-force current city from targetHash
+ *          - Pick new city deterministically (targetHash as entropy)
+ *          - Compute newTargetHash = keccak256(newCity, salt)
+ *          - Send ACTION_UPDATE_TARGET via signed Keystone report
+ *    3. GameMasterProxy verifies signature and calls updateTarget()
+ *    4. GameMaster updates the commit-reveal hash on-chain
+ *
+ *  CHAINLINK SERVICES USED:
+ *    - CRE/Keystone: WASM execution, consensus, signed reports
+ *    - CronCapability: Decentralized scheduling (Chainlink Automation)
+ *    - EVMClient: Reads active missions and cities from Sepolia
+ *    - writeReport: On-chain writes via Keystone Forwarder
+ *
  *  MULTI-MISSION SUPPORT:
  *    Calls getActiveMissionIds() on-chain to get only currently active
  *    mission IDs in a single read. This allows multiple players to have
  *    concurrent missions with independent Carmen movement — no hardcoded
  *    mission IDs, no wasted reads on completed/failed missions.
- *
- *  HOW IT WORKS:
- *    1. CronCapability triggers this handler every 3 minutes
- *    2. Read getActiveMissionIds() — returns only active mission IDs
- *    3. Read getValidCities once (shared across all missions)
- *    4. For each active mission ID:
- *       a. Read getMission — get targetHash
- *       b. Read getMissionSalt — skip if zero (VRF pending)
- *       c. Brute-force targetHash to find Carmen's current city
- *       d. Pick a new city (different from current) deterministically
- *       e. Compute newTargetHash = keccak256(newCity, salt)
- *       f. Send ACTION_UPDATE_TARGET via proxy → GameMaster.updateTarget()
- *    5. Log summary of moves executed
  *
  *  CONFIG:
  *    - chainSelectorName: "ethereum-testnet-sepolia"

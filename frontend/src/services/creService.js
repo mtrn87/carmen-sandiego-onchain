@@ -1,6 +1,27 @@
 import { ethers } from "ethers";
 import { getReadProvider, getSigner } from "./contractService";
 
+// ============================================================
+//  Visual Logging for Video Demo — CRE/Keystone Layer
+// ============================================================
+
+const _clog = (tag, color, ...args) => {
+  const ts = new Date().toISOString().slice(11, 23)
+  console.log(
+    `%c[${ts}] %c${tag}`,
+    "color:#888;font-weight:bold",
+    `color:${color};font-weight:bold;font-size:11px`,
+    ...args
+  )
+}
+const creFlow  = (...a) => _clog("CRE    ⚙️  WORKFLOW   ", "#d35400", ...a)
+const creRead  = (...a) => _clog("CRE    📖 REGISTRY   ", "#3498db", ...a)
+const creSign  = (...a) => _clog("CRE    🔑 EIP-2771   ", "#9b59b6", ...a)
+const creRelay = (...a) => _clog("CRE    → RELAY      ", "#e67e22", ...a)
+const creEvent = (...a) => _clog("CRE    ⚡ EVENT      ", "#f39c12", ...a)
+const creOK    = (...a) => _clog("CRE    ✅ RESULT     ", "#27ae60", ...a)
+const creWarn  = (...a) => _clog("CRE    ⚠️  WARN      ", "#e74c3c", ...a)
+
 const PLAYER_REGISTRY_ABI = [
   // View functions (simple reads, no CRE needed)
   "function getPlayer(address player) external view returns (tuple(address wallet, string nickname, uint256 rank, uint256 missionsCompleted, uint256 missionsAttempted, uint256 totalReward, uint256 totalCluesCollected, uint256 totalInvestigations, uint256 registeredAt, bool isActive))",
@@ -39,7 +60,7 @@ export async function initializePlayerRegistry(address) {
     provider
   );
 
-  console.log("[creService] PlayerRegistry initialized:", address);
+  creRead(`PlayerRegistry initialized: ${address}`);
 }
 
 /**
@@ -72,7 +93,9 @@ async function getPlayerRegistryReadContract() {
   }
 
   // Use read-only provider (no wallet needed)
-  const rpcUrl = "https://eth-sepolia.g.alchemy.com/v2/cZgx1scPSDR68tWHfflr7";
+  const rpcUrl = import.meta.env.VITE_ALCHEMY_RPC_URL_SEPOLIA
+    || import.meta.env.VITE_SEPOLIA_RPC_URL
+    || "https://rpc.ankr.com/eth_sepolia";
   const provider = new ethers.JsonRpcProvider(rpcUrl);
   return new ethers.Contract(_playerRegistryAddress, PLAYER_REGISTRY_ABI, provider);
 }
@@ -87,24 +110,19 @@ async function getPlayerRegistryReadContract() {
  */
 export async function getPlayerData(address) {
   try {
+    creRead(`PlayerRegistry.getPlayer(${address.slice(0, 10)}...)`);
     const contract = await getPlayerRegistryReadContract();
-    console.log("[creService] Reading player data for:", address);
     const player = await contract.getPlayer(address);
-    
-    console.log("[creService] Raw player data:", player);
-    console.log("[creService] Player wallet field:", player.wallet);
-    console.log("[creService] ZeroAddress:", ethers.ZeroAddress);
-    
-    // Check if player exists (wallet != 0x0)
+
     if (player.wallet === ethers.ZeroAddress) {
-      console.log("[creService] Player does not exist (wallet is zero address)");
+      creRead(`Player ${address.slice(0, 10)}... NOT registered (wallet=0x0)`);
       return null;
     }
-    
-    console.log("[creService] Player exists:", player);
+
+    creOK(`Player found: nickname="${player.nickname}", rank=${player.rank}, missions=${player.missionsCompleted}`);
     return player;
   } catch (error) {
-    console.error("[creService] Error reading player data:", error);
+    creWarn(`Error reading player data: ${error.message}`);
     throw error;
   }
 }
@@ -114,13 +132,13 @@ export async function getPlayerData(address) {
  */
 export async function isNicknameAvailable(nickname) {
   try {
+    creRead(`PlayerRegistry.isNicknameAvailable("${nickname}")`);
     const contract = await getPlayerRegistryReadContract();
-    console.log("[creService] Checking nickname availability:", nickname);
     const available = await contract.isNicknameAvailable(nickname);
-    console.log("[creService] Nickname available:", available);
+    creOK(`Nickname "${nickname}" available = ${available}`);
     return available;
   } catch (error) {
-    console.error("[creService] Error checking nickname:", error);
+    creWarn(`Error checking nickname: ${error.message}`);
     throw error;
   }
 }
@@ -138,71 +156,58 @@ export async function isNicknameAvailable(nickname) {
  * @param {string} nickname - Player's nickname
  */
 export async function signRegistrationMessage(user, privySignMessage, playerAddress, nickname) {
-  if (!user || !privySignMessage || typeof privySignMessage !== 'function') {
-    throw new Error("Privy user or signMessage function not available");
+  creSign("EIP-2771 Registration Signing Flow");
+  if (!user) {
+    throw new Error("Privy user not available");
   }
 
-  // Detect which wallet to use
   let actualPlayerAddress = playerAddress;
-  let signatureMethod = 'privy'; // default to privy
+  let signatureMethod = 'privy';
 
-  // Check if user has a linked wallet (MetaMask or other external wallet)
-  if (user.linkedAccounts && user.linkedAccounts.length > 0) {
-    const externalWallet = user.linkedAccounts.find(acc => acc.type === 'wallet');
-    if (externalWallet && externalWallet.address) {
-      // User has external wallet (MetaMask), use it
-      actualPlayerAddress = externalWallet.address;
+  // Strategy: try window.ethereum (MetaMask/injected) FIRST, fall back to Privy embedded
+  if (window.ethereum) {
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      actualPlayerAddress = await signer.getAddress();
       signatureMethod = 'metamask';
-      console.log("[creService] Using MetaMask wallet address:", actualPlayerAddress);
+      creSign(`Detected MetaMask/injected wallet: ${actualPlayerAddress.slice(0, 10)}...`);
+    } catch (e) {
+      creSign(`window.ethereum available but signer failed (${e.message}) — trying Privy`);
     }
   }
 
-  console.log("[creService] Wallet method:", signatureMethod);
-  console.log("[creService] Player address:", playerAddress);
-  console.log("[creService] Signer address:", actualPlayerAddress);
+  creSign(`Wallet: ${signatureMethod} | Player: ${actualPlayerAddress.slice(0, 10)}...`);
 
-  // Get current nonce from contract (read-only is fine here)
   const contract = await getPlayerRegistryReadContract();
   const nonceBigInt = await contract.nonces(actualPlayerAddress);
-  const nonce = Number(nonceBigInt);  // Convert BigInt to number
+  const nonce = Number(nonceBigInt);
+  creSign(`Nonce from PlayerRegistry: ${nonce}`);
 
-  console.log("[creService] Signing registration message:", { actualPlayerAddress, nickname, nonce });
-
-  // Create message hash: keccak256(abi.encodePacked(playerAddress, nickname, nonce, contractAddress))
   const contractAddress = import.meta.env.VITE_PLAYER_REGISTRY_ADDRESS_SEPOLIA;
 
-  // Step 1: Pack the data (nonce must be a number, not BigInt or string)
   const packed = ethers.solidityPacked(
     ["address", "string", "uint256", "address"],
     [actualPlayerAddress, nickname, nonce, contractAddress]
   );
-
-  // Step 2: Hash it with keccak256
   const messageHash = ethers.keccak256(packed);
+  creSign(`Hash: keccak256(pack(addr, "${nickname}", ${nonce}, registry)) = ${messageHash.slice(0, 18)}...`);
 
-  console.log("[creService] Message hash:", messageHash);
-
-  // Step 3: Sign the hash with the appropriate wallet
   let signature;
-  if (signatureMethod === 'metamask' && window.ethereum) {
-    // Use MetaMask to sign
+  if (signatureMethod === 'metamask') {
+    creSign("Requesting MetaMask/external wallet signature...");
     const provider = new ethers.BrowserProvider(window.ethereum);
     const signer = await provider.getSigner();
     signature = await signer.signMessage(ethers.getBytes(messageHash));
-    console.log("[creService] Message signed with MetaMask:", signature);
-  } else {
-    // Use Privy's signMessage (expects string, not bytes)
+  } else if (privySignMessage && typeof privySignMessage === 'function') {
+    creSign("Requesting Privy embedded wallet signature...");
     signature = await privySignMessage(messageHash);
-    console.log("[creService] Message signed with Privy wallet:", signature);
+  } else {
+    throw new Error("No signing method available. Connect MetaMask or use Privy embedded wallet.");
   }
+  creOK(`Signature: ${signature.slice(0, 18)}... ✓`);
 
-  return {
-    playerAddress: actualPlayerAddress,
-    nickname,
-    nonce: nonce.toString(),
-    signature,
-    contractAddress
-  };
+  return { playerAddress: actualPlayerAddress, nickname, nonce: nonce.toString(), signature, contractAddress };
 }
 
 /**
@@ -211,21 +216,20 @@ export async function signRegistrationMessage(user, privySignMessage, playerAddr
  * Chainlink pays gas - user pays nothing
  */
 export async function callChainlinkFunctionsForRegistration(signedData) {
-  console.log("[creService] Calling Chainlink Functions with signed data:", signedData);
-  
   const chainlinkFunctionsUrl = import.meta.env.VITE_CHAINLINK_FUNCTIONS_URL;
-  
+
   if (!chainlinkFunctionsUrl) {
     throw new Error("Chainlink Functions URL not configured in .env");
   }
-  
+
+  creRelay(`POST ${chainlinkFunctionsUrl}`);
+  creRelay(`Payload: player=${signedData.playerAddress.slice(0, 10)}..., nickname="${signedData.nickname}", nonce=${signedData.nonce}`);
+  const t0 = performance.now();
+
   try {
-    // Call Chainlink Functions API
     const response = await fetch(chainlinkFunctionsUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         playerAddress: signedData.playerAddress,
         nickname: signedData.nickname,
@@ -240,16 +244,18 @@ export async function callChainlinkFunctionsForRegistration(signedData) {
     }
 
     const result = await response.json();
-    console.log("[creService] Chainlink Functions response:", result);
+    const dt = (performance.now() - t0).toFixed(0);
 
     if (!result.success) {
+      creWarn(`Relay FAILED (${dt}ms): ${result.error}`);
       throw new Error(result.error || "Chainlink Functions failed");
     }
 
-    console.log("[creService] Registration relayed via Chainlink Functions:", result.txHash);
+    creOK(`Registration relayed (${dt}ms) → tx: ${result.txHash?.slice(0, 18)}...`);
+    creFlow("Server validated signature → called PlayerRegistry.registerPlayer() → gas paid by server");
     return result;
   } catch (error) {
-    console.error("[creService] Chainlink Functions call failed:", error);
+    creWarn(`Chainlink Functions call failed: ${error.message}`);
     throw error;
   }
 }
@@ -260,46 +266,65 @@ export async function callChainlinkFunctionsForRegistration(signedData) {
  * No gas required from user - CRE pays
  */
 export async function requestRegistration(nickname) {
+  creFlow(`PlayerRegistry.requestRegistration("${nickname}") — emits RegistrationRequested event`);
+  creFlow("CRE WASM workflow 'player-registration' will listen and process as paymaster");
   const contract = await getPlayerRegistryWriteContract();
-  console.log("[creService] Calling requestRegistration for nickname:", nickname);
   const tx = await contract.requestRegistration(nickname);
   const receipt = await tx.wait();
-  console.log("[creService] requestRegistration TX confirmed:", receipt.hash);
+  creOK(`requestRegistration confirmed: tx=${receipt.hash.slice(0, 18)}... block=${receipt.blockNumber}`);
+  creEvent("RegistrationRequested event emitted → waiting for CRE to process...");
   return receipt;
 }
 
 // ============================================================
-//  EVENT LISTENERS
+//  EVENT LISTENERS (poll-based, avoids eth_newFilter)
 // ============================================================
 
 /**
- * Listen for PlayerRegistered event
- * Called when player is registered (CRE processed the registration)
+ * Listen for PlayerRegistered event via polling (no eth_newFilter).
  */
 export async function onPlayerRegistered(callback) {
   const contract = await getPlayerRegistryReadContract();
-  console.log("[creService] Setting up PlayerRegistered listener");
+  creEvent("Setting up PlayerRegistered event poll listener (6s interval)");
 
   const filter = contract.filters.PlayerRegistered();
-  const handler = (player, nickname, timestamp, event) => {
-    console.log("[creService] PlayerRegistered received:", {
-      player,
-      nickname,
-      timestamp: Number(timestamp),
-    });
-    callback({
-      player,
-      nickname,
-      timestamp: Number(timestamp),
-      event,
-    });
+  let lastBlock = -1;
+  let stopped = false;
+
+  const poll = async () => {
+    if (stopped) return;
+    try {
+      const currentBlock = await contract.runner.provider.getBlockNumber();
+      const fromBlock = lastBlock === -1 ? currentBlock : lastBlock + 1;
+      if (fromBlock > currentBlock) return;
+      const events = await contract.queryFilter(filter, fromBlock, currentBlock);
+      lastBlock = currentBlock;
+      for (const ev of events) {
+        try {
+          const parsed = contract.interface.parseLog(ev);
+          if (parsed) {
+            creEvent(`PlayerRegistered! player=${parsed.args[0].slice(0, 10)}..., nickname="${parsed.args[1]}", ts=${Number(parsed.args[2])}`);
+            creFlow("CRE processed registration → player is now on-chain ✓");
+            callback({
+              player: parsed.args[0],
+              nickname: parsed.args[1],
+              timestamp: Number(parsed.args[2]),
+            });
+          }
+        } catch { /* skip */ }
+      }
+    } catch (err) {
+      console.warn("[creService] PlayerRegistered poll error:", err.message);
+    }
   };
 
-  contract.on(filter, handler);
+  poll();
+  const id = setInterval(poll, 6000);
 
   return () => {
-    console.log("[creService] Removing PlayerRegistered listener");
-    contract.off(filter, handler);
+    creEvent("Removing PlayerRegistered poll listener");
+    stopped = true;
+    clearInterval(id);
   };
 }
 
@@ -308,22 +333,53 @@ export async function onPlayerRegistered(callback) {
 // ============================================================
 
 /**
- * Wait for PlayerRegistered event with timeout
+ * Wait for PlayerRegistered event with timeout (poll-based).
  */
 export async function waitForPlayerRegistered(playerAddress, timeoutMs = 60000) {
+  const contract = await getPlayerRegistryReadContract();
+  const filter = contract.filters.PlayerRegistered(playerAddress);
+
   return new Promise((resolve, reject) => {
+    let lastBlock = -1;
+    let stopped = false;
+
     const timeout = setTimeout(() => {
-      unsubscribe();
+      stopped = true;
+      clearInterval(id);
       reject(new Error("PlayerRegistered timeout"));
     }, timeoutMs);
 
-    const unsubscribe = onPlayerRegistered((result) => {
-      if (result.player.toLowerCase() === playerAddress.toLowerCase()) {
-        clearTimeout(timeout);
-        unsubscribe();
-        resolve(result);
+    const poll = async () => {
+      if (stopped) return;
+      try {
+        const currentBlock = await contract.runner.provider.getBlockNumber();
+        const fromBlock = lastBlock === -1 ? currentBlock : lastBlock + 1;
+        if (fromBlock > currentBlock) return;
+        const events = await contract.queryFilter(filter, fromBlock, currentBlock);
+        lastBlock = currentBlock;
+        for (const ev of events) {
+          try {
+            const parsed = contract.interface.parseLog(ev);
+            if (parsed && parsed.args[0].toLowerCase() === playerAddress.toLowerCase()) {
+              stopped = true;
+              clearInterval(id);
+              clearTimeout(timeout);
+              resolve({
+                player: parsed.args[0],
+                nickname: parsed.args[1],
+                timestamp: Number(parsed.args[2]),
+              });
+              return;
+            }
+          } catch { /* skip */ }
+        }
+      } catch (err) {
+        console.warn("[creService] waitForPlayerRegistered poll error:", err.message);
       }
-    }).catch(reject);
+    };
+
+    poll();
+    const id = setInterval(poll, 3000);
   });
 }
 
@@ -337,7 +393,7 @@ export async function registerPlayerFlow(nickname, playerAddress, maxRetries = 3
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`[creService] registerPlayerFlow attempt ${attempt}/${maxRetries}`);
+      creFlow(`Attempt ${attempt}/${maxRetries}...`);
 
       // Validate nickname availability first
       const available = await isNicknameAvailable(nickname);
@@ -345,7 +401,10 @@ export async function registerPlayerFlow(nickname, playerAddress, maxRetries = 3
         throw new Error("Nickname already taken");
       }
 
-      console.log(`[creService] Requesting registration for: ${playerAddress} with nickname: ${nickname}`);
+      creFlow("╔══════════════════════════════════════════════════════════╗");
+      creFlow("║  CRE Registration Flow — Chainlink Gasless UX          ║");
+      creFlow("╚══════════════════════════════════════════════════════════╝");
+      creFlow(`Player: ${playerAddress.slice(0, 10)}... | Nickname: "${nickname}"`);
 
       // Set up listener before sending TX
       const resultPromise = waitForPlayerRegistered(playerAddress, 120000);
@@ -354,28 +413,30 @@ export async function registerPlayerFlow(nickname, playerAddress, maxRetries = 3
       // No gas required from user - CRE will process as paymaster
       await requestRegistration(nickname);
 
-      console.log(`[creService] RegistrationRequested event emitted, waiting for CRE to process...`);
+      creFlow("Step 3: Waiting for CRE WASM workflow 'player-registration' to process...");
+      creFlow("  CRE listens for RegistrationRequested → validates → calls registerPlayer()");
 
       // Wait for CRE to process and emit PlayerRegistered
       const result = await resultPromise;
 
-      console.log("[creService] registerPlayerFlow completed:", result);
+      creOK("╔══════════════════════════════════════════════════════════╗");
+      creOK(`║  Registration COMPLETE: "${result.nickname}" is now on-chain!   ║`);
+      creOK("╚══════════════════════════════════════════════════════════╝");
       return {
         nickname: result.nickname,
         timestamp: result.timestamp,
       };
     } catch (error) {
       lastError = error;
-      console.warn(`[creService] Attempt ${attempt} failed:`, error.message);
+      creWarn(`Attempt ${attempt} failed: ${error.message}`);
 
       if (attempt === maxRetries) {
-        console.error(`[creService] All ${maxRetries} attempts failed`);
+        creWarn(`All ${maxRetries} attempts failed`);
         throw new Error(`Failed after ${maxRetries} attempts: ${error.message}`);
       }
 
-      // Exponential backoff: 2^attempt * 1000ms
       const delayMs = Math.pow(2, attempt) * 1000;
-      console.log(`[creService] Retrying in ${delayMs}ms...`);
+      creFlow(`Retrying in ${delayMs}ms...`);
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
