@@ -187,7 +187,7 @@ export default function InteractiveMap({ onSelectCase }) {
         style={{ transform: `translate(${pan.x}px, ${pan.y}px)` }}
       >
         {/* worldmap background */}
-        <img src="/worldmap.png" alt="" className={styles.worldmapBg} />
+        <img src="/worldmap.png" alt="" className={styles.worldmapBg} loading="lazy" />
 
         {/* background canvas */}
         <canvas ref={canvasRef} className={styles.canvas} />

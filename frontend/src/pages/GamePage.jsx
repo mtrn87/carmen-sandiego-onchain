@@ -1,15 +1,16 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePrivy } from '@privy-io/react-auth'
 import TerminalSidebar from '../components/TerminalSidebar'
-import InteractiveMap from '../components/InteractiveMap'
-import ContractExplorer from '../components/ContractExplorer'
-import CaptureMode from '../components/CaptureMode'
-import MissionBriefing from '../components/MissionBriefing'
-import MissionOutcome from '../components/MissionOutcome'
-import MissionPlotModal from '../components/MissionPlotModal'
-import ClueModal from '../components/ClueModal'
-import LeaderboardModal from '../components/LeaderboardModal'
+
+const InteractiveMap = lazy(() => import('../components/InteractiveMap'))
+const ContractExplorer = lazy(() => import('../components/ContractExplorer'))
+const CaptureMode = lazy(() => import('../components/CaptureMode'))
+const MissionBriefing = lazy(() => import('../components/MissionBriefing'))
+const MissionOutcome = lazy(() => import('../components/MissionOutcome'))
+const MissionPlotModal = lazy(() => import('../components/MissionPlotModal'))
+const ClueModal = lazy(() => import('../components/ClueModal'))
+const LeaderboardModal = lazy(() => import('../components/LeaderboardModal'))
 
 import { useWallets } from '@privy-io/react-auth'
 import { useGameStore } from '../store/gameStore'
@@ -140,17 +141,21 @@ export default function GamePage() {
   const renderMainContent = () => {
     if (showMap) {
       return (
-        <InteractiveMap
-          onSelectCase={handleSelectCase}
-        />
+        <Suspense fallback={null}>
+          <InteractiveMap
+            onSelectCase={handleSelectCase}
+          />
+        </Suspense>
       )
     }
 
     return (
-      <ContractExplorer
-        onOpenMap={() => setShowMap(true)}
-        onBackToCityPanel={handleBackToCityPanel}
-      />
+      <Suspense fallback={null}>
+        <ContractExplorer
+          onOpenMap={() => setShowMap(true)}
+          onBackToCityPanel={handleBackToCityPanel}
+        />
+      </Suspense>
     )
   }
 
@@ -162,19 +167,29 @@ export default function GamePage() {
       <div className={styles.vignette} />
 
       {/* mission briefing overlay — shown before game loads */}
-      {!briefingDone && <MissionBriefing />}
+      <Suspense fallback={null}>
+        {!briefingDone && <MissionBriefing />}
+      </Suspense>
 
       {/* victory/defeat overlay — only after briefing is done */}
-      {briefingDone && showOutcomeModal && <MissionOutcome />}
+      <Suspense fallback={null}>
+        {briefingDone && showOutcomeModal && <MissionOutcome />}
+      </Suspense>
 
       {/* mission plot overlay — opened from terminal command */}
-      {showPlotModal && <MissionPlotModal />}
+      <Suspense fallback={null}>
+        {showPlotModal && <MissionPlotModal />}
+      </Suspense>
 
       {/* city clue modal — shown after requesting a clue */}
-      {showCityClueModal && <ClueModal />}
+      <Suspense fallback={null}>
+        {showCityClueModal && <ClueModal />}
+      </Suspense>
 
       {/* leaderboard modal — opened from terminal /leaderboard command */}
-      {showLeaderboard && <LeaderboardModal onClose={closeLeaderboard} />}
+      <Suspense fallback={null}>
+        {showLeaderboard && <LeaderboardModal onClose={closeLeaderboard} />}
+      </Suspense>
 
       {/* top bar — agent info + CCIP status + logout */}
       <div className={styles.topBar}>
@@ -213,7 +228,9 @@ export default function GamePage() {
       </main>
 
       {/* capture modal — opens when a tx is selected in capture mode */}
-      {captureMode && captureSelectedTx && !showMap && <CaptureMode />}
+      <Suspense fallback={null}>
+        {captureMode && captureSelectedTx && !showMap && <CaptureMode />}
+      </Suspense>
 
     </div>
   )
