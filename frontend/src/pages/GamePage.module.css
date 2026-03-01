@@ -98,6 +98,29 @@
   border-radius: 2px;
 }
 
+.profileBtn {
+  background: none;
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 1px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.profileBtn:hover {
+  background: rgba(0, 240, 255, 0.1);
+  border-color: var(--cyan);
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.5);
+}
+
+.profileBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .logoutBtn {
   background: none;
   border: 1px solid rgba(255, 42, 109, 0.3);
