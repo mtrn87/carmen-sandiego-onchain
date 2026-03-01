@@ -3,11 +3,11 @@
 
 export const CHAIN_DEFS = {
   421614:   { name: 'Arbitrum Sepolia', color: '#28A0F0', icon: '/blockchain_icon/arbitrum.png', symbol: 'ETH',  deployable: true,  comingSoon: false },
-  97:       { name: 'BNB Testnet',      color: '#F0B90B', icon: '/blockchain_icon/bnb.png',      symbol: 'BNB',  deployable: false, comingSoon: true  },
+  97:       { name: 'BNB Testnet',      color: '#F0B90B', icon: '/blockchain_icon/bnb.png',      symbol: 'BNB',  deployable: true,  comingSoon: false },
   84532:    { name: 'Base Sepolia',     color: '#0052FF', icon: '/blockchain_icon/base.png',      symbol: 'ETH',  deployable: true,  comingSoon: false },
   51:       { name: 'XDC Apothem',      color: '#00AEEF', icon: '/blockchain_icon/xdc.png',       symbol: 'TXDC', deployable: true,  comingSoon: false },
-  80002:    { name: 'Polygon Amoy',     color: '#8247E5', icon: '/blockchain_icon/polygon.png',   symbol: 'MATIC',deployable: false, comingSoon: true  },
-  11155111: { name: 'Ethereum Sepolia', color: '#627EEA', icon: '/blockchain_icon/eth.png',       symbol: 'ETH',  deployable: false, comingSoon: true  },
+  80002:    { name: 'Polygon Amoy',     color: '#8247E5', icon: '/blockchain_icon/polygon.png',   symbol: 'MATIC',deployable: true,  comingSoon: false },
+  11155111: { name: 'Ethereum Sepolia', color: '#627EEA', icon: '/blockchain_icon/eth.png',       symbol: 'ETH',  deployable: true,  comingSoon: false },
   31337:    { name: 'Hardhat Local',    color: '#999999', icon: '/blockchain_icon/hardhat.png',   symbol: 'ETH',  deployable: true,  comingSoon: false },
 }
 
@@ -17,9 +17,9 @@ export const CITYNODE_CONFIG = {
   421614: { rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc', deployable: true  },
   84532:  { rpcUrl: 'https://sepolia.base.org',               deployable: true  },
   51:     { rpcUrl: 'https://erpc.apothem.network',           deployable: true  },
-  97:     { rpcUrl: 'https://data-seed-prebsc-1-e.bnbchain.org:8545', deployable: false },
-  80002:  { rpcUrl: 'https://rpc-amoy.polygon.technology',    deployable: false },
-  11155111:{ rpcUrl: 'https://rpc.sepolia.org',               deployable: false },
+  97:     { rpcUrl: 'https://data-seed-prebsc-1-e.bnbchain.org:8545', deployable: true  },
+  80002:  { rpcUrl: 'https://rpc-amoy.polygon.technology',    deployable: true  },
+  11155111:{ rpcUrl: 'https://rpc.sepolia.org',               deployable: true  },
 }
 
 // ─── Hardhat local virtual CityNode mapping ───
