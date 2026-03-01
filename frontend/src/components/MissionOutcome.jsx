@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
 import { CITY_POOL_MAP } from '../data/cityRegistry'
+import { getMissionToTokenId, getMissionNFTTokenURI, MISSION_NFT_ADDRESS } from '../services/contractService'
 import styles from './MissionOutcome.module.css'
 
 const LINE_TYPE_SPEED = 22
@@ -186,6 +187,25 @@ export default function MissionOutcome() {
   const [typedLines, setTypedLines] = useState([])
   const [allDone, setAllDone] = useState(false)
   const [skipped, setSkipped] = useState(false)
+  const [nftData, setNftData] = useState(null)
+
+  // Fetch NFT data when victory animation completes
+  useEffect(() => {
+    if (!allDone || !isVictory || !missionId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const tokenId = await getMissionToTokenId(missionId)
+        if (cancelled || tokenId == null) return
+        const tokenURI = await getMissionNFTTokenURI(tokenId)
+        if (cancelled) return
+        setNftData({ tokenId, tokenURI })
+      } catch {
+        // NFT not available — graceful fallback
+      }
+    })()
+    return () => { cancelled = true }
+  }, [allDone, isVictory, missionId])
 
   const handleAction = useCallback(() => {
     if (isVictory) {
@@ -326,6 +346,42 @@ export default function MissionOutcome() {
               <span className={styles.cursor}>_</span>
             )}
           </div>
+
+          {/* NFT trophy card */}
+          {allDone && isVictory && nftData && (
+            <div className={styles.nftTrophy}>
+              <div className={styles.nftTrophyImage}>
+                {nftData.tokenURI ? (
+                  <img src={nftData.tokenURI} alt={`MissionNFT #${nftData.tokenId}`} />
+                ) : (
+                  <span className={styles.nftTrophyPlaceholder}>&#127942;</span>
+                )}
+              </div>
+              <div className={styles.nftTrophyInfo}>
+                <span>MissionNFT #{nftData.tokenId}</span>
+                {MISSION_NFT_ADDRESS && (
+                  <div className={styles.nftTrophyLinks}>
+                    <a
+                      className={styles.nftTrophyLink}
+                      href={`https://sepolia.etherscan.io/nft/${MISSION_NFT_ADDRESS}/${nftData.tokenId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Etherscan
+                    </a>
+                    <a
+                      className={styles.nftTrophyLink}
+                      href={`https://testnets.opensea.io/assets/sepolia/${MISSION_NFT_ADDRESS}/${nftData.tokenId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      OpenSea
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* action button */}
           {allDone && (

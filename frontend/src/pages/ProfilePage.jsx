@@ -7,6 +7,7 @@ import {
   getPlayerCityClueCount,
   getPlayerMissionTrophies,
   CITY_MAP,
+  MISSION_NFT_ADDRESS,
 } from '../services/contractService'
 import { ethers } from 'ethers'
 import styles from './ProfilePage.module.css'
@@ -318,15 +319,43 @@ export default function ProfilePage() {
                           className={`${styles.nftCard} ${tier ? styles[`nft${tier}`] : ''}`}
                         >
                           <div className={styles.nftTokenId}>#{t.tokenId}</div>
-                          <div className={styles.nftIcon}>
-                            {tier ? REWARD_TIERS[tier].icon : '🎖️'}
-                          </div>
+                          {t.tokenURI ? (
+                            <img
+                              className={styles.nftImage}
+                              src={t.tokenURI}
+                              alt={`MissionNFT #${t.tokenId}`}
+                            />
+                          ) : (
+                            <div className={styles.nftIcon}>
+                              {tier ? REWARD_TIERS[tier].icon : '🎖️'}
+                            </div>
+                          )}
                           <div className={styles.nftMission}>
                             Mission #{t.record.missionId}
                           </div>
                           <div className={styles.nftBlocks}>
                             {t.record.blocksUsed} blocks
                           </div>
+                          {MISSION_NFT_ADDRESS && (
+                            <div className={styles.nftLinks}>
+                              <a
+                                className={styles.nftLink}
+                                href={`https://sepolia.etherscan.io/nft/${MISSION_NFT_ADDRESS}/${t.tokenId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                Etherscan
+                              </a>
+                              <a
+                                className={styles.nftLink}
+                                href={`https://testnets.opensea.io/assets/sepolia/${MISSION_NFT_ADDRESS}/${t.tokenId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                OpenSea
+                              </a>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
