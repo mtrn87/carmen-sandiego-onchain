@@ -59,7 +59,7 @@ function resolveChainId(cityPoolId) {
 const MISSION_PLOT_STORAGE_KEY = 'carmen_current_mission_plot'
 
 // Chain IDs registered as valid CityNodes in the deployed GameMaster contract
-const VALID_INVESTIGATION_CHAINS = new Set([421614, 84532, 51])
+const VALID_INVESTIGATION_CHAINS = new Set([421614, 84532, 51, 80002, 97, 11155111])
 const PROGRESS_STORAGE_KEY = 'carmen_investigation_progress'
 const SNAPSHOT_STORAGE_KEY = 'carmen_game_snapshot'
 const ABANDONED_MISSION_KEY = 'carmen_abandoned_mission'
@@ -651,11 +651,25 @@ export const useGameStore = create((set, get) => ({
           }
 
           const cid = get().currentCityId
+          // activeCityClue format for ClueModal (always rendered at GamePage level)
+          const creActiveCityClue = {
+            id: newClue.id,
+            locationIdx: get().currentLocationIdx ?? 0,
+            clueIndex: 0,
+            clueType: 'BEHAVIOR_FINGERPRINT',
+            data: text,
+            strength: 85,
+            anomalyRefId: null,
+            cityId: cid,
+            isDeadEnd: false,
+            timestamp: Date.now(),
+          }
           set((s) => ({
             isInvestigating: false,
             clues: [...s.clues, newClue],
             activeClue: newClue,
-            showClueModal: true,
+            showCityClueModal: true,
+            activeCityClue: creActiveCityClue,
             cityClue: cid ? { ...s.cityClue, [cid]: newClue } : s.cityClue,
             missionEvents: [...s.missionEvents, {
               name: 'ClueReceived',
@@ -1123,6 +1137,8 @@ export const useGameStore = create((set, get) => ({
 
   // Safety timeout ID for investigation — cleared when clue arrives
   _investigateTimeoutId: null,
+  // Tracks consecutive TX failures for investigate — resets on success or mock fallback
+  _investigateFailCount: 0,
 
   /**
    * Submit investigation transaction on-chain.
@@ -1148,20 +1164,51 @@ export const useGameStore = create((set, get) => ({
     try {
       const receipt = await submitInvestigationOnChain(resolveChainId(chainId))
 
-      // Safety timeout: if CRE doesn't respond within 90s, unlock the UI
-      const timeoutId = setTimeout(() => {
-        if (get().isInvestigating) {
+      // TX confirmed — now charge the block cost
+      const newBlocks = get()._spendBlocks(5)
+
+      // Reset failure counter on successful TX
+      set({ _investigateFailCount: 0 })
+
+      // Safety timeout: if CRE doesn't respond within 20s, fall back to local mock clue
+      const timeoutId = setTimeout(async () => {
+        if (!get().isInvestigating) return
+        set((s) => ({
+          isInvestigating: false,
+          _investigateTimeoutId: null,
+          terminalLines: [
+            ...s.terminalLines,
+            { text: '> !! CRE oracle timed out. Recovering intel from local signal...', color: 'yellow', type: 'alert' },
+          ],
+        }))
+        // Fallback: use the mock CityNode clue generator which produces contextual scenario clues
+        const { currentCityId, startLocationIdx = 0 } = get()
+        const resolvedChain = resolveChainId(currentCityId)
+        try {
+          const result = await cityNodeRequestClue(resolvedChain, 0, 0, true)
+          const cacheClue = { id: `city-clue-cre-fb-${Date.now()}`, text: result.clueData, type: 'text', timestamp: Date.now() }
+          const activeCityClue = {
+            id: cacheClue.id,
+            clueType: result.clueType,
+            data: result.clueData,
+            strength: result.strength,
+            cityId: currentCityId,
+            isDeadEnd: false,
+            timestamp: Date.now(),
+          }
           set((s) => ({
-            isInvestigating: false,
-            _investigateTimeoutId: null,
-            terminalLines: [
-              ...s.terminalLines,
-              { text: '> !! CRE TIMEOUT — no response after 90s.', color: 'red', type: 'alert' },
-              { text: '> You may investigate again.', color: 'yellow', type: 'system' },
+            showCityClueModal: true,
+            activeCityClue,
+            cityClue: { ...s.cityClue, [currentCityId]: cacheClue },
+            terminalLines: [...s.terminalLines,
+              { text: `> INTEL RECOVERED: ${result.clueData}`, color: 'yellow', type: 'alert' },
             ],
           }))
+        } catch {
+          const fallbackClue = { id: `city-clue-cre-fb-${Date.now()}`, text: '[SIGNAL DEGRADED] — local cache incomplete.', type: 'text', timestamp: Date.now() }
+          set((s) => ({ cityClue: { ...s.cityClue, [currentCityId]: fallbackClue } }))
         }
-      }, 90_000)
+      }, 20_000)
       set({ _investigateTimeoutId: timeoutId })
 
       set((s) => ({
@@ -1187,7 +1234,8 @@ export const useGameStore = create((set, get) => ({
         terminalLines: [
           ...s.terminalLines,
           { text: `> TX CONFIRMED: ${receipt.hash}`, color: 'green', type: 'system' },
-          { text: '> Waiting for CRE workflow response...', color: 'cyan', type: 'system' },
+          { text: `> +5 BLOCKS (${newBlocks} total)`, color: 'yellow', type: 'system' },
+          { text: '> Waiting for CRE oracle response... (20s timeout)', color: 'cyan', type: 'system' },
         ],
       }))
 
@@ -1195,13 +1243,55 @@ export const useGameStore = create((set, get) => ({
       // isInvestigating stays true until clue arrives or timeout fires
     } catch (error) {
       console.error('Investigation failed:', error)
-      set((s) => ({
-        isInvestigating: false,
-        terminalLines: [
-          ...s.terminalLines,
-          { text: `> !! TX FAILED: ${error.reason || error.message}`, color: 'red', type: 'alert' },
-        ],
-      }))
+      const failCount = get()._investigateFailCount + 1
+      set({ _investigateFailCount: failCount })
+
+      const isCancelled = error?.code === 4001 || /user (rejected|denied|cancelled)/i.test(error?.message || '')
+      const errMsg = isCancelled ? 'Transaction cancelled by user.' : (error.reason || error.message || 'Unknown error')
+
+      if (failCount >= 2) {
+        // After 2 failures, fall back to mock so the player isn't stuck
+        set((s) => ({
+          isInvestigating: false,
+          _investigateFailCount: 0,
+          terminalLines: [
+            ...s.terminalLines,
+            { text: `> !! TX FAILED: ${errMsg}`, color: 'red', type: 'alert' },
+            { text: '> Falling back to cached intel after repeated failures.', color: 'yellow', type: 'system' },
+          ],
+        }))
+        const { currentCityId } = get()
+        const fallbackClue = {
+          id: `city-clue-fallback-${Date.now()}`,
+          text: '[FALLBACK INTEL] — signal lost, using last known intercept.',
+          type: 'text',
+          timestamp: Date.now(),
+        }
+        const activeCityClue = {
+          id: fallbackClue.id,
+          clueType: 'PARTIAL',
+          data: fallbackClue.text,
+          strength: 15,
+          cityId: currentCityId,
+          isDeadEnd: false,
+          timestamp: Date.now(),
+        }
+        set((s) => ({
+          showCityClueModal: true,
+          activeCityClue,
+          cityClue: { ...s.cityClue, [currentCityId]: fallbackClue },
+        }))
+      } else {
+        // First failure — notify and allow retry (no blocks charged)
+        set((s) => ({
+          isInvestigating: false,
+          terminalLines: [
+            ...s.terminalLines,
+            { text: `> !! TX FAILED: ${errMsg}`, color: 'red', type: 'alert' },
+            { text: '> Click INVESTIGATE CITY again to retry.', color: 'yellow', type: 'system' },
+          ],
+        }))
+      }
     }
   },
 
@@ -2089,47 +2179,60 @@ export const useGameStore = create((set, get) => ({
       return
     }
 
-    const newBlocks = get()._spendBlocks(5)
-    if (newBlocks >= MAX_BLOCKS) return
-
     const chainId = resolveChainId(currentCityId)
     const isOnChainCity = VALID_INVESTIGATION_CHAINS.has(chainId)
 
     set((s) => ({
       terminalLines: [...s.terminalLines,
         { text: `> REQUESTING CITY INTEL${isOnChainCity ? ' via CRE...' : ' (mock)...'}`, color: 'cyan', type: 'action' },
-        { text: `> +5 BLOCKS (${newBlocks} total)`, color: 'yellow', type: 'system' },
       ],
     }))
 
     if (isOnChainCity) {
-      // on-chain cities: delegate to investigate — CRE responds via ClueReceived event listener
+      // on-chain cities: blocks are charged only after TX confirms (inside investigate)
       await get().investigate(currentCityId)
       return
     }
 
-    // non-configured cities: use mock clue from CityNode mock layer
+    // non-configured cities: use mock clue — charge blocks here
+    const newBlocks = get()._spendBlocks(5)
+    if (newBlocks >= MAX_BLOCKS) return
+
+    set((s) => ({
+      terminalLines: [...s.terminalLines,
+        { text: `> +5 BLOCKS (${newBlocks} total)`, color: 'yellow', type: 'system' },
+      ],
+    }))
+
     try {
       set({ gameplayLoading: true })
       const isStartingClue = locationIdx === get().startLocationIdx
       const result = await cityNodeRequestClue(chainId, locationIdx, 0, isStartingClue)
-      const mockClue = {
-        id: `clue-${Date.now()}`,
-        locationId: null,
-        text: result.clueData,
-        type: 'text',
+      const isDeadEnd = result.clueType === 'DEAD_END'
+      // activeCityClue format matches ClueModal (always rendered at GamePage level)
+      const activeCityClue = {
+        id: `city-clue-${Date.now()}`,
+        locationIdx,
+        clueIndex: 0,
+        clueType: result.clueType,
+        data: result.clueData,
+        strength: result.strength,
+        anomalyRefId: result.anomalyRefId,
+        cityId: currentCityId,
+        isDeadEnd,
         timestamp: Date.now(),
-        decrypted: true,
       }
+      // cityClue cache stores .text for LocationDetail display
+      const cacheClue = { id: activeCityClue.id, text: result.clueData, type: 'text', timestamp: Date.now() }
       set((s) => ({
         gameplayLoading: false,
         isInvestigating: false,
-        showClueModal: true,
-        activeClue: mockClue,
-        clues: [...s.clues, mockClue],
-        cityClue: { ...s.cityClue, [currentCityId]: mockClue },
+        showCityClueModal: true,
+        activeCityClue,
+        cityEvidence: [...s.cityEvidence, activeCityClue],
+        cityClue: { ...s.cityClue, [currentCityId]: cacheClue },
         terminalLines: [...s.terminalLines,
-          { text: `> INTEL RECEIVED (mock): ${result.clueType}`, color: 'green', type: 'system' },
+          { text: `> INTEL RECEIVED: ${result.clueType}`, color: 'green', type: 'system' },
           { text: `> ${result.clueData}`, color: 'yellow', type: 'alert' },
         ],
       }))

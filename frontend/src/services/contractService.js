@@ -254,7 +254,9 @@ function pollEvents(contract, filter, handler, intervalMs = 6000) {
     try {
       const provider = contract.runner?.provider || contract.provider
       const currentBlock = await provider.getBlockNumber()
-      const fromBlock = lastBlock === -1 ? currentBlock : lastBlock + 1
+      const rawFrom = lastBlock === -1 ? currentBlock : lastBlock + 1
+      // Alchemy free tier caps eth_getLogs at 10 blocks per query
+      const fromBlock = Math.max(rawFrom, currentBlock - 9)
       if (fromBlock > currentBlock) return
       const events = await contract.queryFilter(filter, fromBlock, currentBlock)
       lastBlock = currentBlock
