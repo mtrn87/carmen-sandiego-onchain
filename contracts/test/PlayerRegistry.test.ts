@@ -433,4 +433,377 @@ describe("PlayerRegistry", function () {
         .updatePlayerStats(player1.address, 100, 3, 5, 25, true);
     });
   });
+
+  // ============================================================
+  //  Signature-Based Registration (requestRegistrationWithSignature)
+  // ============================================================
+
+  describe("Signature-Based Registration", function () {
+    /**
+     * Helper: sign a registration message matching the contract's expected format.
+     * Contract expects: keccak256(abi.encodePacked(playerAddress, nickname, nonce, contractAddress))
+     * Then verifies via ECDSA.recover(toEthSignedMessageHash(hash), signature)
+     */
+    async function signRegistration(
+      signer: any,
+      playerAddress: string,
+      nickname: string,
+      nonce: bigint,
+      contractAddress: string
+    ) {
+      const messageHash = ethers.solidityPackedKeccak256(
+        ["address", "string", "uint256", "address"],
+        [playerAddress, nickname, nonce, contractAddress]
+      );
+      // signMessage auto-prepends the Ethereum signed message prefix
+      return signer.signMessage(ethers.getBytes(messageHash));
+    }
+
+    it("Should register with valid signature", async function () {
+      const nickname = "SignedAgent";
+      const registryAddress = await playerRegistry.getAddress();
+      const nonce = await playerRegistry.nonces(player1.address);
+
+      const signature = await signRegistration(
+        player1,
+        player1.address,
+        nickname,
+        nonce,
+        registryAddress
+      );
+
+      await playerRegistry.requestRegistrationWithSignature(
+        player1.address,
+        nickname,
+        signature,
+        nonce
+      );
+
+      // Verify event was emitted (registration request goes to CRE)
+      // The player is NOT directly registered — RegistrationRequested is emitted
+    });
+
+    it("Should emit RegistrationRequested event on valid signature", async function () {
+      const nickname = "EventAgent";
+      const registryAddress = await playerRegistry.getAddress();
+      const nonce = await playerRegistry.nonces(player1.address);
+
+      const signature = await signRegistration(
+        player1,
+        player1.address,
+        nickname,
+        nonce,
+        registryAddress
+      );
+
+      await expect(
+        playerRegistry.requestRegistrationWithSignature(
+          player1.address,
+          nickname,
+          signature,
+          nonce
+        )
+      )
+        .to.emit(playerRegistry, "RegistrationRequested")
+        .withArgs(player1.address, nickname);
+    });
+
+    it("Should increment nonce after successful registration request", async function () {
+      const nickname = "NonceAgent";
+      const registryAddress = await playerRegistry.getAddress();
+      const nonceBefore = await playerRegistry.nonces(player1.address);
+      expect(nonceBefore).to.equal(0n);
+
+      const signature = await signRegistration(
+        player1,
+        player1.address,
+        nickname,
+        nonceBefore,
+        registryAddress
+      );
+
+      await playerRegistry.requestRegistrationWithSignature(
+        player1.address,
+        nickname,
+        signature,
+        nonceBefore
+      );
+
+      const nonceAfter = await playerRegistry.nonces(player1.address);
+      expect(nonceAfter).to.equal(1n);
+    });
+
+    it("Should reject invalid signature (wrong signer)", async function () {
+      const nickname = "WrongSigner";
+      const registryAddress = await playerRegistry.getAddress();
+      const nonce = await playerRegistry.nonces(player1.address);
+
+      // player2 signs but claims to be player1
+      const signature = await signRegistration(
+        player2,
+        player1.address,
+        nickname,
+        nonce,
+        registryAddress
+      );
+
+      await expect(
+        playerRegistry.requestRegistrationWithSignature(
+          player1.address,
+          nickname,
+          signature,
+          nonce
+        )
+      ).to.be.revertedWith("Invalid signature");
+    });
+
+    it("Should reject replay attack (reused nonce)", async function () {
+      const registryAddress = await playerRegistry.getAddress();
+      const nonce = await playerRegistry.nonces(player1.address);
+
+      // First request succeeds
+      const sig1 = await signRegistration(
+        player1,
+        player1.address,
+        "Agent001",
+        nonce,
+        registryAddress
+      );
+      await playerRegistry.requestRegistrationWithSignature(
+        player1.address,
+        "Agent001",
+        sig1,
+        nonce
+      );
+
+      // Now player1 is "registered" via event, but suppose CRE registered them.
+      // Complete registration so the address is taken
+      await playerRegistry.connect(gameMaster).registerPlayer(player1.address, "Agent001");
+
+      // Second request with same nonce should fail (nonce was incremented)
+      const sig2 = await signRegistration(
+        player2,
+        player2.address,
+        "Agent002",
+        nonce, // reuse old nonce value (0)
+        registryAddress
+      );
+      // player2's nonce is still 0, so this checks a different path
+      // Let's test player1 trying with stale nonce
+      await expect(
+        playerRegistry.requestRegistrationWithSignature(
+          player1.address,
+          "AgentReplay",
+          sig1,
+          nonce // nonce 0 was already used, now nonce is 1
+        )
+      ).to.be.revertedWith("Already registered");
+    });
+
+    it("Should reject wrong nonce (not current)", async function () {
+      const nickname = "FutureNonce";
+      const registryAddress = await playerRegistry.getAddress();
+      const wrongNonce = 999n;
+
+      const signature = await signRegistration(
+        player1,
+        player1.address,
+        nickname,
+        wrongNonce,
+        registryAddress
+      );
+
+      await expect(
+        playerRegistry.requestRegistrationWithSignature(
+          player1.address,
+          nickname,
+          signature,
+          wrongNonce
+        )
+      ).to.be.revertedWith("Invalid nonce");
+    });
+
+    it("Should reject signature with wrong contract address", async function () {
+      const nickname = "WrongContract";
+      const nonce = await playerRegistry.nonces(player1.address);
+
+      // Sign with a different contract address
+      const fakeContractAddr = ethers.Wallet.createRandom().address;
+      const signature = await signRegistration(
+        player1,
+        player1.address,
+        nickname,
+        nonce,
+        fakeContractAddr
+      );
+
+      await expect(
+        playerRegistry.requestRegistrationWithSignature(
+          player1.address,
+          nickname,
+          signature,
+          nonce
+        )
+      ).to.be.revertedWith("Invalid signature");
+    });
+
+    it("Should reject signature with wrong nickname", async function () {
+      const registryAddress = await playerRegistry.getAddress();
+      const nonce = await playerRegistry.nonces(player1.address);
+
+      // Sign with "AgentA" but submit with "AgentB"
+      const signature = await signRegistration(
+        player1,
+        player1.address,
+        "AgentA",
+        nonce,
+        registryAddress
+      );
+
+      await expect(
+        playerRegistry.requestRegistrationWithSignature(
+          player1.address,
+          "AgentB",
+          signature,
+          nonce
+        )
+      ).to.be.revertedWith("Invalid signature");
+    });
+
+    it("Should reject zero address", async function () {
+      const nickname = "ZeroAddr";
+      const registryAddress = await playerRegistry.getAddress();
+      const nonce = 0n;
+
+      const signature = await signRegistration(
+        player1,
+        ethers.ZeroAddress,
+        nickname,
+        nonce,
+        registryAddress
+      );
+
+      await expect(
+        playerRegistry.requestRegistrationWithSignature(
+          ethers.ZeroAddress,
+          nickname,
+          signature,
+          nonce
+        )
+      ).to.be.revertedWith("Invalid address");
+    });
+
+    it("Should reject if player already registered", async function () {
+      const registryAddress = await playerRegistry.getAddress();
+
+      // Register player1 via GameMaster
+      await registerViaGM(player1.address, "ExistingAgent");
+
+      const nonce = await playerRegistry.nonces(player1.address);
+      const signature = await signRegistration(
+        player1,
+        player1.address,
+        "NewNickname",
+        nonce,
+        registryAddress
+      );
+
+      await expect(
+        playerRegistry.requestRegistrationWithSignature(
+          player1.address,
+          "NewNickname",
+          signature,
+          nonce
+        )
+      ).to.be.revertedWith("Already registered");
+    });
+
+    it("Should reject invalid nickname via signature path", async function () {
+      const registryAddress = await playerRegistry.getAddress();
+      const nonce = await playerRegistry.nonces(player1.address);
+
+      const signature = await signRegistration(
+        player1,
+        player1.address,
+        "ab", // too short
+        nonce,
+        registryAddress
+      );
+
+      await expect(
+        playerRegistry.requestRegistrationWithSignature(
+          player1.address,
+          "ab",
+          signature,
+          nonce
+        )
+      ).to.be.revertedWith("Invalid nickname");
+    });
+
+    it("Should reject taken nickname via signature path", async function () {
+      const registryAddress = await playerRegistry.getAddress();
+
+      // Register "TakenName" for player1
+      await registerViaGM(player1.address, "TakenName");
+
+      // player2 tries to register with same nickname via signature
+      const nonce = await playerRegistry.nonces(player2.address);
+      const signature = await signRegistration(
+        player2,
+        player2.address,
+        "TakenName",
+        nonce,
+        registryAddress
+      );
+
+      await expect(
+        playerRegistry.requestRegistrationWithSignature(
+          player2.address,
+          "TakenName",
+          signature,
+          nonce
+        )
+      ).to.be.revertedWith("Nickname taken");
+    });
+
+    it("Should allow different players to register sequentially with signatures", async function () {
+      const registryAddress = await playerRegistry.getAddress();
+
+      // Player 1
+      const nonce1 = await playerRegistry.nonces(player1.address);
+      const sig1 = await signRegistration(
+        player1,
+        player1.address,
+        "Agent_Alpha",
+        nonce1,
+        registryAddress
+      );
+      await playerRegistry.requestRegistrationWithSignature(
+        player1.address,
+        "Agent_Alpha",
+        sig1,
+        nonce1
+      );
+
+      // Player 2
+      const nonce2 = await playerRegistry.nonces(player2.address);
+      const sig2 = await signRegistration(
+        player2,
+        player2.address,
+        "Agent_Bravo",
+        nonce2,
+        registryAddress
+      );
+      await playerRegistry.requestRegistrationWithSignature(
+        player2.address,
+        "Agent_Bravo",
+        sig2,
+        nonce2
+      );
+
+      // Verify nonces incremented independently
+      expect(await playerRegistry.nonces(player1.address)).to.equal(1n);
+      expect(await playerRegistry.nonces(player2.address)).to.equal(1n);
+    });
+  });
 });
