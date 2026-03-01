@@ -23,6 +23,7 @@ export default function GamePage() {
   const {
     isConnected,
     briefingDone,
+    autoOpenHomeCity,
     showOutcomeModal,
     showPlotModal,
     showCityClueModal,
@@ -39,7 +40,7 @@ export default function GamePage() {
     walletAddress,
   } = useGameStore()
   const { wallets } = useWallets()
-  const [showMap, setShowMap] = useState(false)
+  const [showMap, setShowMap] = useState(true)
   const [ccipStatus, setCcipStatus] = useState(null)
 
   const handleLogout = useCallback(async () => {
@@ -92,6 +93,13 @@ export default function GamePage() {
       initGame()
     }
   }, [isConnected, initGame])
+
+  // open map automatically when briefing ends on a new mission
+  useEffect(() => {
+    if (briefingDone && autoOpenHomeCity) {
+      setShowMap(true)
+    }
+  }, [briefingDone, autoOpenHomeCity])
 
   // Fetch Chainlink CCIP cross-chain messaging status
   useEffect(() => {
