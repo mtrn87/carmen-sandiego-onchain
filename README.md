@@ -33,7 +33,7 @@
 
 Carmen Sandiego stole a priceless NFT and is fleeing across blockchains. As an ACME detective, you must track her down by investigating CityNode contracts deployed on **4 different testnets**, collecting encrypted clues, and capturing Carmen before she escapes.
 
-Every mission is **unique**. Every clue is **scenario-driven and ECIES-encrypted** (AI generation via OpenAI is integrated and ready for CRE v2 async support). Every outcome is **provably fair via Chainlink VRF**. And the entire Game Master runs inside **Chainlink CRE** — zero centralized servers.
+Every mission is **unique**. Every clue is **scenario-driven and ECIES-encrypted**, selected from curated scenario pools with 150+ contextual clues. OpenAI GPT-4o-mini integration is fully coded and ready to activate when CRE v2 ships async handler support. Every outcome is **provably fair via Chainlink VRF**. And the entire Game Master runs inside **Chainlink CRE** — zero centralized servers.
 
 ---
 
@@ -112,16 +112,16 @@ This project uses **6 Chainlink services** working together as a unified system.
 
 **In-Game Usage:**
 - Player investigates a city → `InvestigationSubmitted` event → CRE **mission-start** workflow brute-forces the VRF hash, selects contextual clues from the scenario pool, ECIES-encrypts them with the player's public key, and delivers the encrypted clue on-chain
-- Player starts a mission → CRE **generate-briefing** calls OpenAI to create a noir-style narrative, encrypts it, delivers on-chain
-- Player captures Carmen → CRE **generate-finale** creates a personalized victory story + dynamic SVG trophy, sets it as the ERC-721 token URI (fully on-chain, no IPFS)
+- Player starts a mission → CRE **generate-briefing** builds an enriched noir-style narrative from scenario templates (OpenAI integration coded, ready for CRE v2 async), encrypts it, delivers on-chain
+- Player captures Carmen → CRE **generate-finale** creates a personalized victory story + dynamic SVG trophy, sets it as the ERC-721 token URI (fully on-chain data URIs, no IPFS dependency)
 - Every 3 minutes → CRE **carmen-moves** reads all active missions and relocates Carmen to a different chain
 - Player registers → CRE **player-registration** validates nickname availability and registers the player gaslessly
 
 | Workflow | Trigger | In-Game Action |
 |----------|---------|----------------|
-| `mission-start` | LogTrigger: `InvestigationSubmitted` | Player investigates a city → receives encrypted clue |
-| `generate-briefing` | LogTrigger: `MissionStarted` | Mission begins → player gets AI mission narrative |
-| `generate-finale` | LogTrigger: `CarmenCaptured` | Carmen caught → AI victory story + SVG trophy NFT |
+| `mission-start` | LogTrigger: `InvestigationSubmitted` | Player investigates a city → receives encrypted scenario-based clue |
+| `generate-briefing` | LogTrigger: `MissionStarted` | Mission begins → player gets enriched mission narrative |
+| `generate-finale` | LogTrigger: `CarmenCaptured` | Carmen caught → personalized victory story + SVG trophy NFT |
 | `carmen-moves` | CronCapability (every 3 min) | Carmen escapes to a different blockchain city |
 | `player-registration` | LogTrigger: `RegistrationRequested` | New player joins → gasless on-chain registration |
 | `player-check` | LogTrigger: `PlayerCheckRequested` | System verifies player data on-chain |
@@ -250,9 +250,9 @@ carmen-moves CRE workflow triggers (every 3 min)
 
 | File | Description | Trigger | AI Integration |
 |------|-------------|---------|----------------|
-| [`cre-workflows/mission-start/main.ts`](cre-workflows/mission-start/main.ts) | **Core game engine** — brute-forces Carmen's VRF-derived location, generates clues, calculates deterministic strength scores, ECIES-encrypts clues with player's public key, extracts wallet fragments | LogTrigger: `InvestigationSubmitted` | OpenAI GPT-4o-mini |
-| [`cre-workflows/generate-briefing/main.ts`](cre-workflows/generate-briefing/main.ts) | Generates unique AI mission narrative, ECIES-encrypts with player's public key, delivers on-chain | LogTrigger: `MissionStarted` | OpenAI GPT-4o-mini |
-| [`cre-workflows/generate-finale/main.ts`](cre-workflows/generate-finale/main.ts) | Creates personalized AI victory text + dynamic SVG trophy image, encodes as ERC-721 data URI (fully on-chain, no IPFS) | LogTrigger: `CarmenCaptured` | OpenAI GPT-4o-mini |
+| [`cre-workflows/mission-start/main.ts`](cre-workflows/mission-start/main.ts) | **Core game engine** — brute-forces Carmen's VRF-derived location, selects scenario-based clues, calculates deterministic strength scores, ECIES-encrypts clues with player's public key, extracts wallet fragments | LogTrigger: `InvestigationSubmitted` | OpenAI GPT-4o-mini (coded, CRE v2) |
+| [`cre-workflows/generate-briefing/main.ts`](cre-workflows/generate-briefing/main.ts) | Generates enriched mission narrative from scenario templates, ECIES-encrypts with player's public key, delivers on-chain | LogTrigger: `MissionStarted` | OpenAI GPT-4o-mini (coded, CRE v2) |
+| [`cre-workflows/generate-finale/main.ts`](cre-workflows/generate-finale/main.ts) | Creates personalized victory text + dynamic SVG trophy image, encodes as ERC-721 data URI (fully on-chain, no IPFS) | LogTrigger: `CarmenCaptured` | OpenAI GPT-4o-mini (coded, CRE v2) |
 | [`cre-workflows/carmen-moves/main.ts`](cre-workflows/carmen-moves/main.ts) | Reads all active missions efficiently, relocates Carmen to a different chain per mission | CronCapability (every 3 min) | — |
 | [`cre-workflows/player-registration/main.ts`](cre-workflows/player-registration/main.ts) | Validates nickname availability and relays gasless player registration | LogTrigger: `RegistrationRequested` | — |
 | [`cre-workflows/player-check/main.ts`](cre-workflows/player-check/main.ts) | Reads player data on-chain and reports back via CRE signed callback | LogTrigger: `PlayerCheckRequested` | — |
@@ -381,7 +381,7 @@ All game logic — location verification, AI clue generation, Carmen movement, N
 Carmen's location is provably random (VRF 2.5) and stored as `targetHash = keccak256(chainId, salt)`. CRE brute-forces the location off-chain by trying all chain IDs; on-chain verification is O(1). Nobody can cheat — not players, not oracle operators.
 
 ### Scenario-Driven Content + End-to-End Encryption in CRE
-Workflows select contextual clues from a curated scenario pool, then ECIES-encrypt them with each player's secp256k1 public key. Only the player holding the private key in their browser can decrypt their clues. The DON never sees plaintext. OpenAI GPT-4o-mini integration is coded and ready — a one-line change enables full AI generation when CRE v2 ships async handler support.
+Workflows select contextual clues from a curated pool of 8 heist scenarios with 150+ clues, then ECIES-encrypt them with each player's secp256k1 public key. Only the player holding the private key in their browser can decrypt their clues. The DON never sees plaintext. OpenAI GPT-4o-mini integration is fully coded within the workflows — a one-line uncomment enables full AI generation when CRE v2 ships async handler support. Currently, enriched scenario-based templates serve as the content engine.
 
 ### Multi-Chain with CCIP + CRE Orchestration
 Each blockchain IS a city — investigation literally happens on different networks. CRE reads from all 4 chains via RPC and writes results to Sepolia. CCIP provides secure cross-chain messaging between the Sepolia hub and CityNode contracts on Arbitrum, Base, and XDC, enabling Carmen movement notifications and cross-chain state synchronization.
@@ -427,7 +427,7 @@ The `carmen-moves` workflow runs every 3 minutes via CronCapability. It reads al
 | Scheduling | Chainlink CronCapability (Automation) |
 | Price Data | Chainlink Data Feeds (ETH/USD) |
 | Cross-Chain | Chainlink CCIP (cross-chain messaging) |
-| AI | OpenAI GPT-4o-mini (integrated, planned for CRE v2 async) |
+| AI | OpenAI GPT-4o-mini (fully coded, gated for CRE v2 async; scenario templates active) |
 | Encryption | ECIES secp256k1 (end-to-end clue privacy) |
 | Frontend | React 18, Vite, Zustand, ethers.js v6 |
 | Auth | Privy (embedded wallet + MetaMask) |
@@ -450,7 +450,7 @@ carmen-sandiego-onchain/
 │   │   ├── interfaces/             # IGameMaster, ICityNode, IReceiver, IMissionNFT
 │   │   └── mocks/                  # VRFCoordinatorV2PlusMock
 │   ├── scripts/deploy-all.ts       # Full multi-chain deployment
-│   └── test/                       # 275 passing tests
+│   └── test/                       # 400+ passing tests
 │
 ├── chainlink-functions/            # Chainlink Functions Paymaster (gasless)
 │   ├── server.js                   # Express relay — /faucet, /relay endpoints
@@ -546,7 +546,7 @@ Each workflow has `config.staging.json` and `config.production.json` pointing to
 cd contracts
 npm install
 npx hardhat compile
-npx hardhat test                                                  # 275 tests
+npx hardhat test                                                  # 400+ tests
 npx hardhat run scripts/deploy-all.ts --network sepolia           # Deploy everything
 ```
 
@@ -602,7 +602,7 @@ Performance is measured by blocks elapsed since mission start:
 
 ## Challenges We Ran Into
 
-1. **CRE v1 async limitations** — Handlers are synchronous, so OpenAI calls can't use `await` directly. We architected "v2-ready" code: OpenAI integration functions are fully written but commented out; enriched scenario-based templates serve as the current content engine. A one-line uncomment enables full AI when CRE v2 ships async support.
+1. **CRE v1 async limitations** — WASM handlers are synchronous, so OpenAI calls can't use `await` directly. We architected "v2-ready" code: `generateAIClue()`, `generateAIBriefing()`, and AI finale functions are fully written inside each workflow but gated behind the async barrier. Enriched scenario-based templates (`buildEnrichedBriefing()`, scenario clue pools) serve as the current content engine. A one-line uncomment enables full AI when CRE v2 ships async support.
 
 2. **Multi-chain event listening** — Alchemy's `eth_newFilter` expires after ~5 minutes. We built a `pollEvents()` helper using `queryFilter`/`getLogs` with 6-second intervals.
 
@@ -631,7 +631,7 @@ Performance is measured by blocks elapsed since mission start:
 | 5 | **Data Feeds** | ETH/USD for reward calculation + heist value in USD | Rewards + stolen amounts reflect real-world value. |
 | 6 | **CCIP** | Cross-chain Carmen movement broadcast to CityNodes | Trustless multi-chain state sync without custom bridges. |
 
-**AI Integration** — OpenAI GPT-4o-mini for narratives, clues, and trophies (CRE v2 ready). 8 hand-crafted noir scenarios with 150+ contextual clues as deterministic fallback.
+**AI Integration** — OpenAI GPT-4o-mini functions are fully coded inside CRE workflows for narratives, clues, and trophies (gated behind CRE v1 async barrier, ready for CRE v2). Currently uses 8 hand-crafted noir scenarios with 150+ contextual clues as the active content engine.
 
 ---
 
