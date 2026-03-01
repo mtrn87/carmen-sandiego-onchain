@@ -434,7 +434,8 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
   const pubKeyBytes = parsePubKey(playerPubKeyHex, runtime.log)
   if (!pubKeyBytes) return {}
 
-  const encryptedClue = eciesEncrypt(pubKeyBytes, clueText)
+  const saltBytes = toBytes(salt as `0x${string}`)
+  const encryptedClue = eciesEncrypt(pubKeyBytes, clueText, saltBytes)
   runtime.log(`Clue encrypted (${encryptedClue.length} hex chars)`)
 
   // ── Step 8: Send clue report ──
@@ -520,7 +521,7 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
       chars: fragmentChars,
     })
     const fragmentContentHash = keccak256(toBytes(fragmentPayload))
-    const encryptedFragment = eciesEncrypt(pubKeyBytes, fragmentPayload)
+    const encryptedFragment = eciesEncrypt(pubKeyBytes, fragmentPayload, saltBytes)
 
     // Send wallet fragment report
     const fragData = encodeAbiParameters(
@@ -622,5 +623,4 @@ export async function main() {
   await runner.run(initWorkflow)
 }
 
-// Export for testing
-export { generateAIClue }
+// generateAIClue not exported — Javy WASM does not support exported functions with parameters

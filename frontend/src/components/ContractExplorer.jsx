@@ -77,7 +77,7 @@ function buildAnomalyNarrative(anomalyData, ethPriceUsd = 0) {
   }
 }
 
-export default function ContractExplorer({ onOpenMap }) {
+export default function ContractExplorer({ onOpenMap, onBackToCityPanel }) {
   const {
     gas,
     gasFlash,
@@ -97,12 +97,14 @@ export default function ContractExplorer({ onOpenMap }) {
     cityLocations,
     blocksElapsed,
     backToMap,
+    backToCityPanel,
     gameplayScanAnomalies,
     gameplayRequestClue,
     walletAddress,
     captureMode,
     captureSelectedTx,
     setCaptureSelectedTx,
+    toggleCaptureMode,
     gameplayLoading,
   } = useGameStore()
 
@@ -247,9 +249,13 @@ export default function ContractExplorer({ onOpenMap }) {
           {isCityNodeMode ? (
             <>
               <button className={styles.backBtn} onClick={() => {
-                backToMap()
-                onOpenMap()
-              }}>&#9664;</button>
+                if (onBackToCityPanel) {
+                  onBackToCityPanel()
+                } else {
+                  backToMap()
+                  onOpenMap()
+                }
+              }}>&#9664; BACK</button>
               <div
                 className={styles.chainDot}
                 style={{ backgroundColor: cityMeta.color, boxShadow: `0 0 6px ${cityMeta.color}` }}
@@ -526,9 +532,10 @@ export default function ContractExplorer({ onOpenMap }) {
               const locationScanned = currentLocation
                 ? currentLocation.scanned
                 : cityLocations.some((l) => l.scanned)
+              // tag each tx with its locationIdx so CaptureMode knows which location it belongs to
               const displayTxs = currentLocation
-                ? (currentLocation.transactions || [])
-                : cityLocations.flatMap((l) => l.transactions || [])
+                ? (currentLocation.transactions || []).map(tx => ({ ...tx, _locationIdx: currentLocationIdx }))
+                : cityLocations.flatMap((l, li) => (l.transactions || []).map(tx => ({ ...tx, _locationIdx: li })))
 
               return (
                 <>
@@ -554,11 +561,12 @@ export default function ContractExplorer({ onOpenMap }) {
                       const fromStr = typeof tx.from === 'string' ? tx.from : String(tx.from)
                       const toStr = typeof tx.to === 'string' ? tx.to : String(tx.to)
                       const isCaptureSelected = captureMode && captureSelectedTx?.txHashLike === tx.txHashLike
+                      const handleTxClick = captureMode ? () => setCaptureSelectedTx(tx) : undefined
                       return (
                         <div
                           key={i}
-                          className={`${styles.txTableRow} ${captureMode ? styles.txRowCapture : ''} ${isCaptureSelected ? styles.txCaptureSelected : ''}`}
-                          onClick={captureMode ? () => setCaptureSelectedTx(tx) : undefined}
+                          className={`${styles.txTableRow} ${captureMode ? `${styles.txRowClickable} ${styles.txRowCapture}` : ''} ${isCaptureSelected ? styles.txCaptureSelected : ''}`}
+                          onClick={handleTxClick}
                         >
                           <span className={styles.tdStatus}>
                             <span className={`${styles.statusDot} ${styles.statusSuccess}`} />

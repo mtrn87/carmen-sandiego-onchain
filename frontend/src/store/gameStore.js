@@ -46,8 +46,9 @@ import {
 } from '../services/contractService'
 import { decryptClue, getPublicKeyHex } from '../utils/ecies'
 import scenariosData from '../data/scenarios.json'
-import { CITY_POOL_MAP, pickStartingCity, pickRevealedCities } from '../data/cityRegistry'
+import { CITY_POOL_MAP, CHAIN_DEFS, pickStartingCity, pickRevealedCities } from '../data/cityRegistry'
 import { getCarmenWallet, getCarmenLocationIdx } from '../data/walletPool'
+import { getActiveRoute } from '../data/scriptedRoutes'
 
 /** Resolve a city pool ID (e.g. 511 for Nairobi) to the real on-chain chainId (e.g. 51 for XDC Apothem). */
 function resolveChainId(cityPoolId) {
@@ -57,12 +58,75 @@ function resolveChainId(cityPoolId) {
 
 const MISSION_PLOT_STORAGE_KEY = 'carmen_current_mission_plot'
 const PROGRESS_STORAGE_KEY = 'carmen_investigation_progress'
+const SNAPSHOT_STORAGE_KEY = 'carmen_game_snapshot'
+const ABANDONED_MISSION_KEY = 'carmen_abandoned_mission'
+
+// build a rich city descriptor from a city id
+function describeCityById(cityId) {
+  const city = CITY_POOL_MAP[cityId]
+  if (!city) return { id: cityId, name: 'Unknown', chain: 'Unknown', chainId: null }
+  const chainDef = CHAIN_DEFS[city.chainId] || {}
+  return {
+    id: city.id,
+    name: city.name,
+    chain: city.chain || chainDef.name || 'Unknown',
+    chainId: city.chainId,
+    flag: city.flag || '',
+    locations: (city.cases || []).map((c) => c.name),
+  }
+}
+
+// build a full game state snapshot for debugging / state persistence
+function buildGameSnapshot(state) {
+  const visibleCities = (state.discoveredCityIds || []).map((id) => {
+    const desc = describeCityById(id)
+    return {
+      ...desc,
+      isCurrent: id === state.currentCityId,
+      isVisited: (state.visitedCityIds || []).includes(id),
+      isHome: id === 80002,
+    }
+  })
+
+  // group visible cities by chain to verify 1-per-chain rule
+  const citiesByChain = {}
+  visibleCities.forEach((c) => {
+    const key = c.chain || 'unknown'
+    if (!citiesByChain[key]) citiesByChain[key] = []
+    citiesByChain[key].push(c.name)
+  })
+
+  return {
+    timestamp: new Date().toISOString(),
+    missionId: state.missionId || null,
+    blocksElapsed: state.blocksElapsed || 0,
+    // current city details
+    currentCity: state.currentCityId ? describeCityById(state.currentCityId) : null,
+    currentLocationIdx: state.currentLocationIdx,
+    // the 3 cities visible on the map right now
+    visibleCities,
+    visibleCitiesByChain: citiesByChain,
+    visibleCount: visibleCities.length,
+    // full trail and history
+    visitedCities: (state.visitedCityIds || []).map(describeCityById),
+    cityTrail: (state.cityTrail || []).map(describeCityById),
+    trailOrder: (state.cityTrail || []).map((id) => CITY_POOL_MAP[id]?.name || id),
+    // discovery counters
+    discoveryScanCount: state.discoveryScanCount || 0,
+    // evidence summary
+    evidenceCount: state.evidenceCount || 0,
+    walletFragmentCount: state.walletFragmentCount || 0,
+    walletCaptureAvailable: state.walletCaptureAvailable || false,
+    clueCount: (state.clues || []).length,
+  }
+}
 
 function saveProgress(state) {
   const data = {
     scannedLocations: state.scannedLocations,
     blocksElapsed: state.blocksElapsed,
     currentCityId: state.currentCityId,
+    currentLocationIdx: state.currentLocationIdx,
     // per-city location states (inspected/scanned per locationIdx)
     cityLocationStates: state.cityLocations.map((loc) => ({
       inspected: loc.inspected || false,
@@ -82,6 +146,11 @@ function saveProgress(state) {
     evidenceCount: state.evidenceCount,
   }
   localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(data))
+
+  // save rich snapshot alongside progress
+  const snapshot = buildGameSnapshot(state)
+  localStorage.setItem(SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot))
+  console.log('[CARMEN] game state snapshot saved:', snapshot)
 }
 
 function loadProgress() {
@@ -205,6 +274,12 @@ const CITY_LOCATIONS = [
 ]
 
 // ============================================================
+//  Constants
+// ============================================================
+
+const MAX_BLOCKS = 320
+
+// ============================================================
 //  Store
 // ============================================================
 
@@ -238,6 +313,7 @@ export const useGameStore = create((set, get) => ({
   scannedLocations: [],
   isScanning: false,
   briefingDone: false,
+  autoOpenHomeCity: false,
   tourActive: false,
   tourStep: 0,
   currentCase: null,
@@ -266,7 +342,8 @@ export const useGameStore = create((set, get) => ({
   _blockPollInterval: null,
 
   // ── gameplay loop state ──
-  currentCityId: null,
+  currentCityId: null,      // unique city id (e.g. 512 for Rio) — used for display/CITY_MAP lookups
+  currentChainId: null,     // real blockchain chainId (e.g. 51 for XDC) — used for contract calls
   currentCityInfo: null,
   cityLocations: [],
   cityAnomalyTxRefs: [],
@@ -379,8 +456,20 @@ export const useGameStore = create((set, get) => ({
       // Check active mission (read-only, no signer needed)
       const activeMissionId = await getPlayerActiveMission(queryAddr)
       if (activeMissionId > 0n) {
-        const state = get()
-        await state.loadMissionState(Number(activeMissionId))
+        const abandonedId = localStorage.getItem(ABANDONED_MISSION_KEY)
+        if (abandonedId === String(activeMissionId)) {
+          console.log('[initGame] mission', activeMissionId, 'was abandoned — skipping restore')
+        } else {
+          // check if mission is already expired before loading full state
+          const blocksUsed = await getBlocksUsed(Number(activeMissionId))
+          if (blocksUsed >= MAX_BLOCKS) {
+            console.log('[initGame] mission', activeMissionId, 'already expired (' + blocksUsed + ' blocks) — auto-abandoning')
+            localStorage.setItem(ABANDONED_MISSION_KEY, String(activeMissionId))
+          } else {
+            const state = get()
+            await state.loadMissionState(Number(activeMissionId))
+          }
+        }
       }
     } catch (error) {
       console.error('initGame error:', error)
@@ -518,6 +607,26 @@ export const useGameStore = create((set, get) => ({
     const newUnsubs = []
 
     // Poll blocks elapsed every 12s (~ 1 Sepolia block)
+    const applyBlockPoll = (blocks) => {
+      const clamped = Math.min(blocks, MAX_BLOCKS)
+      // Only update if on-chain value is higher than local (actions may have
+      // pushed local ahead of chain). This avoids resetting action-based cost.
+      if (clamped > get().blocksElapsed) {
+        set({ blocksElapsed: clamped })
+      }
+      if (clamped >= MAX_BLOCKS && !get().showOutcomeModal && get().briefingDone) {
+        set((s) => ({
+          showOutcomeModal: true,
+          missionOutcome: { type: 'failed' },
+          currentMission: s.currentMission ? { ...s.currentMission, status: 'failed' } : null,
+          terminalLines: [...s.terminalLines,
+            { text: '> !! MISSION FAILED — block limit reached!', color: 'red', type: 'alert' },
+            { text: '> Carmen escaped. Start a new mission.', color: 'yellow', type: 'system' },
+          ],
+        }))
+      }
+    }
+
     try {
       const blocks = await getBlocksUsed(missionId)
       set({ blocksElapsed: blocks })
@@ -747,6 +856,7 @@ export const useGameStore = create((set, get) => ({
 
       // Listen for mission failure
       const unsubFail = await onMissionFailed(missionId, () => {
+        if (!get().briefingDone) return // don't show outcome before briefing
         set((s) => ({
           showOutcomeModal: true,
           missionOutcome: { type: 'failed' },
@@ -950,6 +1060,37 @@ export const useGameStore = create((set, get) => ({
   //  Game actions
   // ============================================================
 
+  /**
+   * Increment blocksElapsed, clamped to MAX_BLOCKS.
+   * Triggers mission failure screen when limit is reached.
+   * Returns the new blocksElapsed value.
+   */
+  _spendBlocks: (cost, { allowExceed = false } = {}) => {
+    const { blocksElapsed, missionId } = get()
+    const newBlocks = allowExceed ? blocksElapsed + cost : Math.min(blocksElapsed + cost, MAX_BLOCKS)
+    set({ blocksElapsed: newBlocks })
+
+    if (newBlocks >= MAX_BLOCKS && !allowExceed) {
+      set((s) => ({
+        showOutcomeModal: true,
+        missionOutcome: { type: 'failed' },
+        currentMission: s.currentMission
+          ? { ...s.currentMission, status: 'failed' }
+          : null,
+        terminalLines: [
+          ...s.terminalLines,
+          { text: '> !! MISSION FAILED — block limit reached!', color: 'red', type: 'alert' },
+          { text: '> Carmen escaped. Start a new mission.', color: 'yellow', type: 'system' },
+        ],
+      }))
+    }
+
+    return newBlocks
+  },
+
+  /** Check if the mission has exceeded the block limit. */
+  _isMissionExpired: () => get().blocksElapsed >= MAX_BLOCKS,
+
   scanLocation: (locationId, scanCost = 30) => {
     const state = get()
     if (state.isScanning || state.scannedLocations.includes(locationId)) return
@@ -1103,9 +1244,14 @@ export const useGameStore = create((set, get) => ({
           const { walletAddress } = get()
           const activeMissionId = await getPlayerActiveMission(walletAddress)
           if (activeMissionId > 0n) {
-            mId = Number(activeMissionId)
-            const mission = await getMission(mId)
-            set({ missionId: mId, missionData: mission })
+            const abandonedId = localStorage.getItem(ABANDONED_MISSION_KEY)
+            if (abandonedId === String(activeMissionId)) {
+              console.log('[completeBriefing] mission', activeMissionId, 'was abandoned — ignoring')
+            } else {
+              mId = Number(activeMissionId)
+              const mission = await getMission(mId)
+              set({ missionId: mId, missionData: mission })
+            }
           }
         } catch (err) {
           console.warn('[completeBriefing] Could not fetch active mission:', err.message)
@@ -1215,12 +1361,22 @@ export const useGameStore = create((set, get) => ({
         if (Object.keys(restored).length > 0) set(restored)
       }
 
-      const startingCityId = get().discoveredCityIds[0] || 421614
+      const _route = getActiveRoute()
+      const HOME_CITY_ID = _route ? _route.homeCityId : 80002
+      // restore last visited city and location from saved progress, or fall back to defaults
+      const savedProgress = loadProgress()
+      const startingCityId = savedProgress?.currentCityId || get().discoveredCityIds[0] || HOME_CITY_ID
       await get().selectCity(startingCityId)
       const locCount = get().cityLocations.length || 3
-      const startIdx = Math.floor(Math.random() * locCount)
+      const savedLocIdx = savedProgress?.currentLocationIdx
+      const startIdx = (savedLocIdx != null && savedLocIdx >= 0 && savedLocIdx < locCount)
+        ? savedLocIdx
+        : Math.floor(Math.random() * locCount)
       set({ startLocationIdx: startIdx })
       get().selectLocation(startIdx)
+
+      // persist initial state (home city scanned + discovered cities) to localStorage
+      saveProgress(get())
 
       if (mId) {
         const state = get()
@@ -1228,6 +1384,7 @@ export const useGameStore = create((set, get) => ({
 
         set({
           briefingDone: true,
+          autoOpenHomeCity: true,
           tourActive: true,
           tourStep: 0,
         })
@@ -1247,6 +1404,7 @@ export const useGameStore = create((set, get) => ({
         // No on-chain mission — start in mock/demo mode
         set({
           briefingDone: true,
+          autoOpenHomeCity: true,
           tourActive: true,
           tourStep: 0,
         })
@@ -1346,14 +1504,20 @@ export const useGameStore = create((set, get) => ({
   closeOutcomeModal: () => set({ showOutcomeModal: false }),
 
   /**
-   * Start a new mission after completion or failure.
-   * Resets game state and goes back to briefing flow.
+   * Abandon current mission and clear all state (used on defeat → exit).
+   * Does NOT start a new on-chain mission — just resets local state so the
+   * player can return to the home screen cleanly.
    */
-  startNewMission: async () => {
-    const { _unsubscribers, _blockPollInterval, _cityNodeUnsub } = get()
+  abandonMission: () => {
+    const { _unsubscribers, _blockPollInterval, _cityNodeUnsub, missionId } = get()
     _unsubscribers.forEach((unsub) => unsub())
     if (_blockPollInterval) clearInterval(_blockPollInterval)
     if (_cityNodeUnsub) _cityNodeUnsub()
+
+    // mark mission as abandoned so initGame won't restore it from on-chain
+    if (missionId) {
+      localStorage.setItem(ABANDONED_MISSION_KEY, String(missionId))
+    }
 
     set({
       missionId: null,
@@ -1365,6 +1529,91 @@ export const useGameStore = create((set, get) => ({
       locations: CITY_LOCATIONS,
       scannedLocations: [],
       briefingDone: false,
+      autoOpenHomeCity: false,
+      isInvestigating: false,
+      showClueModal: false,
+      activeClue: null,
+      showCityClueModal: false,
+      activeCityClue: null,
+      showPlotModal: false,
+      showOutcomeModal: false,
+      missionOutcome: null,
+      currentMission: null,
+      currentPlot: null,
+      gas: 100,
+      blocksElapsed: 0,
+      carmenMovedAlert: false,
+      _blockPollInterval: null,
+      _unsubscribers: [],
+      carmenWalletAddress: null,
+      carmenLocationIdx: null,
+      walletFragments: [],
+      walletFragmentCount: 0,
+      walletCaptureAvailable: false,
+      evidenceCount: 0,
+      discoveredCityIds: [],
+      visitedCityIds: [],
+      cityTrail: [],
+      discoveryScanCount: 0,
+      currentCityId: null,
+      currentChainId: null,
+      currentCityInfo: null,
+      cityLocations: [],
+      cityAnomalyTxRefs: [],
+      citySuspectWallets: [],
+      cityEvidence: [],
+      currentLocationIdx: null,
+      startLocationIdx: null,
+      captureMode: false,
+      captureState: 'ready',
+      captureResult: null,
+      captureSelectedTx: null,
+      showDossierModal: false,
+      dossierData: null,
+      cityViewTab: 'overview',
+      gameplayLoading: false,
+      _cityNodeUnsub: null,
+      terminalLines: [],
+    })
+
+    clearSavedMissionPlot()
+    clearProgress()
+    localStorage.removeItem(SNAPSHOT_STORAGE_KEY)
+  },
+
+  /**
+   * Start a new mission after completion or failure.
+   * Resets game state and goes back to briefing flow.
+   */
+  /**
+   * Reset current mission and start fresh.
+   * Calls startMission on-chain (auto-fails active mission) then resets local state.
+   */
+  startNewMission: async () => {
+    const { _unsubscribers, _blockPollInterval, _cityNodeUnsub } = get()
+    _unsubscribers.forEach((unsub) => unsub())
+    if (_blockPollInterval) clearInterval(_blockPollInterval)
+    if (_cityNodeUnsub) _cityNodeUnsub()
+
+    // call startMission on-chain — this auto-fails any active mission
+    try {
+      await ensureSepoliaNetwork()
+      await startMissionOnChain()
+    } catch (err) {
+      console.warn('[startNewMission] on-chain startMission failed:', err.message)
+    }
+
+    set({
+      missionId: null,
+      missionData: null,
+      missionEvents: [],
+      clues: [],
+      evidence: [],
+      lastKnownLocation: null,
+      locations: CITY_LOCATIONS,
+      scannedLocations: [],
+      briefingDone: false,
+      autoOpenHomeCity: false,
       isInvestigating: false,
       showClueModal: false,
       activeClue: null,
@@ -1395,6 +1644,7 @@ export const useGameStore = create((set, get) => ({
       discoveryScanCount: 0,
       // reset gameplay loop state
       currentCityId: null,
+      currentChainId: null,
       currentCityInfo: null,
       cityLocations: [],
       cityAnomalyTxRefs: [],
@@ -1418,6 +1668,7 @@ export const useGameStore = create((set, get) => ({
 
     clearSavedMissionPlot()
     clearProgress()
+    localStorage.removeItem(ABANDONED_MISSION_KEY)
   },
 
   hydrateMissionPlot: (missionIdParam = null) => {
@@ -1479,24 +1730,45 @@ export const useGameStore = create((set, get) => ({
    * Combined action: load CityNode data + call inspectLocation on-chain.
    * Used by InteractiveMap's "SCAN NETWORK" button.
    */
-  scanAndInspect: async (chainId) => {
+  scanAndInspect: async (cityId) => {
     const state = get()
-    if (state.isScanning || state.scannedLocations.includes(chainId)) return
+    if (state.isScanning || state.scannedLocations.includes(cityId)) return
+    if (get()._isMissionExpired()) return
 
     set({ isScanning: true })
 
     try {
-      // 1. Load all CityNode data (locations, anomalies, suspects, energy)
-      await state.selectCity(chainId)
+      // 1. Spend 21 blocks for scanning a new city network
+      const newBlocks = get()._spendBlocks(21)
+      if (newBlocks >= MAX_BLOCKS) { set({ isScanning: false }); return }
 
-      // 2. Call inspectLocation(0) on-chain (costs 1 energy)
-      await state.gameplayInspectLocation(0)
+      // 2. Load all CityNode data (locations, anomalies, suspects, energy)
+      await state.selectCity(cityId)
 
-      // 3. Mark city as scanned in the UI so case cards appear
+      // 3. Mark city as scanned and keep all previously-scanned cities on the map
+      const { discoveredCityIds, scannedLocations, visitedCityIds } = get()
+      const _scanRoute = getActiveRoute()
+      const HOME_CITY_ID = _scanRoute ? _scanRoute.homeCityId : 80002
+      const updatedScanned = [...new Set([...scannedLocations, cityId])]
+
+      // keep: city just scanned + home + any previously scanned city
+      // prune only never-scanned, never-visited cities (old unacted reveals)
+      const keptCityIds = discoveredCityIds.filter((id) =>
+        id === cityId ||                        // the city being scanned
+        id === HOME_CITY_ID ||                  // always keep home
+        updatedScanned.includes(id) ||          // any previously scanned city stays visible
+        visitedCityIds.includes(id)             // any visited city stays visible
+      )
+
       set((s) => ({
         isScanning: false,
-        scannedLocations: [...s.scannedLocations, chainId],
+        scannedLocations: updatedScanned,
+        discoveredCityIds: keptCityIds,
       }))
+
+      // 4. Reveal 3 nearby cities (at least 1 never-scanned when available)
+      get().revealCities(cityId)
+
       saveProgress(get())
     } catch (error) {
       console.error('scanAndInspect error:', error)
@@ -1509,8 +1781,12 @@ export const useGameStore = create((set, get) => ({
     }
   },
 
-  selectCity: async (chainId) => {
-    set({ currentCityId: chainId, gameplayLoading: true, currentLocationIdx: null, cityViewTab: 'overview' })
+  selectCity: async (cityId) => {
+    // Resolve the real blockchain chainId from the unique city id
+    const cityPoolEntry = CITY_POOL_MAP[cityId]
+    const chainId = cityPoolEntry?.chainId || cityId
+
+    set({ currentCityId: cityId, currentChainId: chainId, gameplayLoading: true, currentLocationIdx: null, cityViewTab: 'overview' })
 
     try {
       const realChainId = resolveChainId(chainId)
@@ -1523,7 +1799,7 @@ export const useGameStore = create((set, get) => ({
 
       // Restore saved location states (inspected/scanned) from localStorage
       const saved = loadProgress()
-      if (saved?.cityLocationStates && saved.currentCityId === chainId) {
+      if (saved?.cityLocationStates && saved.currentCityId === cityId) {
         locations.forEach((loc, i) => {
           const savedLoc = saved.cityLocationStates[i]
           if (savedLoc) {
@@ -1538,7 +1814,7 @@ export const useGameStore = create((set, get) => ({
       // build a lightweight Carmen wallet object for tx generation
       const cwObj = cwAddr ? { address: cwAddr, _missionId: get().missionId || 1 } : null
       locations.forEach((loc, i) => {
-        loc.transactions = buildLocationTransactions(chainId, i, anomalyTxRefs, locations.length, cwObj, cLocIdx)
+        loc.transactions = buildLocationTransactions(cityId, i, anomalyTxRefs, locations.length, cwObj, cLocIdx)
       })
 
       // Fetch player energy from CityNode
@@ -1628,49 +1904,111 @@ export const useGameStore = create((set, get) => ({
 
   /**
    * Initialize city discovery for a mission.
-   * Picks a deterministic starting city based on missionId.
+   * Home city (Santiago) is always fully enabled.
+   * Two additional plausible cities are revealed immediately.
    */
   initDiscovery: async (missionId) => {
+    // scripted route overrides home city and initial reveals
+    const route = getActiveRoute()
+    const HOME_CITY_ID = route ? route.homeCityId : 80002
+
     // try restoring from localStorage first
     const saved = loadProgress()
     if (saved?.discoveredCityIds?.length > 0) {
+      // ensure home city is always discovered + scanned even in restored sessions
+      const restoredDiscovered = saved.discoveredCityIds.includes(HOME_CITY_ID)
+        ? saved.discoveredCityIds
+        : [HOME_CITY_ID, ...saved.discoveredCityIds]
+      const restoredScanned = saved.scannedLocations?.includes(HOME_CITY_ID)
+        ? saved.scannedLocations
+        : [...(saved.scannedLocations || []), HOME_CITY_ID]
+
       set({
-        discoveredCityIds: saved.discoveredCityIds,
+        discoveredCityIds: restoredDiscovered,
         visitedCityIds: saved.visitedCityIds || [],
         cityTrail: saved.cityTrail || [],
         discoveryScanCount: saved.discoveryScanCount || 0,
+        scannedLocations: restoredScanned,
       })
       return
     }
 
-    // initialize Carmen wallet for this mission (deterministic from missionId)
+    // initialize Carmen wallet for this mission
     const mId = missionId || 1
-    const carmenW = getCarmenWallet(mId)
-    const carmenLocIdx = getCarmenLocationIdx(mId, 3) // 3 locations per city
-    set({ carmenWalletAddress: carmenW.address, carmenLocationIdx: carmenLocIdx })
+    if (route) {
+      // scripted route: use fixed wallet address
+      const carmenLocIdx = getCarmenLocationIdx(mId, 3)
+      set({ carmenWalletAddress: route.carmenWallet, carmenLocationIdx: carmenLocIdx })
+    } else {
+      // default: deterministic wallet from missionId
+      const carmenW = getCarmenWallet(mId)
+      const carmenLocIdx = getCarmenLocationIdx(mId, 3) // 3 locations per city
+      set({ carmenWalletAddress: carmenW.address, carmenLocationIdx: carmenLocIdx })
+    }
 
-    const startingCityId = pickStartingCity(mId)
-    const cityData = CITY_POOL_MAP[startingCityId]
+    // home city is the starting point (player's origin)
+    const homeCity = CITY_POOL_MAP[HOME_CITY_ID]
+
+    // reveal initial cities
+    let revealedIds
+    if (route) {
+      // scripted route: reveal the next 2 path cities + 1 distraction
+      const pathCities = route.path.slice(1) // skip home city
+      const distractionPool = pickRevealedCities(mId, 0, route.path, route.homeCityId, [])
+      const distraction = distractionPool.length > 0 ? [distractionPool[0].id] : []
+      revealedIds = [...pathCities, ...distraction]
+    } else {
+      const initialRevealed = pickRevealedCities(mId, 0, [HOME_CITY_ID], HOME_CITY_ID, [])
+      revealedIds = initialRevealed.map((c) => c.id)
+    }
+
+    const revealLines = revealedIds.map((id) => {
+      const c = CITY_POOL_MAP[id]
+      return c
+        ? { text: `> INTEL: Suspicious activity detected in ${c.name} (${c.chain})`, color: 'green', type: 'alert' }
+        : null
+    }).filter(Boolean)
 
     set((s) => ({
-      discoveredCityIds: [startingCityId],
+      discoveredCityIds: [HOME_CITY_ID, ...revealedIds],
       visitedCityIds: [],
-      cityTrail: [startingCityId],
-      discoveryScanCount: 0,
+      cityTrail: [HOME_CITY_ID],
+      discoveryScanCount: 1, // count the initial reveal
+      // home city is fully scanned — known territory
+      scannedLocations: [...s.scannedLocations, HOME_CITY_ID],
       terminalLines: [...s.terminalLines,
-        { text: `> INTEL: Initial network detected in ${cityData?.name || 'Unknown'} (${cityData?.chain || 'Unknown Chain'})`, color: 'cyan', type: 'system' },
+        { text: `> HOME BASE: ${homeCity?.name || 'Santiago'} (${homeCity?.chain || 'Polygon Amoy'}) — network fully mapped.`, color: 'cyan', type: 'system' },
+        { text: '> Local contacts provide 100% network coverage here.', color: 'green', type: 'system' },
+        ...revealLines,
       ],
     }))
   },
 
   /**
-   * Reveal 2 new cities after a successful scan.
-   * Uses deterministic algorithm based on missionId + scanCount.
+   * Reveal 3 nearby cities after a scan.
+   * Proximity-sorted from originCityId. Guarantees at least 1 never-scanned city.
+   * @param {number|null} originCityId - city the player just scanned (proximity anchor)
    */
-  revealCities: () => {
-    const { missionId, discoveryScanCount, discoveredCityIds, visitedCityIds } = get()
+  revealCities: (originCityId = null) => {
+    const { missionId, discoveryScanCount, discoveredCityIds, visitedCityIds, scannedLocations } = get()
+    // exclude cities already visible on the map — scanned cities are OK to re-reveal (proximity revisit)
     const excludeIds = [...new Set([...discoveredCityIds, ...visitedCityIds])]
-    const newCities = pickRevealedCities(missionId || 1, discoveryScanCount, excludeIds)
+    let newCities = pickRevealedCities(missionId || 1, discoveryScanCount, excludeIds, originCityId, scannedLocations)
+
+    // scripted route: ensure next path city is always among revealed cities
+    const _revealRoute = getActiveRoute()
+    if (_revealRoute) {
+      const undiscovered = _revealRoute.path.filter((id) => !excludeIds.includes(id))
+      if (undiscovered.length > 0) {
+        const mustReveal = undiscovered[0]
+        const alreadyIncluded = newCities.some((c) => c.id === mustReveal)
+        if (!alreadyIncluded && CITY_POOL_MAP[mustReveal]) {
+          // replace the last revealed city with the path city
+          if (newCities.length > 0) newCities[newCities.length - 1] = CITY_POOL_MAP[mustReveal]
+          else newCities = [CITY_POOL_MAP[mustReveal]]
+        }
+      }
+    }
 
     if (newCities.length === 0) return
 
@@ -1738,6 +2076,7 @@ export const useGameStore = create((set, get) => ({
     if (_cityNodeUnsub) _cityNodeUnsub()
     set({
       currentCityId: null,
+      currentChainId: null,
       currentCityInfo: null,
       cityLocations: [],
       cityAnomalyTxRefs: [],
@@ -1749,8 +2088,14 @@ export const useGameStore = create((set, get) => ({
     })
   },
 
+  // go back to the city location panel (keeps city state, clears location selection)
+  backToCityPanel: () => {
+    set({ currentLocationIdx: null })
+  },
+
   selectLocation: (idx) => {
     set({ currentLocationIdx: idx })
+    saveProgress(get())
   },
 
   clearLocation: () => {
@@ -1764,13 +2109,16 @@ export const useGameStore = create((set, get) => ({
   gameplayInspectLocation: async (locationIdx) => {
     const { currentCityId } = get()
     if (!currentCityId) return
+    if (get()._isMissionExpired()) return
+
+    const newBlocks = get()._spendBlocks(1)
+    if (newBlocks >= MAX_BLOCKS) return
 
     set((s) => ({
-      blocksElapsed: s.blocksElapsed + 1,
       terminalLines: [...s.terminalLines,
         { text: '', color: 'muted', type: 'system' },
         { text: `> INSPECT: ${s.cityLocations[locationIdx]?.name || `Location ${locationIdx}`}`, color: 'cyan', type: 'action' },
-        { text: `> +1 BLOCK (${s.blocksElapsed + 1} total)`, color: 'yellow', type: 'system' },
+        { text: `> +1 BLOCK (${newBlocks} total)`, color: 'yellow', type: 'system' },
       ],
     }))
 
@@ -1788,7 +2136,6 @@ export const useGameStore = create((set, get) => ({
       saveProgress(get())
     } catch (error) {
       set((s) => ({
-        blocksElapsed: Math.max(0, s.blocksElapsed - 1),
         terminalLines: [...s.terminalLines,
           { text: `> !! INSPECT FAILED: ${error.message}`, color: 'red', type: 'alert' },
         ],
@@ -1799,12 +2146,15 @@ export const useGameStore = create((set, get) => ({
   gameplayScanAnomalies: async (locationIdx) => {
     const { currentCityId } = get()
     if (!currentCityId) return
+    if (get()._isMissionExpired()) return
+
+    const newBlocks = get()._spendBlocks(3)
+    if (newBlocks >= MAX_BLOCKS) return
 
     set((s) => ({
-      blocksElapsed: s.blocksElapsed + 2,
       terminalLines: [...s.terminalLines,
         { text: `> SCAN ANOMALIES: ${s.cityLocations[locationIdx]?.name}`, color: 'cyan', type: 'action' },
-        { text: `> +2 BLOCKS (${s.blocksElapsed + 2} total)`, color: 'yellow', type: 'system' },
+        { text: `> +3 BLOCKS (${newBlocks} total)`, color: 'yellow', type: 'system' },
       ],
     }))
 
@@ -1828,13 +2178,11 @@ export const useGameStore = create((set, get) => ({
       ])
       set({ cityAnomalyTxRefs: anomalyTxRefs, citySuspectWallets: suspectWallets })
 
-      // reveal 2 new cities after successful scan
-      get().revealCities()
+      // city discovery is handled by scanAndInspect (map-level scan), not here
 
       saveProgress(get())
     } catch (error) {
       set((s) => ({
-        blocksElapsed: Math.max(0, s.blocksElapsed - 2),
         terminalLines: [...s.terminalLines,
           { text: `> !! SCAN FAILED: ${error.message}`, color: 'red', type: 'alert' },
         ],
@@ -1843,14 +2191,19 @@ export const useGameStore = create((set, get) => ({
   },
 
   gameplayRequestClue: async (locationIdx, clueIndex) => {
-    const { currentCityId, startLocationIdx } = get()
+    const { currentCityId, startLocationIdx, gameplayLoading } = get()
     if (!currentCityId) return
+    if (gameplayLoading) return
+    if (get()._isMissionExpired()) return
+
+    const newBlocks = get()._spendBlocks(5)
+    if (newBlocks >= MAX_BLOCKS) return
 
     set((s) => ({
-      blocksElapsed: s.blocksElapsed + 2,
+      gameplayLoading: true,
       terminalLines: [...s.terminalLines,
         { text: `> REQUEST CLUE ${clueIndex + 1}/3: ${s.cityLocations[locationIdx]?.name}`, color: 'cyan', type: 'action' },
-        { text: `> +2 BLOCKS (${s.blocksElapsed + 2} total)`, color: 'yellow', type: 'system' },
+        { text: `> +5 BLOCKS (${newBlocks} total)`, color: 'yellow', type: 'system' },
         { text: '> PENDING GM...', color: 'muted', type: 'system' },
       ],
     }))
@@ -1869,7 +2222,7 @@ export const useGameStore = create((set, get) => ({
         data: result.clueData,
         strength: result.strength,
         anomalyRefId: result.anomalyRefId,
-        cityId: currentCityId,
+        cityId: get().currentCityId,
         isDeadEnd,
         timestamp: Date.now(),
       }
@@ -1890,6 +2243,7 @@ export const useGameStore = create((set, get) => ({
       } : null
 
       set((s) => ({
+        gameplayLoading: false,
         showCityClueModal: true,
         activeCityClue: newClue,
         cityLocations: s.cityLocations.map((loc, i) =>
@@ -1915,7 +2269,7 @@ export const useGameStore = create((set, get) => ({
       saveProgress(get())
     } catch (error) {
       set((s) => ({
-        blocksElapsed: Math.max(0, s.blocksElapsed - 2),
+        gameplayLoading: false,
         terminalLines: [...s.terminalLines,
           { text: `> !! CLUE REQUEST FAILED: ${error.message}`, color: 'red', type: 'alert' },
         ],
@@ -1926,12 +2280,15 @@ export const useGameStore = create((set, get) => ({
   gameplayFlagTx: async (refId) => {
     const { currentCityId } = get()
     if (!currentCityId) return
+    if (get()._isMissionExpired()) return
+
+    const newBlocks = get()._spendBlocks(1)
+    if (newBlocks >= MAX_BLOCKS) return
 
     set((s) => ({
-      blocksElapsed: s.blocksElapsed + 1,
       terminalLines: [...s.terminalLines,
         { text: `> FLAG TX: ref#${refId?.slice(2, 10) || '????'}`, color: 'cyan', type: 'action' },
-        { text: `> +1 BLOCK (${s.blocksElapsed + 1} total)`, color: 'yellow', type: 'system' },
+        { text: `> +1 BLOCK (${newBlocks} total)`, color: 'yellow', type: 'system' },
       ],
     }))
 
@@ -1945,7 +2302,6 @@ export const useGameStore = create((set, get) => ({
       saveProgress(get())
     } catch (error) {
       set((s) => ({
-        blocksElapsed: Math.max(0, s.blocksElapsed - 1),
         terminalLines: [...s.terminalLines,
           { text: `> !! FLAG FAILED: ${error.message}`, color: 'red', type: 'alert' },
         ],
@@ -1956,13 +2312,16 @@ export const useGameStore = create((set, get) => ({
   gameplayRequestDossier: async () => {
     const { currentCityId } = get()
     if (!currentCityId) return
+    if (get()._isMissionExpired()) return
+
+    const newBlocks = get()._spendBlocks(1)
+    if (newBlocks >= MAX_BLOCKS) return
 
     set((s) => ({
-      blocksElapsed: s.blocksElapsed + 1,
       gameplayLoading: true,
       terminalLines: [...s.terminalLines,
         { text: '> REQUEST DOSSIER: Compiling evidence...', color: 'cyan', type: 'action' },
-        { text: `> +1 BLOCK (${s.blocksElapsed + 1} total)`, color: 'yellow', type: 'system' },
+        { text: `> +1 BLOCK (${newBlocks} total)`, color: 'yellow', type: 'system' },
       ],
     }))
 
@@ -1980,7 +2339,6 @@ export const useGameStore = create((set, get) => ({
     } catch (error) {
       set((s) => ({
         gameplayLoading: false,
-        blocksElapsed: Math.max(0, s.blocksElapsed - 1),
         terminalLines: [...s.terminalLines,
           { text: `> !! DOSSIER FAILED: ${error.message}`, color: 'red', type: 'alert' },
         ],
@@ -2004,16 +2362,21 @@ export const useGameStore = create((set, get) => ({
   gameplayRequestCapture: async (suspectWallet) => {
     const { currentCityId } = get()
     if (!currentCityId) return
+    // allow capture even past MAX_BLOCKS — the capture itself can exceed the limit
+    // only block if mission was explicitly expired before this attempt
+    if (get()._isMissionExpired()) return
+
+    const CAPTURE_COST = 30
+    const newBlocks = get()._spendBlocks(CAPTURE_COST, { allowExceed: true })
 
     set((s) => ({
       captureState: 'pending',
-      blocksElapsed: s.blocksElapsed + 3,
       terminalLines: [...s.terminalLines,
         { text: '', color: 'muted', type: 'system' },
         { text: '> ████████████████████████████████████████', color: 'red', type: 'system' },
         { text: `> CAPTURE ATTEMPT: ${suspectWallet}`, color: 'red', type: 'action' },
-        { text: `> +3 BLOCKS (${s.blocksElapsed + 3} total)`, color: 'yellow', type: 'system' },
-        { text: '> Submitting evidence bundle to GameMaster...', color: 'muted', type: 'system' },
+        { text: `> +${CAPTURE_COST} BLOCKS (${newBlocks} total)`, color: 'yellow', type: 'system' },
+        { text: '> Initiating full evidence analysis...', color: 'muted', type: 'system' },
       ],
     }))
 
@@ -2037,17 +2400,29 @@ export const useGameStore = create((set, get) => ({
           captureState: 'fail',
           captureResult: result,
           terminalLines: [...s.terminalLines,
-            { text: `> !! CAPTURE FAILED: ${result.reasonCode}`, color: 'red', type: 'alert' },
-            { text: `> GM Note: ${result.gmNote}`, color: 'yellow', type: 'system' },
+            { text: `> !! CAPTURE RESULT: ${result.reasonCode}`, color: 'red', type: 'alert' },
+            { text: `> ${result.gmNote}`, color: 'yellow', type: 'system' },
             { text: '> ████████████████████████████████████████', color: 'red', type: 'system' },
           ],
         }))
+        // if blocks exceeded after failed capture, trigger mission failure
+        if (get().blocksElapsed >= MAX_BLOCKS) {
+          setTimeout(() => {
+            set((s) => ({
+              captureMode: false,
+              showOutcomeModal: true,
+              missionOutcome: { type: 'failed' },
+              terminalLines: [...s.terminalLines,
+                { text: '> !! MISSION EXPIRED — Carmen escaped.', color: 'red', type: 'alert' },
+              ],
+            }))
+          }, 3000)
+        }
       }
     } catch (error) {
       set((s) => ({
         captureState: 'fail',
         captureResult: { success: false, reasonCode: 'TX_FAILED', gmNote: error.message },
-        blocksElapsed: Math.max(0, s.blocksElapsed - 3),
         terminalLines: [...s.terminalLines,
           { text: `> !! CAPTURE TX FAILED: ${error.message}`, color: 'red', type: 'alert' },
         ],
@@ -2109,6 +2484,29 @@ export const useGameStore = create((set, get) => ({
     set((s) => ({
       terminalLines: [...s.terminalLines, { text, color, type }],
     })),
+
+  /**
+   * Get a rich snapshot of the current game state.
+   * Shows exactly which cities are on screen, visited history, current city, and chain distribution.
+   */
+  getGameStateSnapshot: () => {
+    const snapshot = buildGameSnapshot(get())
+    console.log('[CARMEN] current game snapshot:', snapshot)
+    return snapshot
+  },
+
+  /**
+   * Load the last saved snapshot from localStorage.
+   */
+  loadLastSnapshot: () => {
+    try {
+      const raw = localStorage.getItem(SNAPSHOT_STORAGE_KEY)
+      if (!raw) return null
+      return JSON.parse(raw)
+    } catch {
+      return null
+    }
+  },
 }))
 
 function getRankTitle(rank) {

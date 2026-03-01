@@ -10,7 +10,7 @@ export const CHAIN_DEFS = {
   11155111: { name: 'Ethereum Sepolia',  color: '#627EEA', icon: '/blockchain_icon/eth.png',      symbol: 'ETH' },
 }
 
-// ─── 16 cities pool ───
+// ─── 17 cities pool ───
 // id = unique city identifier used across the app
 // chainId = the real blockchain chainId this city maps to for contract calls
 
@@ -20,7 +20,7 @@ export const CITY_POOL = [
     id: 421614, name: 'Tokyo', flag: '\u{1F5FE}',
     chain: 'Arbitrum Sepolia', chainId: 421614,
     chainColor: '#28A0F0', chainIcon: '/blockchain_icon/arbitrum.png',
-    image: '/tokyo.png', coords: { left: '83%', top: '34%' },
+    image: '/tokyo.png', coords: { x: 1704, y: 315 },
     cases: [
       { id: 'tokyo-sensoji', name: 'Senso-ji Temple Node', type: 'Bridge Relay', status: 'active', description: 'Ancient relay pulsing with cross-chain traffic.', image: '/tokyo_1.png', chainId: 421614 },
       { id: 'tokyo-tower', name: 'Tokyo Tower Beacon', type: 'Signal Router', status: 'active', description: 'High-altitude signal bouncing encrypted bursts.', image: '/tokyo_2.png', chainId: 421614 },
@@ -31,7 +31,7 @@ export const CITY_POOL = [
     id: 4216141, name: 'Ottawa', flag: '\u{1F1E8}\u{1F1E6}',
     chain: 'Arbitrum Sepolia', chainId: 421614,
     chainColor: '#28A0F0', chainIcon: '/blockchain_icon/arbitrum.png',
-    image: '/ottawa.png', coords: { left: '29%', top: '27%' },
+    image: '/ottawa.png', coords: { x: 556, y: 237 },
     cases: [
       { id: 'ottawa-rideau', name: 'Rideau Canal Relay', type: 'Bridge Relay', status: 'active', description: 'A relay node pulsing under the frozen Rideau Canal.', image: '/ottawa_1.png', chainId: 421614 },
       { id: 'ottawa-parliament', name: 'Parliament Hill Beacon', type: 'Signal Router', status: 'active', description: 'Encrypted bursts match known thief signatures.', image: '/ottawa_2.png', chainId: 421614 },
@@ -43,7 +43,7 @@ export const CITY_POOL = [
     id: 97, name: 'London', flag: '\u{1F1EC}\u{1F1E7}',
     chain: 'BNB Testnet', chainId: 97,
     chainColor: '#F0B90B', chainIcon: '/blockchain_icon/bnb.png',
-    image: '/london.png', coords: { left: '46%', top: '24%' },
+    image: '/london.png', coords: { x: 959, y: 188 },
     cases: [
       { id: 'london-bigben', name: 'Big Ben Relay', type: 'Bridge Relay', status: 'active', description: 'A relay hidden beneath Big Ben. BNB ingress confirmed.', image: '/london_1.png', chainId: 97 },
       { id: 'london-palace', name: 'Buckingham Palace Beacon', type: 'Signal Router', status: 'active', description: 'Encrypted signals pulse from behind palace walls.', image: '/london_2.png', chainId: 97 },
@@ -54,7 +54,7 @@ export const CITY_POOL = [
     id: 98, name: 'Shanghai', flag: '\u{1F3E2}',
     chain: 'BNB Testnet', chainId: 97,
     chainColor: '#F0B90B', chainIcon: '/blockchain_icon/bnb.png',
-    image: '/shanghai.png', coords: { left: '78%', top: '39%' },
+    image: '/shanghai.png', coords: { x: 1607, y: 350 },
     cases: [
       { id: 'shanghai-pearl', name: 'Oriental Pearl Relay', type: 'Bridge Relay', status: 'active', description: 'A relay broadcasting from the Oriental Pearl. Cross-chain drift detected.', image: '/shanghai_1.png', chainId: 97 },
       { id: 'shanghai-tower', name: 'Shanghai Tower Node', type: 'Signal Router', status: 'active', description: 'Data spikes match the stolen NFT trail.', image: '/shanghai_2.png', chainId: 97 },
@@ -65,11 +65,22 @@ export const CITY_POOL = [
     id: 99, name: 'Reykjav\u00EDk', flag: '\u2744\uFE0F',
     chain: 'BNB Testnet', chainId: 97,
     chainColor: '#F0B90B', chainIcon: '/blockchain_icon/bnb.png',
-    image: '/island.png', coords: { left: '38%', top: '14%' },
+    image: '/island.png', coords: { x: 843, y: 87 },
     cases: [
       { id: 'reykjavik-hallgrimskirkja', name: 'Hallgr\u00EDmskirkja Node', type: 'Signal Router', status: 'active', description: 'BNB transmissions spike in the northern aurora.', image: '/island_1.png', chainId: 97 },
       { id: 'reykjavik-harpa', name: 'Harpa Concert Relay', type: 'Bridge Relay', status: 'active', description: 'Cross-chain flows converge in the cold.', image: '/island_2.png', chainId: 97 },
       { id: 'reykjavik-lagoon', name: 'Blue Lagoon Vault', type: 'Custody Protocol', status: 'active', description: 'Assets are being laundered in geothermal cover.', image: '/island_3.png', chainId: 97 },
+    ],
+  },
+  {
+    id: 971, name: 'Berlin', flag: '\u{1F1E9}\u{1F1EA}',
+    chain: 'BNB Testnet', chainId: 97,
+    chainColor: '#F0B90B', chainIcon: '/blockchain_icon/bnb.png',
+    image: '/berlin.png', coords: { x: 1031, y: 180 },
+    cases: [
+      { id: 'berlin-gate', name: 'Brandenburg Gate Relay', type: 'Bridge Relay', status: 'active', description: 'BNB ingress surging at the historic gate. Cross-chain signatures detected.', image: '/berlin_1.png', chainId: 97 },
+      { id: 'berlin-tower', name: 'TV Tower Beacon', type: 'Signal Router', status: 'active', description: 'Encrypted bursts pulse from the Fernsehturm. Signal matches known suspect patterns.', image: '/berlin_2.png', chainId: 97 },
+      { id: 'berlin-wall', name: 'East Side Gallery Vault', type: 'Custody Protocol', status: 'active', description: 'Custody traffic spikes along the Wall. Assets staged for cross-chain exit.', image: '/berlin_3.png', chainId: 97 },
     ],
   },
   // ── Base Sepolia ──
@@ -77,7 +88,7 @@ export const CITY_POOL = [
     id: 84532, name: 'Paris', flag: '\u{1F5FC}',
     chain: 'Base Sepolia', chainId: 84532,
     chainColor: '#0052FF', chainIcon: '/blockchain_icon/base.png',
-    image: '/paris.png', coords: { left: '48%', top: '29%' },
+    image: '/paris.png', coords: { x: 972, y: 209 },
     cases: [
       { id: 'paris-eiffel', name: 'Eiffel Tower Relay', type: 'Monitoring Beacon', status: 'active', description: 'Monitoring beacon with bridge ingress traces.', image: '/paris_1.png', chainId: 84532 },
       { id: 'paris-louvre', name: 'Louvre Custody Router', type: 'Custody Protocol', status: 'active', description: 'High-value custody operations detected.', image: '/paris_2.png', chainId: 84532 },
@@ -88,7 +99,7 @@ export const CITY_POOL = [
     id: 845321, name: 'Rome', flag: '\u{1F3DB}',
     chain: 'Base Sepolia', chainId: 84532,
     chainColor: '#0052FF', chainIcon: '/blockchain_icon/base.png',
-    image: '/roma.png', coords: { left: '53%', top: '34%' },
+    image: '/roma.png', coords: { x: 1027, y: 265 },
     cases: [
       { id: 'rome-st-peter', name: 'Saint Peter Relay', type: 'Bridge Relay', status: 'active', description: 'Base hops stacking rapidly near Saint Peter.', image: '/roma_1.png', chainId: 84532 },
       { id: 'rome-colosseum', name: 'Colosseum Beacon', type: 'Signal Router', status: 'active', description: 'Signal echoes align with the theft trail.', image: '/roma_2.png', chainId: 84532 },
@@ -100,7 +111,7 @@ export const CITY_POOL = [
     id: 51, name: 'Sydney', flag: '\u{1F3A7}',
     chain: 'XDC Apothem', chainId: 51,
     chainColor: '#00AEEF', chainIcon: '/blockchain_icon/xdc.png',
-    image: '/sydney.png', coords: { left: '87%', top: '78%' },
+    image: '/sydney.png', coords: { x: 1765, y: 871 },
     cases: [
       { id: 'sydney-opera', name: 'Opera House Node', type: 'Signal Router', status: 'active', description: 'XDC transmissions intensify after dusk.', image: '/sydney_1.png', chainId: 51 },
       { id: 'sydney-bridge', name: 'Harbour Bridge Relay', type: 'Bridge Relay', status: 'active', description: 'Cross-chain drips forming a trail.', image: '/sydney_2.png', chainId: 51 },
@@ -111,7 +122,7 @@ export const CITY_POOL = [
     id: 511, name: 'Nairobi', flag: '\u{1F333}',
     chain: 'XDC Apothem', chainId: 51,
     chainColor: '#00AEEF', chainIcon: '/blockchain_icon/xdc.png',
-    image: '/nairobi.png', coords: { left: '59%', top: '61%' },
+    image: '/nairobi.png', coords: { x: 1157, y: 610 },
     cases: [
       { id: 'nairobi-park', name: 'National Park Relay', type: 'Bridge Relay', status: 'active', description: 'XDC ingress confirmed from the park.', image: '/nairobi_1.png', chainId: 51 },
       { id: 'nairobi-giraffe', name: 'Giraffe Centre Beacon', type: 'Signal Router', status: 'active', description: "The thief's route is close.", image: '/nairobi_2.png', chainId: 51 },
@@ -122,7 +133,7 @@ export const CITY_POOL = [
     id: 512, name: 'Rio de Janeiro', flag: '\u{1F3D6}',
     chain: 'XDC Apothem', chainId: 51,
     chainColor: '#00AEEF', chainIcon: '/blockchain_icon/xdc.png',
-    image: '/rio.png', coords: { left: '34%', top: '74%' },
+    image: '/rio.png', coords: { x: 730, y: 784 },
     cases: [
       { id: 'rio-cristo', name: 'Cristo Redentor Node', type: 'Signal Router', status: 'active', description: 'XDC traffic flares at night.', image: '/rio_1.png', chainId: 51 },
       { id: 'rio-copacabana', name: 'Copacabana Vault', type: 'Custody Protocol', status: 'active', description: 'Custody flows pool near Copacabana Palace.', image: '/rio_2.png', chainId: 51 },
@@ -134,7 +145,7 @@ export const CITY_POOL = [
     id: 80002, name: 'Santiago', flag: '\u{1F5FB}',
     chain: 'Polygon Amoy', chainId: 80002,
     chainColor: '#8247E5', chainIcon: '/blockchain_icon/polygon.png',
-    image: '/chile.png', coords: { left: '26%', top: '82%' },
+    image: '/chile.png', coords: { x: 583, y: 868 },
     cases: [
       { id: 'santiago-easter', name: 'Easter Island Relay', type: 'Bridge Relay', status: 'active', description: 'Polygon flows converge at Easter Island.', image: '/chile_1.png', chainId: 80002 },
       { id: 'santiago-torre', name: 'Gran Torre Node', type: 'Signal Router', status: 'active', description: 'Polygon pings align with the suspect route.', image: '/chile_2.png', chainId: 80002 },
@@ -145,7 +156,7 @@ export const CITY_POOL = [
     id: 800021, name: 'Dakar', flag: '\u{1F30D}',
     chain: 'Polygon Amoy', chainId: 80002,
     chainColor: '#8247E5', chainIcon: '/blockchain_icon/polygon.png',
-    image: '/dakar.png', coords: { left: '36%', top: '56%' },
+    image: '/dakar.png', coords: { x: 867, y: 483 },
     cases: [
       { id: 'dakar-renaissance', name: 'Renaissance Monument Relay', type: 'Bridge Relay', status: 'active', description: 'Polygon ingress rising.', image: '/dakar_1.png', chainId: 80002 },
       { id: 'dakar-goree', name: 'Goree Island Node', type: 'Signal Router', status: 'active', description: 'Traffic spikes match the stolen route.', image: '/dakar_2.png', chainId: 80002 },
@@ -156,7 +167,7 @@ export const CITY_POOL = [
     id: 800022, name: 'Moscow', flag: '\u26EA',
     chain: 'Polygon Amoy', chainId: 80002,
     chainColor: '#8247E5', chainIcon: '/blockchain_icon/polygon.png',
-    image: '/moscow.png', coords: { left: '58%', top: '22%' },
+    image: '/moscow.png', coords: { x: 1161, y: 154 },
     cases: [
       { id: 'moscow-red-square', name: 'Red Square Relay', type: 'Bridge Relay', status: 'active', description: 'Polygon ingress rising fast.', image: '/moscow_1.png', chainId: 80002 },
       { id: 'moscow-kremlin', name: 'Kremlin Beacon', type: 'Signal Router', status: 'active', description: 'Encrypted traffic matches the suspect trail.', image: '/moscow_2.png', chainId: 80002 },
@@ -168,7 +179,7 @@ export const CITY_POOL = [
     id: 11155111, name: 'New York City', flag: '\u{1F30E}',
     chain: 'Ethereum Sepolia', chainId: 11155111,
     chainColor: '#627EEA', chainIcon: '/blockchain_icon/eth.png',
-    image: '/nyc.png', coords: { left: '27%', top: '34%' },
+    image: '/nyc.png', coords: { x: 565, y: 274 },
     cases: [
       { id: 'nyc-liberty', name: 'Liberty Island Relay', type: 'Bridge Relay', status: 'active', description: 'Ethereum ingress confirmed.', image: '/nyc_1.png', chainId: 11155111 },
       { id: 'nyc-central', name: 'Central Park Beacon', type: 'Signal Router', status: 'active', description: 'Signal bursts ripple across Central Park.', image: '/nyc_2.png', chainId: 11155111 },
@@ -179,7 +190,7 @@ export const CITY_POOL = [
     id: 11155112, name: 'Mexico City', flag: '\u{1F1F2}\u{1F1FD}',
     chain: 'Ethereum Sepolia', chainId: 11155111,
     chainColor: '#627EEA', chainIcon: '/blockchain_icon/eth.png',
-    image: '/mexico.png', coords: { left: '23%', top: '50%' },
+    image: '/mexico.png', coords: { x: 431, y: 444 },
     cases: [
       { id: 'mexico-bellas', name: 'Bellas Artes Relay', type: 'Bridge Relay', status: 'active', description: 'Ethereum hops intensify near Bellas Artes.', image: '/mexico_1.png', chainId: 11155111 },
       { id: 'mexico-chapultepec', name: 'Chapultepec Beacon', type: 'Signal Router', status: 'active', description: 'The suspects route passes through here.', image: '/mexico_2.png', chainId: 11155111 },
@@ -190,7 +201,7 @@ export const CITY_POOL = [
     id: 11155113, name: 'Dubai', flag: '\u{1F3E0}',
     chain: 'Ethereum Sepolia', chainId: 11155111,
     chainColor: '#627EEA', chainIcon: '/blockchain_icon/eth.png',
-    image: '/dubai.png', coords: { left: '62%', top: '46%' },
+    image: '/dubai.png', coords: { x: 1255, y: 398 },
     cases: [
       { id: 'dubai-burj', name: 'Burj Khalifa Node', type: 'Signal Router', status: 'active', description: 'Ethereum bursts align with the theft.', image: '/dubai_1.png', chainId: 11155111 },
       { id: 'dubai-airport', name: 'Dubai Airport Relay', type: 'Bridge Relay', status: 'active', description: 'Cross-chain transfers accelerating.', image: '/dubai_2.png', chainId: 11155111 },
@@ -251,33 +262,118 @@ const STATUS_CYCLE = [
   { status: 'TRAFFIC ANALYSIS \u2014 LOW THREAT', statusColor: 'green' },
 ]
 
-// hand-crafted narratives for the original 3 cities
+// location & network curiosities for all 16 cities
 const CUSTOM_NARRATIVES = {
+  // ── Tokyo (421614) — Arbitrum Sepolia ──
   421614: {
-    0: { title: 'Senso-ji Temple Node', analysis: 'Ancient relay pulsing with cross-chain traffic. This bridge relay has been used by blockchain wallets to funnel assets across networks under the cover of legitimate temple donation micro-transactions. High volumes of token wrapping detected \u2014 someone is laundering trail signatures through prayer bell intervals.', status: 'ACTIVE RELAY \u2014 MEDIUM THREAT', statusColor: 'yellow' },
-    1: { title: 'Tokyo Tower Beacon', analysis: "High-altitude signal router bouncing encrypted bursts across the Pacific corridor. Packet analysis reveals fragmented wallet signatures hidden inside routine beacon pings. This tower is being used as a signal repeater to coordinate cross-chain movements \u2014 the timing patterns match Carmen's known operational cadence.", status: 'SIGNAL INTERCEPT \u2014 HIGH THREAT', statusColor: 'red' },
-    2: { title: 'Chochin Market', analysis: 'Underground swap protocol operating beneath the lantern market stalls. Token swaps are masking asset movements through rapid-fire micro-trades \u2014 thousands of transactions per block, each one carefully sized to stay below anomaly detection thresholds. Classic layering technique.', status: 'SWAP MASKING \u2014 LOW THREAT', statusColor: 'green' },
+    0: { title: 'Senso-ji Temple Node', analysis: "Senso-ji is Tokyo's oldest temple, founded in 645 AD. Its Kaminarimon (Thunder Gate) has welcomed visitors for over a thousand years. Much like this ancient gateway, Arbitrum serves as a gateway to Ethereum \u2014 an L2 rollup that batches thousands of transactions before posting them to mainnet, achieving speeds of up to 40,000 TPS while keeping fees a fraction of L1 costs.", status: 'LANDMARK \u2014 FOUNDED 645 AD', statusColor: 'yellow' },
+    1: { title: 'Tokyo Tower Beacon', analysis: "Tokyo Tower stands 333 meters tall, built in 1958 from steel \u2014 including recycled American tanks from the Korean War. It broadcasts TV and radio signals across the Kanto region. Similarly, Arbitrum broadcasts rollup proofs to Ethereum mainnet, using optimistic fraud proofs to ensure every transaction is valid. The tower's dual observation decks mirror Arbitrum's dual layers: fast execution off-chain, finality on-chain.", status: 'BEACON \u2014 333M ALTITUDE', statusColor: 'green' },
+    2: { title: 'Chochin Market', analysis: "Nakamise-dori, the shopping street leading to Senso-ji, has been a marketplace since the 1680s \u2014 one of Japan's oldest commercial streets. Vendors sell traditional chochin paper lanterns handcrafted in the same way for centuries. Arbitrum's DEX ecosystem processes billions in daily volume with the same reliability, offering swap fees as low as $0.01 thanks to its efficient rollup compression.", status: 'MARKET \u2014 SINCE 1680', statusColor: 'yellow' },
   },
+  // ── Ottawa (4216141) — Arbitrum Sepolia ──
+  4216141: {
+    0: { title: 'Rideau Canal Relay', analysis: "The Rideau Canal is a UNESCO World Heritage Site and, at 7.8 km, the world's largest naturally frozen skating rink. Built in 1832 as a military supply route, it now connects communities across Ottawa. Arbitrum connects dApps to Ethereum's security in a similar way \u2014 providing a smooth, frictionless pathway for tokens and data to flow between L2 and L1.", status: 'UNESCO HERITAGE \u2014 7.8 KM', statusColor: 'green' },
+    1: { title: 'Parliament Hill Beacon', analysis: "Parliament Hill's Gothic Revival buildings have housed Canada's federal government since 1866. The Peace Tower stands 92.2 meters tall with a 53-bell carillon. Just as Canada's parliamentary system provides stable governance, Arbitrum's decentralized sequencer and fraud-proof system ensure that no single entity can manipulate transaction ordering.", status: 'PARLIAMENT \u2014 EST. 1866', statusColor: 'yellow' },
+    2: { title: 'National Gallery Vault', analysis: "The National Gallery of Canada houses over 93,000 works, including the world's most comprehensive collection of Canadian art. Its iconic glass and granite building was designed by Moshe Safdie. Arbitrum hosts a similarly impressive collection \u2014 over 600 protocols and dApps, making it the most adopted Ethereum L2 by total value locked.", status: 'GALLERY \u2014 93,000 WORKS', statusColor: 'yellow' },
+  },
+  // ── London (97) — BNB Testnet ──
+  97: {
+    0: { title: 'Big Ben Relay', analysis: "Fun fact: \"Big Ben\" is actually the name of the 13.5-ton bell inside the Elizabeth Tower, not the tower itself. It has kept time for London since 1859, losing no more than 2 seconds per day. BNB Chain keeps similar precision with its 3-second block times \u2014 one of the fastest among major blockchains \u2014 processing over 2,000 transactions per second.", status: 'CLOCK \u2014 3-SEC PRECISION', statusColor: 'green' },
+    1: { title: 'Buckingham Palace Beacon', analysis: "Buckingham Palace has 775 rooms, including 78 bathrooms and 92 offices. It has been the official London residence of British monarchs since 1837. BNB Chain's ecosystem is equally grand \u2014 it hosts thousands of dApps and over 21 active validators that rotate to keep the network secure and decentralized through its Proof of Staked Authority consensus.", status: 'PALACE \u2014 775 ROOMS', statusColor: 'yellow' },
+    2: { title: 'London Eye Vault', analysis: "The London Eye stands 135 meters tall with 32 passenger capsules, each representing a London borough. One full rotation takes exactly 30 minutes. BNB Chain's validator rotation cycles keep the network turning with similar precision \u2014 rotating validators ensure no single node dominates, while the chain processes transactions worth billions daily.", status: 'EYE \u2014 135M ALTITUDE', statusColor: 'green' },
+  },
+  // ── Shanghai (98) — BNB Testnet ──
+  98: {
+    0: { title: 'Oriental Pearl Relay', analysis: "The Oriental Pearl Tower is 468 meters tall with its distinctive pink sphere design, making it one of the most recognizable structures in Asia. Built in 1994, it was Shanghai's tallest building for a decade. BNB Chain similarly stood as one of the most-used blockchains for years, pioneering low-cost DeFi access for millions of users across Asia and beyond.", status: 'TOWER \u2014 468M HEIGHT', statusColor: 'green' },
+    1: { title: 'Shanghai Tower Node', analysis: "Shanghai Tower reaches 632 meters \u2014 the world's second tallest building. Its twisted design reduces wind load by 24%, an elegant engineering solution. BNB Chain's architecture is similarly optimized: its dual-chain structure (BNB Beacon Chain for governance + BNB Smart Chain for smart contracts) elegantly separates concerns to maximize throughput.", status: 'SKYSCRAPER \u2014 632M', statusColor: 'green' },
+    2: { title: 'The Bund Market', analysis: "The Bund is Shanghai's iconic waterfront, featuring 52 buildings in Art Deco, Baroque, and Romanesque styles \u2014 a living museum of early 20th-century architecture. It was once the financial hub of East Asia. BNB Chain carries this legacy forward as one of the most active DeFi ecosystems, where PancakeSwap alone processes billions in daily trading volume.", status: 'BUND \u2014 52 HISTORIC BUILDINGS', statusColor: 'yellow' },
+  },
+  // ── Reykjav\u00edk (99) — BNB Testnet ──
+  99: {
+    0: { title: 'Hallgr\u00edmskirkja Node', analysis: "Hallgr\u00edmskirkja is Iceland's largest church at 74.5 meters, designed to resemble basalt lava columns found across Iceland's volcanic landscape. It took 41 years to build (1945-1986). BNB Chain's structured validator architecture mirrors these natural columns \u2014 orderly, resilient, and built to withstand the test of time through consistent block production.", status: 'CHURCH \u2014 74.5M HEIGHT', statusColor: 'yellow' },
+    1: { title: 'Harpa Concert Relay', analysis: "Harpa Concert Hall's facade consists of 1,000 steel and glass panels designed by artist Olafur Eliasson, creating a kaleidoscopic light show as the sun shifts. The geometric patterns reflect Iceland's basalt formations. BNB Chain's modular design philosophy echoes this \u2014 each component (consensus, execution, storage) works independently but creates a unified, cohesive system.", status: 'HARPA \u2014 1,000 GLASS PANELS', statusColor: 'green' },
+    2: { title: 'Blue Lagoon Vault', analysis: "The Blue Lagoon's milky-blue water is a byproduct of the nearby Svartsengi geothermal power plant, maintained at 37-39\u00b0C year-round. Iceland generates nearly 100% of its electricity from renewable sources. This makes it a prime location for sustainable blockchain operations \u2014 BNB Chain's Proof of Staked Authority consensus uses far less energy than Proof of Work, aligning with Iceland's green philosophy.", status: 'GEOTHERMAL \u2014 37-39\u00b0C', statusColor: 'green' },
+  },
+  // ── Paris (84532) — Base Sepolia ──
   84532: {
-    0: { title: 'Eiffel Tower Relay', analysis: 'Monitoring beacon with bridge ingress traces converging from multiple L2 chains. The relay is intercepting Base network traffic and logging wallet fingerprints. Cross-referencing with known Carmen associates reveals at least three flagged addresses routing through this node in the last 48 blocks.', status: 'MONITORING ACTIVE \u2014 MEDIUM THREAT', statusColor: 'yellow' },
-    1: { title: 'Louvre Custody Router', analysis: "High-value custody operations detected behind museum-grade encryption. This protocol is staging significant digital asset transfers \u2014 the vault signatures match patterns from previous Carmen heists. Someone is preparing to move a large payload off-chain. Extreme caution advised.", status: 'CUSTODY BREACH RISK \u2014 CRITICAL', statusColor: 'red' },
-    2: { title: 'Notre-Dame Gate', analysis: 'Base traffic converges at this bridge relay like pilgrims to a cathedral. The gate is acting as a funnel point for cross-chain asset flows, blending legitimate DeFi activity with obfuscated transfers. The noise-to-signal ratio is deliberately high \u2014 someone wants this node to look busy.', status: 'BRIDGE CONVERGENCE \u2014 LOW THREAT', statusColor: 'green' },
+    0: { title: 'Eiffel Tower Relay', analysis: "The Eiffel Tower is made of 7,300 tons of wrought iron with 2.5 million rivets. Originally built as a temporary exhibit for the 1889 World's Fair, artists protested it as an eyesore \u2014 yet it became Paris's most iconic symbol. Base, built by Coinbase, follows a similar trajectory: a practical L2 solution that's rapidly becoming a cornerstone of the on-chain economy, bringing the next billion users to Ethereum.", status: 'TOWER \u2014 7,300 TONS OF IRON', statusColor: 'yellow' },
+    1: { title: 'Louvre Custody Router', analysis: "The Louvre is the world's most visited museum, welcoming over 7.8 million visitors annually. It houses 380,000 objects across 72,735 square meters. Base's mission to bring the next billion users on-chain echoes the Louvre's role as a gateway to culture \u2014 both make something valuable accessible to everyone, with Base's sub-cent transaction fees removing the cost barrier.", status: 'MUSEUM \u2014 380,000 OBJECTS', statusColor: 'yellow' },
+    2: { title: 'Notre-Dame Gate', analysis: "Notre-Dame Cathedral took 182 years to build (1163-1345) and survived the devastating 2019 fire thanks to the bravery of firefighters and the resilience of its medieval stone vault. Base is similarly built for the long term \u2014 as an MIT-licensed, open-source L2, its infrastructure is designed to outlast any single company, with decentralized sequencing on the roadmap.", status: 'CATHEDRAL \u2014 182 YEARS TO BUILD', statusColor: 'yellow' },
   },
+  // ── Rome (845321) — Base Sepolia ──
+  845321: {
+    0: { title: 'Saint Peter Relay', analysis: "St. Peter's Basilica is the world's largest church, covering 23,000 square meters. Its dome, designed by Michelangelo, rises 136 meters and took 120 years to complete. Base's infrastructure is built with similar ambition \u2014 designed to handle massive throughput at scale, with the goal of making on-chain interactions as common as online shopping.", status: 'BASILICA \u2014 23,000 SQ METERS', statusColor: 'yellow' },
+    1: { title: 'Colosseum Beacon', analysis: "The Colosseum could seat 50,000 to 80,000 spectators and featured a retractable awning system (velarium) operated by a team of sailors. It was the ancient world's largest amphitheatre. Base channels this same capacity \u2014 processing thousands of transactions per second with Ethereum's security backing every operation, like the Colosseum's engineering backing every spectacle.", status: 'ARENA \u2014 50,000+ CAPACITY', statusColor: 'green' },
+    2: { title: 'Trevi Fountain Vault', analysis: "Visitors throw approximately \u20ac3,000 into the Trevi Fountain daily (over \u20ac1 million per year), which is collected and donated to charity. The fountain's Baroque design took 30 years to complete. Base's low transaction fees (often under $0.01) make micro-transactions viable \u2014 so even tossing a digital coin into a smart contract fountain is economically feasible.", status: 'FOUNTAIN \u2014 \u20ac3,000/DAY', statusColor: 'green' },
+  },
+  // ── Sydney (51) — XDC Apothem ──
   51: {
-    0: { title: 'Opera House Node', analysis: "XDC transmissions intensify after dusk at the Opera House. The router is disguised within cultural network traffic but deeper analysis reveals fragmented wallet signatures embedded in XDC heartbeat pings. Carmen's coordination protocol is active here.", status: 'HIGH-FREQ SWAPS \u2014 HIGH THREAT', statusColor: 'red' },
-    1: { title: 'Harbour Bridge Relay', analysis: 'A relay strung across the Harbour Bridge carries cross-chain drips forming a trail. Bridge analysis reveals fragmented wallet data hidden beneath routine XDC synchronization signals. The steganographic encoding matches known Carmen signatures.', status: 'SIGNAL INTERCEPT \u2014 MEDIUM THREAT', statusColor: 'yellow' },
-    2: { title: 'Bondi Beach Market', analysis: 'Market routes surge near Bondi. Deep-storage custody patterns hidden beneath layers of routine DeFi traffic. The vault shows standard yield farming rebalances on the surface, but deeper analysis reveals suspicious asset consolidation.', status: 'DEEP STORAGE \u2014 LOW THREAT', statusColor: 'green' },
+    0: { title: 'Opera House Node', analysis: "The Sydney Opera House took 16 years to build and features over 1 million Swedish-made roof tiles. Its construction went 1,357% over budget \u2014 from AU$7 million to AU$102 million. XDC Network focuses on trade finance and enterprise solutions with a similarly ambitious scope, aiming to digitize the $5 trillion global trade finance market through ISO 20022-compliant blockchain infrastructure.", status: 'OPERA \u2014 1M ROOF TILES', statusColor: 'yellow' },
+    1: { title: 'Harbour Bridge Relay', analysis: "The Sydney Harbour Bridge, nicknamed \"The Coathanger,\" is 134 meters tall and used 52,800 tonnes of steel. It took 8 years to build and connects Sydney's CBD to the North Shore. XDC Network similarly bridges the gap between traditional trade finance and blockchain \u2014 connecting banks, exporters, and importers through its hybrid relay architecture.", status: 'BRIDGE \u2014 52,800 TONNES STEEL', statusColor: 'green' },
+    2: { title: 'Bondi Beach Market', analysis: "Bondi Beach stretches 1 kilometer of golden sand and hosts some of the world's largest surf competitions. The Bondi to Coogee coastal walk attracts over 3 million visitors yearly. XDC's decentralized exchange ecosystem carries a similar energy \u2014 with fast 2-second block times and near-zero gas fees, tokens flow through the XDC network like waves through Bondi's famous break.", status: 'BEACH \u2014 1 KM GOLDEN SAND', statusColor: 'green' },
+  },
+  // ── Nairobi (511) — XDC Apothem ──
+  511: {
+    0: { title: 'National Park Relay', analysis: "Nairobi National Park is the only national park in the world located within a capital city. Just 7 km from downtown, you can see lions with the Nairobi skyline in the background. XDC Network is similarly unique \u2014 the only enterprise-grade blockchain fully focused on trade finance, operating right alongside traditional financial institutions rather than in isolation.", status: 'PARK \u2014 7 KM FROM DOWNTOWN', statusColor: 'green' },
+    1: { title: 'Giraffe Centre Beacon', analysis: "The African Fund for Endangered Wildlife's Giraffe Centre was established in 1979 to protect the Rothschild's giraffe, of which fewer than 800 remain in the wild. Their long necks evolved for reaching high foliage. XDC takes a similarly far-sighted approach to blockchain \u2014 building long-term trade finance infrastructure that reaches across borders and institutions.", status: 'CONSERVATION \u2014 EST. 1979', statusColor: 'green' },
+    2: { title: 'National Museum Vault', analysis: "The National Museum of Kenya houses some of humanity's oldest fossils, including the famous Turkana Boy \u2014 a 1.6 million-year-old Homo erectus skeleton. These artifacts trace the origins of human civilization. XDC traces the origins of digital trade finance, creating immutable records of transactions that will endure as long as the blockchain itself.", status: 'MUSEUM \u2014 1.6M YEAR OLD FOSSILS', statusColor: 'yellow' },
+  },
+  // ── Rio de Janeiro (512) — XDC Apothem ──
+  512: {
+    0: { title: 'Cristo Redentor Node', analysis: "Cristo Redentor stands 30 meters tall on an 8-meter pedestal atop Corcovado mountain at 710 meters elevation. Built between 1922-1931, it is made of reinforced concrete and soapstone. Its open arms span 28 meters, symbolizing welcome. XDC Network's architecture is equally open \u2014 its hybrid blockchain allows both public and private participation, welcoming enterprises and individuals alike.", status: 'STATUE \u2014 710M ELEVATION', statusColor: 'yellow' },
+    1: { title: 'Copacabana Vault', analysis: "Copacabana Beach stretches 4 kilometers and hosts the world's largest New Year's celebration, drawing over 2 million people. Its distinctive Portuguese wave-pattern sidewalk was designed in the 1930s. XDC's vibrant DeFi ecosystem mirrors this energy \u2014 a growing community of builders creating decentralized applications for trade finance and beyond.", status: 'BEACH \u2014 4 KM STRETCH', statusColor: 'green' },
+    2: { title: 'Escadaria Selar\u00f3n Market', analysis: "The Escadaria Selar\u00f3n consists of 215 steps covered with over 2,000 hand-painted tiles from more than 60 countries around the world. Chilean-born artist Jorge Selar\u00f3n called it his tribute to the Brazilian people. XDC connects trade across a similarly global network \u2014 facilitating cross-border transactions between enterprises in dozens of countries through its interoperable protocol.", status: 'STAIRS \u2014 60+ COUNTRIES', statusColor: 'yellow' },
+  },
+  // ── Santiago (80002) — Polygon Amoy ──
+  80002: {
+    0: { title: 'Easter Island Relay', analysis: "Easter Island (Rapa Nui) is home to 887 monumental moai statues carved by the Rapa Nui people between 1250-1500 AD. The largest erected moai stands 10 meters tall and weighs 82 tonnes. Like these enduring sentinels, Polygon's validator nodes stand watch over the network \u2014 hundreds of validators securing billions in value through Proof of Stake consensus.", status: 'ISLAND \u2014 887 MOAI STATUES', statusColor: 'yellow' },
+    1: { title: 'Gran Torre Node', analysis: "Gran Torre Santiago is the tallest building in Latin America at 300 meters with 64 floors. It was completed in 2013 and houses offices, a hotel, and a mall. Polygon scales to similar heights in the blockchain world \u2014 its zkEVM and PoS chains process thousands of transactions per second, making it one of the most scalable Ethereum L2 solutions available.", status: 'TOWER \u2014 300M / 64 FLOORS', statusColor: 'green' },
+    2: { title: 'La Moneda Vault', analysis: "La Moneda Palace has served as Chile's presidential seat since 1846. Originally built as the national mint (hence the name \"La Moneda\" meaning \"The Coin\"). This connection to currency is fitting \u2014 Polygon's MATIC token powers the entire ecosystem, and the network's governance model is as established as Chile's democratic institutions.", status: 'PALACE \u2014 \"THE COIN\" SINCE 1846', statusColor: 'yellow' },
+  },
+  // ── Dakar (800021) — Polygon Amoy ──
+  800021: {
+    0: { title: 'Renaissance Monument Relay', analysis: "The African Renaissance Monument in Dakar stands 49 meters tall \u2014 taller than the Statue of Liberty. Built in 2010, it depicts a man, woman, and child emerging from a volcano, symbolizing Africa's emergence into the modern world. Polygon represents a similar renaissance for Web3 \u2014 bringing scalable, low-cost blockchain access to emerging markets worldwide.", status: 'MONUMENT \u2014 49M HEIGHT', statusColor: 'yellow' },
+    1: { title: 'Gor\u00e9e Island Node', analysis: "Gor\u00e9e Island is a UNESCO World Heritage Site located 3 km off the coast of Dakar. It serves as a powerful symbol of historical memory and reconciliation. Polygon's blockchain technology shares a core principle with this site \u2014 the immutable preservation of records. Once a transaction is written to Polygon, it cannot be erased or rewritten.", status: 'UNESCO \u2014 3 KM OFFSHORE', statusColor: 'yellow' },
+    2: { title: 'Grand Mosque Vault', analysis: "The Grand Mosque of Dakar is one of the largest in West Africa, combining traditional Islamic architecture with local Senegalese design elements. Its community serves as a gathering point for millions. Polygon's developer community echoes this scale \u2014 with over 53,000 dApps deployed and millions of daily active users, it's one of the most vibrant blockchain ecosystems.", status: "MOSQUE \u2014 WEST AFRICA'S LARGEST", statusColor: 'yellow' },
+  },
+  // ── Moscow (800022) — Polygon Amoy ──
+  800022: {
+    0: { title: 'Red Square Relay', analysis: "Red Square spans 330 meters in length and 70 meters in width, serving as Moscow's central hub since the 15th century. Its name comes from the old Russian word \"krasnaya\" meaning \"beautiful,\" not \"red.\" Polygon's network is similarly central to Ethereum's ecosystem \u2014 a scalable solution that hosts thousands of active dApps and processes millions of transactions daily.", status: 'SQUARE \u2014 330M LENGTH', statusColor: 'yellow' },
+    1: { title: 'Kremlin Beacon', analysis: "The Moscow Kremlin is a fortified complex spanning 27.5 hectares, containing palaces, cathedrals, and the seat of government. Its walls are 2.2 km long with 20 towers. Polygon's security architecture is fortress-like in its own right \u2014 its proof-of-stake checkpoints anchor to Ethereum's mainnet, creating multiple layers of protection for billions in assets.", status: 'FORTRESS \u2014 20 TOWERS', statusColor: 'green' },
+    2: { title: 'Bolshoi Theatre Vault', analysis: "The Bolshoi Theatre was founded in 1776 and is one of the world's oldest and most renowned ballet and opera companies. Its 2,150-seat main hall features extraordinary acoustics perfected over centuries. Polygon orchestrates blockchain transactions with similar precision \u2014 its fast finality and low latency create a seamless experience for DeFi, gaming, and NFT applications.", status: 'THEATRE \u2014 FOUNDED 1776', statusColor: 'yellow' },
+  },
+  // ── New York City (11155111) — Ethereum Sepolia ──
+  11155111: {
+    0: { title: 'Liberty Island Relay', analysis: "The Statue of Liberty was a gift from France in 1886, made entirely of copper plates just 2.4 mm thick \u2014 which is why it turned green through oxidation over decades. It symbolizes freedom and opportunity. Ethereum embodies this same spirit as the original decentralized smart contract platform \u2014 permissionless, open, and accessible to anyone with an internet connection.", status: 'STATUE \u2014 2.4 MM COPPER', statusColor: 'yellow' },
+    1: { title: 'Central Park Beacon', analysis: "Central Park covers 843 acres in the heart of Manhattan and was the first landscaped public park in the United States, opened in 1858. It receives over 42 million visitors annually. Ethereum is the Central Park of DeFi \u2014 the foundational ecosystem where thousands of protocols, from Uniswap to Aave, have taken root and flourished since 2015.", status: 'PARK \u2014 843 ACRES', statusColor: 'green' },
+    2: { title: 'Times Square Market', analysis: "Times Square sees about 330,000 visitors daily and is known as \"The Crossroads of the World.\" Its iconic electronic billboards consume roughly 161 megawatts annually. Ethereum is the crossroads of crypto \u2014 the most connected blockchain where the majority of cross-chain bridges, token standards (ERC-20, ERC-721), and DeFi protocols converge.", status: 'CROSSROADS \u2014 330K DAILY VISITORS', statusColor: 'green' },
+  },
+  // ── Mexico City (11155112) — Ethereum Sepolia ──
+  11155112: {
+    0: { title: 'Bellas Artes Relay', analysis: "The Palacio de Bellas Artes is a masterpiece of Art Nouveau and Art Deco architecture, home to murals by Diego Rivera, David Alfaro Siqueiros, and Rufino Tamayo. Its construction took 30 years due to the Mexican Revolution. Ethereum's smart contracts are equally artful \u2014 composable, programmable building blocks that developers combine to create complex financial instruments.", status: 'PALACE \u2014 30 YEARS TO BUILD', statusColor: 'yellow' },
+    1: { title: 'Chapultepec Beacon', analysis: "Bosque de Chapultepec is one of the largest city parks in the Western Hemisphere at 686 hectares \u2014 nearly twice the size of Central Park. It contains a castle, a zoo, museums, and an ancient forest of Montezuma cypress trees. Ethereum's ecosystem is similarly expansive \u2014 hosting the largest collection of dApps, developer tools, and standards in all of crypto.", status: 'FOREST \u2014 686 HECTARES', statusColor: 'green' },
+    2: { title: 'Templo Mayor Vault', analysis: "Templo Mayor was the main temple of the Aztec capital Tenochtitlan, rediscovered accidentally in 1978 beneath modern Mexico City. Archaeological layers reveal 7 phases of construction spanning 200 years. Ethereum's architecture has similarly deep layers \u2014 from the EVM execution layer to the consensus layer, each upgrade (Merge, Shanghai, Dencun) builds upon the last.", status: 'TEMPLE \u2014 7 LAYERS DEEP', statusColor: 'yellow' },
+  },
+  // ── Dubai (11155113) — Ethereum Sepolia ──
+  11155113: {
+    0: { title: 'Burj Khalifa Node', analysis: "The Burj Khalifa reaches 828 meters \u2014 the tallest structure ever built by humans, with 163 floors. Its Y-shaped design resists wind forces at extreme heights. Ethereum similarly aims high with its ambitious roadmap: the Surge for 100,000+ TPS through L2s, the Verge for stateless clients, and the Purge for reduced node requirements.", status: 'TOWER \u2014 828M / 163 FLOORS', statusColor: 'green' },
+    1: { title: 'Dubai Airport Relay', analysis: "Dubai International Airport (DXB) is the world's busiest by international passenger traffic, serving over 87 million travelers annually across 260+ destinations. It never closes. Ethereum processes transactions 24/7 as well \u2014 the network has maintained nearly 100% uptime since launch in 2015, serving as the world's busiest decentralized finance hub.", status: 'AIRPORT \u2014 87M PASSENGERS/YEAR', statusColor: 'green' },
+    2: { title: 'Dubai Mall Market', analysis: "The Dubai Mall is the world's largest shopping mall by total area at 502,000 square meters, housing over 1,200 retail outlets, an aquarium, and an ice rink. Ethereum is the world's largest on-chain marketplace \u2014 hosting the majority of NFT trading volume, DeFi liquidity, and tokenized assets, with over $50 billion in total value locked across its ecosystem.", status: 'MALL \u2014 502,000 SQ METERS', statusColor: 'yellow' },
   },
 }
 
 function generateNarrative(city, locIdx) {
   const c = city.cases[locIdx]
   if (!c) return null
-  const cycle = STATUS_CYCLE[locIdx % 3]
+  const cycle = [
+    { status: 'LANDMARK \u2014 ACTIVE NODE', statusColor: 'yellow' },
+    { status: 'NETWORK INSIGHT \u2014 INFRASTRUCTURE', statusColor: 'green' },
+    { status: 'REGIONAL HUB \u2014 CONNECTED', statusColor: 'yellow' },
+  ]
   return {
     title: c.name,
-    analysis: `${c.description} Cross-chain analysis at ${city.name} reveals suspicious patterns at this ${c.type.toLowerCase()} node. Traffic fingerprints match known Carmen operational signatures. The ${city.chain} network shows elevated activity \u2014 someone is moving assets through this location under the cover of routine ${c.type.toLowerCase()} operations.`,
-    ...cycle,
+    analysis: `${c.name} is a notable landmark in ${city.name}, connected to the ${city.chain} network (Chain ID: ${city.chainId}). This ${c.type.toLowerCase()} node operates on one of the blockchain ecosystem's key networks. ${city.chain} provides the infrastructure for fast, low-cost transactions that power decentralized applications across the globe.`,
+    ...cycle[locIdx % 3],
   }
 }
 
@@ -321,7 +417,7 @@ const CUSTOM_CLUE_DATA = {
         'Tokyo Tower beacon intercepted a burst transmission containing partial coordinates. Destination chain unclear \u2014 could be Paris or London.',
       ],
       strong: [
-        'Tokyo Tower beacon intercepted a burst with partial coordinates. The destination chain resolves to Base Sepolia \u2014 Carmen may be heading to Paris. [WALLET INTEL: suspect wallet contains WBTC among its holdings]',
+        'Tokyo Tower beacon intercepted a burst with partial coordinates. The destination chain resolves to another L2 network. [WALLET INTEL: suspect wallet contains WBTC among its holdings]',
         "Full burst decoded from Tower beacon: Carmen's relay signature confirmed. Transmission target locked. [WALLET INTEL: suspect wallet holds tokens on at least 2 different chains]",
       ],
     },
@@ -636,7 +732,7 @@ const CUSTOM_CLUE_DATA = {
         'Harbour Bridge relay intercepted encrypted bursts aimed at a relay. The signal carries fragmented data but the encryption key is unknown.',
       ],
       strong: [
-        "Harbour Bridge relay intercepted encrypted burst transmissions aimed at Tokyo. The signal carries fragmented wallet signatures \u2014 Carmen is coordinating a multi-chain extraction. [WALLET INTEL: suspect wallet contains ARB tokens \u2014 likely bridged from Arbitrum]",
+        "Harbour Bridge relay intercepted encrypted burst transmissions aimed at another chain. The signal carries fragmented wallet signatures \u2014 Carmen is coordinating a multi-chain extraction. [WALLET INTEL: suspect wallet contains ARB tokens \u2014 likely bridged from Arbitrum]",
         "Full relay intercept decoded: Carmen's relay coordination protocol captured. Multi-chain extraction timeline confirmed. [WALLET INTEL: suspect wallet bridged tokens from Arbitrum within the last 72 hours]",
       ],
     },
@@ -1065,31 +1161,82 @@ export function pickStartingCity(missionId) {
   return CITY_POOL[seed % CITY_POOL.length].id
 }
 
-export function pickRevealedCities(missionId, scanCount, excludeIds) {
+/**
+ * Parse CSS coord string (e.g. '83%') to a number.
+ * Falls back to 50 for unparseable values.
+ */
+function parseCoord(val) {
+  if (typeof val !== 'string') return 50
+  return parseFloat(val) || 50
+}
+
+/**
+ * Euclidean distance between two cities based on their map coords.
+ */
+function cityDistance(a, b) {
+  const ax = parseCoord(a.coords?.left), ay = parseCoord(a.coords?.top)
+  const bx = parseCoord(b.coords?.left), by = parseCoord(b.coords?.top)
+  return Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2)
+}
+
+/**
+ * Pick up to 3 cities to reveal, sorted by proximity to originCityId.
+ * Guarantees at least 1 never-scanned city when available.
+ *
+ * @param {number}   missionId      - current mission
+ * @param {number}   scanCount      - deterministic seed offset
+ * @param {number[]} excludeIds     - city IDs already on the map (discoveredCityIds)
+ * @param {number}   originCityId   - city the player just scanned (proximity anchor)
+ * @param {number[]} scannedIds     - all cities the player has ever scanned
+ */
+export function pickRevealedCities(missionId, scanCount, excludeIds, originCityId = null, scannedIds = []) {
   const seed = hashSeed(missionId, scanCount)
   const excluded = new Set(excludeIds)
+  const scannedSet = new Set(scannedIds)
 
-  // get current city's chainId so we can prioritize different chains
-  const currentCity = CITY_POOL_MAP[excludeIds[excludeIds.length - 1]]
-  const currentChainId = currentCity?.chainId
+  const origin = originCityId ? CITY_POOL_MAP[originCityId] : null
 
-  // sort candidates: different chain first, then by deterministic shuffle
-  const candidates = CITY_POOL
-    .filter((c) => !excluded.has(c.id))
-    .sort((a, b) => {
-      const aDiff = a.chainId !== currentChainId ? 0 : 1
-      const bDiff = b.chainId !== currentChainId ? 0 : 1
-      if (aDiff !== bDiff) return aDiff - bDiff
+  // all cities not currently on the map
+  const candidates = CITY_POOL.filter((c) => !excluded.has(c.id))
+  if (candidates.length === 0) return []
+
+  // sort by proximity to origin city, with deterministic tiebreaker
+  if (origin) {
+    candidates.sort((a, b) => {
+      const da = cityDistance(origin, a)
+      const db = cityDistance(origin, b)
+      if (Math.abs(da - db) > 1) return da - db
       return hashSeed(seed, a.id) - hashSeed(seed, b.id)
     })
+  } else {
+    candidates.sort((a, b) => hashSeed(seed, a.id) - hashSeed(seed, b.id))
+  }
 
-  return candidates.slice(0, 2)
+  // split into never-scanned and already-scanned
+  const fresh = candidates.filter((c) => !scannedSet.has(c.id))
+  const revisit = candidates.filter((c) => scannedSet.has(c.id))
+
+  const result = []
+
+  // guarantee at least 1 fresh city when available
+  if (fresh.length > 0) {
+    result.push(fresh.shift())
+  }
+
+  // fill remaining 2 slots from the full proximity-sorted list
+  for (const c of candidates) {
+    if (result.length >= 3) break
+    if (result.some((r) => r.id === c.id)) continue
+    result.push(c)
+  }
+
+  return result.slice(0, 3)
 }
 
 // ─── Country code lookup ───
 
 const COUNTRY_CODES = {
-  421614: 'JP', 4216141: 'CA', 97: 'GB', 98: 'CN', 99: 'IS',
+  421614: 'JP', 4216141: 'CA', 97: 'GB', 98: 'CN', 99: 'IS', 971: 'DE',
   84532: 'FR', 845321: 'IT', 51: 'AU', 511: 'KE', 512: 'BR',
   80002: 'CL', 800021: 'SN', 800022: 'RU',
   11155111: 'US', 11155112: 'MX', 11155113: 'AE',

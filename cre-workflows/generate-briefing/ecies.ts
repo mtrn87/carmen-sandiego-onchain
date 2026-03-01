@@ -18,12 +18,26 @@ import { secp256k1 } from "@noble/curves/secp256k1"
 import { gcm } from "@noble/ciphers/aes"
 import { hkdf } from "@noble/hashes/hkdf"
 import { sha256 } from "@noble/hashes/sha256"
-import { randomBytes } from "@noble/ciphers/webcrypto"
 
 const IV_LENGTH = 12
 
-export function eciesEncrypt(recipientPubKey: Uint8Array, plaintext: string): string {
-  const ephemeralPrivKey = secp256k1.utils.randomPrivateKey()
+/**
+ * Deterministic ECIES encrypt.
+ *
+ * Instead of true randomness (not available in Javy/WASM), the ephemeral
+ * private key and IV are derived deterministically from the VRF salt via
+ * HKDF(sha256, salt, sha256(plaintext), "carmen-ecies-ephem", 44).
+ *
+ * This is required for DON consensus: all nodes must produce identical output.
+ * Security comes from the VRF salt uniqueness, not from randomness at encrypt time.
+ */
+export function eciesEncrypt(recipientPubKey: Uint8Array, plaintext: string, seed: Uint8Array): string {
+  // Derive ephemeral key (32 bytes) + IV (12 bytes) from seed + plaintext hash
+  const plaintextHash = sha256(new TextEncoder().encode(plaintext))
+  const derived = hkdf(sha256, seed, plaintextHash, "carmen-ecies-ephem", 44)
+  const ephemeralPrivKey = derived.slice(0, 32)
+  const iv = derived.slice(32, 44)
+
   const ephemeralPubKey = secp256k1.getPublicKey(ephemeralPrivKey, false)
 
   const sharedPoint = secp256k1.getSharedSecret(ephemeralPrivKey, recipientPubKey)
@@ -31,7 +45,6 @@ export function eciesEncrypt(recipientPubKey: Uint8Array, plaintext: string): st
 
   const aesKey = hkdf(sha256, sharedX, undefined, "carmen-ecies", 32)
 
-  const iv = randomBytes(IV_LENGTH)
   const plaintextBytes = new TextEncoder().encode(plaintext)
   const cipher = gcm(aesKey, iv)
   const ciphertext = cipher.encrypt(plaintextBytes)

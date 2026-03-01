@@ -103,12 +103,12 @@ export default function GamePage() {
 
   const handleSelectCase = async (c) => {
     // CityNode cities: load city data and set location index
-    const cityNodeChains = [421614, 84532, 51]
-    if (c?.chainId && cityNodeChains.includes(c.chainId)) {
+    // Use unique cityId (from InteractiveMap) to identify the city
+    const cityId = c?.cityId
+    if (cityId && CITY_POOL_MAP[cityId]) {
       const locIdx = c.locationIdx ?? 0
-      if (!currentCityId || currentCityId !== c.chainId) {
-        await selectCity(c.chainId)
-        selectLocation(locIdx)
+      if (!currentCityId || currentCityId !== cityId) {
+        selectCity(cityId).then(() => selectLocation(locIdx))
       } else {
         selectLocation(locIdx)
       }
@@ -118,25 +118,29 @@ export default function GamePage() {
     setShowMap(false)
   }
 
+  // back to city location panel (preserves city state, reopens map with panel)
+  const handleBackToCityPanel = () => {
+    backToCityPanel()
+    useGameStore.setState({ autoOpenHomeCity: true })
+    setShowMap(true)
+  }
+
   // determine what to show in the main area
   const renderMainContent = () => {
     if (showMap) {
       return (
-        <>
-          <InteractiveMap
-            onSelectCase={handleSelectCase}
-          />
-          <button
-            className={styles.backToExplorer}
-            onClick={() => setShowMap(false)}
-          >
-            &#9664; BACK TO EXPLORER
-          </button>
-        </>
+        <InteractiveMap
+          onSelectCase={handleSelectCase}
+        />
       )
     }
 
-    return <ContractExplorer onOpenMap={() => setShowMap(true)} />
+    return (
+      <ContractExplorer
+        onOpenMap={() => setShowMap(true)}
+        onBackToCityPanel={handleBackToCityPanel}
+      />
+    )
   }
 
   return (
@@ -149,8 +153,8 @@ export default function GamePage() {
       {/* mission briefing overlay — shown before game loads */}
       {!briefingDone && <MissionBriefing />}
 
-      {/* victory/defeat overlay — shown when mission ends */}
-      {showOutcomeModal && <MissionOutcome />}
+      {/* victory/defeat overlay — only after briefing is done */}
+      {briefingDone && showOutcomeModal && <MissionOutcome />}
 
       {/* mission plot overlay — opened from terminal command */}
       {showPlotModal && <MissionPlotModal />}
@@ -179,17 +183,19 @@ export default function GamePage() {
       </div>
 
       {/* left sidebar — terminal (dimmed in capture mode) */}
-      <aside className={`${styles.sidebar} ${captureMode ? styles.sidebarDimmed : ''}`}>
+      <aside className={`${styles.sidebar} ${captureMode && captureSelectedTx ? styles.sidebarDimmed : ''}`}>
         <TerminalSidebar />
       </aside>
 
-      {/* right area — explorer/map + capture bar */}
+      {/* right area — explorer/map */}
       <main className={styles.main}>
         <div className={styles.mapArea}>
           {renderMainContent()}
         </div>
-        {captureMode && <CaptureMode />}
       </main>
+
+      {/* capture modal — opens when a tx is selected in capture mode */}
+      {captureMode && captureSelectedTx && !showMap && <CaptureMode />}
 
     </div>
   )

@@ -346,7 +346,7 @@ describe("CityNode", function () {
   describe("Energy System", function () {
     it("should start at MAX_ENERGY for new players", async function () {
       const energy = await cityNode.getEnergy(player.address);
-      expect(energy).to.equal(10);
+      expect(energy).to.equal(20);
     });
 
     it("should decrease energy on action", async function () {
@@ -355,52 +355,51 @@ describe("CityNode", function () {
       // inspect costs 1 energy
       await cityNode.connect(player).inspectLocation(0);
       const energy = await cityNode.getEnergy(player.address);
-      expect(energy).to.equal(9);
+      expect(energy).to.equal(19);
     });
 
     it("should regenerate energy over time", async function () {
       await cityNode.connect(owner).setupLocations(sampleLocations);
 
       // spend some energy
-      await cityNode.connect(player).inspectLocation(0); // 10 -> 9
-      await cityNode.connect(player).inspectLocation(1); // 9 -> 8
+      await cityNode.connect(player).inspectLocation(0); // 20 -> 19
+      await cityNode.connect(player).inspectLocation(1); // 19 -> 18
 
       // advance time by 30 minutes (2 regen ticks)
       await time.increase(30 * 60);
 
       const energy = await cityNode.getEnergy(player.address);
-      expect(energy).to.equal(10); // 8 + 2 = 10 (capped at MAX)
+      expect(energy).to.equal(20); // 18 + 2 = 20 (capped at MAX)
     });
 
     it("should cap energy at MAX_ENERGY", async function () {
       await cityNode.connect(owner).setupLocations(sampleLocations);
 
       // spend 1 energy
-      await cityNode.connect(player).inspectLocation(0); // 10 -> 9
+      await cityNode.connect(player).inspectLocation(0); // 20 -> 19
 
       // advance time by 2 hours (lots of regen)
       await time.increase(2 * 60 * 60);
 
       const energy = await cityNode.getEnergy(player.address);
-      expect(energy).to.equal(10); // capped at MAX
+      expect(energy).to.equal(20); // capped at MAX
     });
 
     it("should reject action when not enough energy", async function () {
       await cityNode.connect(owner).setupLocations(sampleLocations);
       await cityNode.connect(owner).addAnomalyTxRef(makeTxRef(1));
 
-      // exhaust energy: 10 total, each inspect=1, scan=2
-      // 3 inspects (3 energy) + 3 scans (6 energy) = 9, then requestClue = 2 > 1 remaining
-      await cityNode.connect(player).inspectLocation(0); // 10->9
-      await cityNode.connect(player).inspectLocation(1); // 9->8
-      await cityNode.connect(player).inspectLocation(2); // 8->7
-      await cityNode.connect(player).scanAnomalies(0);   // 7->5
-      await cityNode.connect(player).scanAnomalies(1);   // 5->3
-      await cityNode.connect(player).scanAnomalies(2);   // 3->1
+      // exhaust energy: 20 total, each inspect=1, scan=6
+      // 3 inspects (3 energy) + 2 scans (12 energy) = 15, then scan=6 > 5 remaining
+      await cityNode.connect(player).inspectLocation(0); // 20->19
+      await cityNode.connect(player).inspectLocation(1); // 19->18
+      await cityNode.connect(player).inspectLocation(2); // 18->17
+      await cityNode.connect(player).scanAnomalies(0);   // 17->11
+      await cityNode.connect(player).scanAnomalies(1);   // 11->5
 
-      // requestClue costs 2, but only 1 left
+      // scanAnomalies costs 6, but only 5 left
       await expect(
-        cityNode.connect(player).requestClue(0, 0)
+        cityNode.connect(player).scanAnomalies(2)
       ).to.be.revertedWith("Not enough energy");
     });
 
@@ -409,7 +408,7 @@ describe("CityNode", function () {
 
       await expect(cityNode.connect(player).inspectLocation(0))
         .to.emit(cityNode, "EnergySpent")
-        .withArgs(player.address, 1, 9, 0); // cost=1, remaining=9, actionType=INSPECT(0)
+        .withArgs(player.address, 1, 19, 0); // cost=1, remaining=19, actionType=INSPECT(0)
     });
   });
 
@@ -543,7 +542,7 @@ describe("CityNode", function () {
     it("should cost 1 energy", async function () {
       const refId = ethers.keccak256(ethers.toUtf8Bytes("suspicious-tx"));
       await cityNode.connect(player).flagTx(refId);
-      expect(await cityNode.getEnergy(player.address)).to.equal(9);
+      expect(await cityNode.getEnergy(player.address)).to.equal(19);
     });
   });
 
@@ -556,7 +555,7 @@ describe("CityNode", function () {
 
     it("should cost 1 energy", async function () {
       await cityNode.connect(player).requestDossier();
-      expect(await cityNode.getEnergy(player.address)).to.equal(9);
+      expect(await cityNode.getEnergy(player.address)).to.equal(19);
     });
   });
 
@@ -588,7 +587,7 @@ describe("CityNode", function () {
       const suspectWallet = ethers.Wallet.createRandom().address;
       const evidenceHash = ethers.keccak256(ethers.toUtf8Bytes("evidence"));
       await cityNode.connect(player).requestCapture(suspectWallet, evidenceHash);
-      expect(await cityNode.getEnergy(player.address)).to.equal(7);
+      expect(await cityNode.getEnergy(player.address)).to.equal(17);
     });
   });
 
@@ -876,7 +875,7 @@ describe("CityNode", function () {
       expect(scans).to.equal(0);
 
       // energy should also be reset to max
-      expect(await cityNode.getEnergy(player.address)).to.equal(10);
+      expect(await cityNode.getEnergy(player.address)).to.equal(20);
     });
   });
 

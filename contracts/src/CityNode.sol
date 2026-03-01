@@ -22,14 +22,14 @@ contract CityNode is ICityNode, CCIPReceiver {
     //                     CONSTANTS
     // ============================================================
 
-    uint32 public constant MAX_ENERGY = 10;
+    uint32 public constant MAX_ENERGY = 20;
     uint32 public constant ENERGY_REGEN_INTERVAL = 15 minutes;
     uint8 public constant NUM_LOCATIONS = 3;
     uint8 public constant CLUES_PER_LOCATION = 3;
 
     // action costs
     uint32 private constant COST_INSPECT = 1;
-    uint32 private constant COST_SCAN = 2;
+    uint32 private constant COST_SCAN = 6;
     uint32 private constant COST_REQUEST_CLUE = 2;
     uint32 private constant COST_FLAG_TX = 1;
     uint32 private constant COST_REQUEST_DOSSIER = 1;

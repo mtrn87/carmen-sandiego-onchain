@@ -80,7 +80,10 @@ export default function LoginPage() {
   useEffect(() => {
     if (user && privyReady && wallets?.length === 0) {
       createWallet().catch((err) => {
-        console.warn('[LoginPage] createWallet failed:', err.message)
+        // "already has wallet" is expected when wallets array is momentarily empty during hydration
+        if (!err.message?.includes('already has')) {
+          console.warn('[LoginPage] createWallet failed:', err.message)
+        }
       })
     }
   }, [user, privyReady, wallets, createWallet])
@@ -214,6 +217,7 @@ export default function LoginPage() {
 
   const handleNicknameConfirm = useCallback((nickname) => {
     localStorage.setItem('player_nickname', nickname)
+    useGameStore.getState().setPlayerNickname(nickname)
     setShowNicknameModal(false)
     navigate('/game')
   }, [navigate])
@@ -340,12 +344,29 @@ export default function LoginPage() {
                     loading={startingMission}
                     onClick={async () => {
                       if (missionId) {
-                        // mission already active — skip briefing, load city and go to game
+                        // mission already active — skip briefing, restore discovery + city state
                         setStartingMission(true)
                         try {
                           const store = useGameStore.getState()
-                          await store.selectCity(421614)
-                          store.selectLocation(0)
+                          // restore discovered cities, visited cities, trail from localStorage
+                          await store.initDiscovery(missionId)
+                          // restore saved evidence from localStorage
+                          const saved = JSON.parse(localStorage.getItem('carmen_investigation_progress') || '{}')
+                          const restored = {}
+                          if (saved.evidence?.length > 0) restored.evidence = saved.evidence
+                          if (saved.cityEvidence?.length > 0) restored.cityEvidence = saved.cityEvidence
+                          if (saved.walletFragments?.length > 0) {
+                            restored.walletFragments = saved.walletFragments
+                            restored.walletFragmentCount = saved.walletFragmentCount || saved.walletFragments.length
+                            restored.walletCaptureAvailable = (restored.walletFragmentCount || 0) >= 3
+                          }
+                          if (saved.evidenceCount > 0) restored.evidenceCount = saved.evidenceCount
+                          if (Object.keys(restored).length > 0) useGameStore.setState(restored)
+                          // restore last visited city or fall back to home
+                          const resumeCityId = saved.currentCityId || useGameStore.getState().discoveredCityIds?.[0] || 80002
+                          const resumeLocIdx = saved.currentLocationIdx ?? 0
+                          await store.selectCity(resumeCityId)
+                          store.selectLocation(resumeLocIdx)
                           store.hydrateMissionPlot(missionId)
                           await store._setupEventListeners(missionId)
                         } catch (err) {
@@ -353,6 +374,8 @@ export default function LoginPage() {
                         }
                         useGameStore.setState({
                           briefingDone: true,
+                          showOutcomeModal: false,
+                          missionOutcome: null,
                           terminalLines: [
                             { text: '> ACME MAINFRAME :: INITIALIZING MISSION', color: 'cyan', type: 'system' },
                             { text: '> Agent connected. Welcome, Detective.', color: 'green', type: 'system' },

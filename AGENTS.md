@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus MCP
 
-This project is indexed by GitNexus as **carmenSandiego** (1322 symbols, 2752 relationships, 65 execution flows).
+This project is indexed by GitNexus as **carmenSandiego** (1364 symbols, 2852 relationships, 83 execution flows).
 
 ## Always Start Here
 

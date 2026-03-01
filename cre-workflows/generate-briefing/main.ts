@@ -489,7 +489,8 @@ const onMissionStarted = (runtime: Runtime<Config>, log: EVMLog): Record<string,
   const pubKeyBytes = parsePubKey(playerPubKeyHex, runtime.log)
   if (!pubKeyBytes) return {}
 
-  const encryptedBriefing = eciesEncrypt(pubKeyBytes, briefingText)
+  const saltBytes = toBytes(salt as `0x${string}`)
+  const encryptedBriefing = eciesEncrypt(pubKeyBytes, briefingText, saltBytes)
   runtime.log(`Opening clue encrypted (${encryptedBriefing.length} hex chars)`)
 
   // ── Step 7: Compute contentHash and send report ──
@@ -557,5 +558,4 @@ export async function main() {
   await runner.run(initWorkflow)
 }
 
-// Export for testing
-export { generateAIBriefing, buildEnrichedBriefing }
+// generateAIBriefing / buildEnrichedBriefing not exported — Javy WASM does not support exported functions with parameters

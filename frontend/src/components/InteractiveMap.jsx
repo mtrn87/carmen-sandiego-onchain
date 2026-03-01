@@ -1,13 +1,16 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { CITY_POOL, CITY_POOL_MAP } from '../data/cityRegistry'
 import styles from './InteractiveMap.module.css'
 
 const SCAN_COST = 30
+const MAP_W = 1920
+const MAP_H = 1080
 
 export default function InteractiveMap({ onSelectCase }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
+  const mapWorldRef = useRef(null)
   const {
     locations,
     showClueModal,
@@ -25,11 +28,69 @@ export default function InteractiveMap({ onSelectCase }) {
     carmenMovedAlert,
     discoveredCityIds,
     visitedCityIds,
+    autoOpenHomeCity,
+    currentCityId,
   } = useGameStore()
 
-  const blockColor = blocksElapsed <= 20 ? 'green' : blocksElapsed <= 35 ? 'yellow' : 'red'
+  const blockColor = blocksElapsed <= 128 ? 'green' : blocksElapsed <= 224 ? 'yellow' : 'red'
 
   const [selectedMarker, setSelectedMarker] = useState(null)
+
+  // pan state
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const dragRef = useRef({ dragging: false, startX: 0, startY: 0, panStartX: 0, panStartY: 0 })
+
+  // center map on mount
+  useEffect(() => {
+    if (!containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    setPan({
+      x: Math.min(0, (rect.width - MAP_W) / 2),
+      y: Math.min(0, (rect.height - MAP_H) / 2),
+    })
+  }, [])
+
+  // clamp pan to keep map within viewport bounds
+  const clampPan = useCallback((px, py) => {
+    if (!containerRef.current) return { x: px, y: py }
+    const rect = containerRef.current.getBoundingClientRect()
+    const minX = Math.min(0, rect.width - MAP_W)
+    const maxX = Math.max(0, rect.width - MAP_W)
+    const minY = Math.min(0, rect.height - MAP_H)
+    const maxY = Math.max(0, rect.height - MAP_H)
+    return {
+      x: Math.max(minX, Math.min(maxX, px)),
+      y: Math.max(minY, Math.min(maxY, py)),
+    }
+  }, [])
+
+  // mouse drag handlers
+  const onPointerDown = useCallback((e) => {
+    // only drag from map background, not from markers or panels
+    if (e.target !== mapWorldRef.current && e.target !== canvasRef.current && !e.target.classList.contains(styles.worldmapBg)) return
+    dragRef.current = { dragging: true, startX: e.clientX, startY: e.clientY, panStartX: pan.x, panStartY: pan.y }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }, [pan])
+
+  const onPointerMove = useCallback((e) => {
+    if (!dragRef.current.dragging) return
+    const dx = e.clientX - dragRef.current.startX
+    const dy = e.clientY - dragRef.current.startY
+    setPan(clampPan(dragRef.current.panStartX + dx, dragRef.current.panStartY + dy))
+  }, [clampPan])
+
+  const onPointerUp = useCallback(() => {
+    dragRef.current.dragging = false
+  }, [])
+
+  // auto-open home city location panel on new mission start
+  useEffect(() => {
+    if (autoOpenHomeCity && currentCityId && !selectedMarker) {
+      setSelectedMarker(currentCityId)
+      useGameStore.setState({ autoOpenHomeCity: false })
+    }
+  }, [autoOpenHomeCity, currentCityId, selectedMarker])
+
   const mapLocations = discoveredCityIds && discoveredCityIds.length > 0
     ? CITY_POOL.filter((c) => discoveredCityIds.includes(c.id))
     : CITY_POOL
@@ -41,33 +102,27 @@ export default function InteractiveMap({ onSelectCase }) {
     let animId
     let t = 0
 
-    const resize = () => {
-      const rect = containerRef.current.getBoundingClientRect()
-      canvas.width = rect.width
-      canvas.height = rect.height
-    }
-    resize()
-    window.addEventListener('resize', resize)
+    canvas.width = MAP_W
+    canvas.height = MAP_H
 
     const draw = () => {
       t += 0.003
-      const { width, height } = canvas
-      ctx.clearRect(0, 0, width, height)
+      ctx.clearRect(0, 0, MAP_W, MAP_H)
 
       // grid
       ctx.strokeStyle = 'rgba(0, 240, 255, 0.04)'
       ctx.lineWidth = 1
       const gridSize = 50
-      for (let x = 0; x < width; x += gridSize) {
+      for (let x = 0; x < MAP_W; x += gridSize) {
         ctx.beginPath()
         ctx.moveTo(x, 0)
-        ctx.lineTo(x, height)
+        ctx.lineTo(x, MAP_H)
         ctx.stroke()
       }
-      for (let y = 0; y < height; y += gridSize) {
+      for (let y = 0; y < MAP_H; y += gridSize) {
         ctx.beginPath()
         ctx.moveTo(0, y)
-        ctx.lineTo(width, y)
+        ctx.lineTo(MAP_W, y)
         ctx.stroke()
       }
 
@@ -77,12 +132,11 @@ export default function InteractiveMap({ onSelectCase }) {
           const target = locations.find((l) => l.id === connId)
           if (!target) return
 
-          const x1 = (loc.coords.x / 100) * width
-          const y1 = (loc.coords.y / 100) * height
-          const x2 = (target.coords.x / 100) * width
-          const y2 = (target.coords.y / 100) * height
+          const x1 = (loc.coords.x / 100) * MAP_W
+          const y1 = (loc.coords.y / 100) * MAP_H
+          const x2 = (target.coords.x / 100) * MAP_W
+          const y2 = (target.coords.y / 100) * MAP_H
 
-          // animated dashed line
           ctx.save()
           ctx.strokeStyle = 'rgba(0, 240, 255, 0.12)'
           ctx.lineWidth = 1
@@ -94,7 +148,6 @@ export default function InteractiveMap({ onSelectCase }) {
           ctx.stroke()
           ctx.restore()
 
-          // data packet traveling along the line
           const packetT = (t * 0.5 + loc.coords.x * 0.01) % 1
           const px = x1 + (x2 - x1) * packetT
           const py = y1 + (y2 - y1) * packetT
@@ -105,8 +158,8 @@ export default function InteractiveMap({ onSelectCase }) {
 
       // random floating data fragments
       for (let i = 0; i < 15; i++) {
-        const fx = ((i * 173.7 + t * 20) % width)
-        const fy = ((i * 83.1 + t * 10 + Math.sin(t * 2 + i) * 15) % height)
+        const fx = ((i * 173.7 + t * 20) % MAP_W)
+        const fy = ((i * 83.1 + t * 10 + Math.sin(t * 2 + i) * 15) % MAP_H)
         ctx.fillStyle = `rgba(0, 240, 255, ${0.08 + Math.sin(t * 3 + i) * 0.04})`
         ctx.font = '8px monospace'
         ctx.fillText(['0x', 'ff', 'a3', '7b', '00', '1e'][i % 6], fx, fy)
@@ -118,36 +171,53 @@ export default function InteractiveMap({ onSelectCase }) {
 
     return () => {
       cancelAnimationFrame(animId)
-      window.removeEventListener('resize', resize)
     }
   }, [locations])
 
   return (
-    <div className={styles.mapContainer} ref={containerRef}>
-      {/* worldmap background */}
-      <img src="/worldmap.png" alt="" className={styles.worldmapBg} />
+    <div
+      className={styles.mapContainer}
+      ref={containerRef}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+    >
+      {/* pannable map world */}
+      <div
+        ref={mapWorldRef}
+        className={styles.mapWorld}
+        style={{ transform: `translate(${pan.x}px, ${pan.y}px)` }}
+      >
+        {/* worldmap background */}
+        <img src="/worldmap.png" alt="" className={styles.worldmapBg} />
 
-      {/* background canvas */}
-      <canvas ref={canvasRef} className={styles.canvas} />
+        {/* background canvas */}
+        <canvas ref={canvasRef} className={styles.canvas} />
 
-      {/* blockchain entities on map */}
-      {mapLocations.map((loc) => {
-        const isScanned = loc.alwaysScanned || scannedLocations.includes(loc.id)
-        return (
-          <div
-            key={loc.id}
-            className={`${styles.entityMarker} ${selectedMarker === loc.id ? styles.entityMarkerActive : ''} ${!isScanned ? styles.entityMarkerLocked : ''} ${visitedCityIds?.includes(loc.id) ? styles.entityMarkerVisited : ''} ${discoveredCityIds?.includes(loc.id) && !scannedLocations.includes(loc.id) && !visitedCityIds?.includes(loc.id) ? styles.entityMarkerNew : ''}`}
-            style={{ left: loc.coords.left, top: loc.coords.top, '--chain-color': loc.chainColor }}
-            onClick={() => setSelectedMarker(selectedMarker === loc.id ? null : loc.id)}
-          >
-            <div className={styles.entityPulse} />
-            <div className={styles.entityIcon}>
-              <img src={loc.chainIcon} alt={loc.chain} />
+        {/* blockchain entities on map */}
+        {mapLocations.map((loc) => {
+          const isScanned = loc.alwaysScanned || scannedLocations.includes(loc.id)
+          return (
+            <div
+              key={loc.id}
+              className={`${styles.entityMarker} ${selectedMarker === loc.id ? styles.entityMarkerActive : ''} ${!isScanned ? styles.entityMarkerLocked : ''} ${visitedCityIds?.includes(loc.id) ? styles.entityMarkerVisited : ''} ${discoveredCityIds?.includes(loc.id) && !scannedLocations.includes(loc.id) && !visitedCityIds?.includes(loc.id) ? styles.entityMarkerNew : ''}`}
+              style={{ left: `${loc.coords.x}px`, top: `${loc.coords.y}px`, '--chain-color': loc.chainColor }}
+              onClick={() => setSelectedMarker(selectedMarker === loc.id ? null : loc.id)}
+            >
+              <div className={styles.entityPulse} />
+              <div className={styles.entityIcon}>
+                <img src={loc.chainIcon} alt={loc.chain} />
+              </div>
+              <span className={styles.entityLabel}>{loc.flag} {loc.name}</span>
             </div>
-            <span className={styles.entityLabel}>{loc.flag} {loc.name}</span>
-          </div>
-        )
-      })}
+          )
+        })}
+
+        {/* CRT overlay */}
+        <div className={styles.crtOverlay} />
+      </div>
+
+      {/* --- everything below is viewport-fixed (not panned) --- */}
 
       {/* location panel */}
       {selectedMarker && (() => {
@@ -161,81 +231,91 @@ export default function InteractiveMap({ onSelectCase }) {
               <img src={loc.image} alt={loc.name} />
               <div className={styles.locationPanelImageOverlay} />
               <div className={styles.locationPanelBadge}>
-                <span>{loc.flag}</span>
-                <span>{loc.name}</span>
+                <span>{loc.flag} {loc.name}</span>
                 <span className={styles.locationPanelChain} style={{ color: loc.chainColor }}>{loc.chain}</span>
               </div>
             </div>
 
-            {!isScanned ? (
-              <div className={styles.scanSection}>
-                <div className={styles.scanInfo}>
-                  <span className={styles.scanIcon}>&#128225;</span>
-                  <span className={styles.scanTitle}>UNCHARTED NETWORK</span>
-                  <span className={styles.scanDesc}>
-                    Scan this network to discover suspicious contracts.
-                  </span>
+            <div className={styles.locationPanelRight}>
+              {missionId && (
+                <div className={`${styles.panelBlockCounter} ${styles[`blockCounter_${blockColor}`]}`}>
+                  <span className={styles.blockCounterIcon}>&#9638;</span>
+                  <div className={styles.blockCounterInfo}>
+                    <span className={styles.blockCounterValue}>{blocksElapsed}</span>
+                    <span className={styles.blockCounterLabel}>BLOCKS</span>
+                  </div>
                 </div>
-                <button
-                  className={`${styles.scanBtn} ${isScanning ? styles.scanBtnDisabled : ''}`}
-                  style={{ '--chain-color': loc.chainColor }}
-                  disabled={isScanning || (!isCityNodeCity && gas < SCAN_COST)}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (isCityNodeCity) {
-                      scanAndInspect(loc.id)
-                    } else {
-                      scanLocation(loc.id, SCAN_COST)
-                    }
-                  }}
-                >
-                  {isScanning ? (
-                    <>
-                      <span className={styles.scanBtnSpinner} />
-                      SCANNING...
-                    </>
-                  ) : isCityNodeCity ? (
-                    <>&#9211; SCAN NETWORK &mdash; 1 BLOCK</>
-                  ) : (
-                    <>&#9211; SCAN NETWORK &mdash; {SCAN_COST} GAS</>
+              )}
+              {!isScanned ? (
+                <div className={styles.scanSection}>
+                  <div className={styles.scanInfo}>
+                    <span className={styles.scanIcon}>&#128225;</span>
+                    <span className={styles.scanTitle}>UNCHARTED NETWORK</span>
+                    <span className={styles.scanDesc}>
+                      Scan this network to discover suspicious contracts.
+                    </span>
+                  </div>
+                  <button
+                    className={`${styles.scanBtn} ${isScanning ? styles.scanBtnDisabled : ''}`}
+                    style={{ '--chain-color': loc.chainColor }}
+                    disabled={isScanning || (!isCityNodeCity && gas < SCAN_COST)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (isCityNodeCity) {
+                        scanAndInspect(loc.id)
+                      } else {
+                        scanLocation(loc.id, SCAN_COST)
+                      }
+                    }}
+                  >
+                    {isScanning ? (
+                      <>
+                        <span className={styles.scanBtnSpinner} />
+                        SCANNING...
+                      </>
+                    ) : isCityNodeCity ? (
+                      <>&#9211; SCAN NETWORK &mdash; 21 BLOCKS</>
+                    ) : (
+                      <>&#9211; SCAN NETWORK &mdash; {SCAN_COST} GAS</>
+                    )}
+                  </button>
+                  {false /* blocks always available */}
+                  {!isCityNodeCity && gas < SCAN_COST && !isScanning && (
+                    <span className={styles.scanNoGas}>INSUFFICIENT GAS</span>
                   )}
-                </button>
-                {false /* blocks always available */}
-                {!isCityNodeCity && gas < SCAN_COST && !isScanning && (
-                  <span className={styles.scanNoGas}>INSUFFICIENT GAS</span>
-                )}
-              </div>
-            ) : (
-              <div className={styles.locationPanelContent}>
-                <div className={styles.locationPanelTitle}>
-                  <span>{isCityNodeCity ? 'LOCATIONS UNLOCKED' : 'CONTRACTS FOUND'}</span>
-                  <span className={styles.locationPanelCount}>{loc.cases.length}</span>
                 </div>
-                <div className={styles.locationPanelCases}>
-                  {loc.cases.map((c, caseIdx) => (
-                    <div
-                      key={c.id}
-                      className={styles.caseCard}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setSelectedMarker(null)
-                        onSelectCase?.({ ...c, locationIdx: caseIdx })
-                      }}
-                    >
-                      <div className={styles.caseImageWrap}>
-                        <img src={c.image} alt={c.name} className={styles.caseImage} />
+              ) : (
+                <div className={styles.locationPanelContent}>
+                  <div className={styles.locationPanelTitle}>
+                    <span>{isCityNodeCity ? 'LOCATIONS UNLOCKED' : 'CONTRACTS FOUND'}</span>
+                    <span className={styles.locationPanelCount}>{loc.cases.length}</span>
+                  </div>
+                  <div className={styles.locationPanelCases}>
+                    {loc.cases.map((c, caseIdx) => (
+                      <div
+                        key={c.id}
+                        className={styles.caseCard}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedMarker(null)
+                          onSelectCase?.({ ...c, cityId: loc.id, locationIdx: caseIdx })
+                        }}
+                      >
+                        <div className={styles.caseImageWrap}>
+                          <img src={c.image} alt={c.name} className={styles.caseImage} />
+                        </div>
+                        <div className={styles.caseInfo}>
+                          <span className={styles.caseType}>{c.type}</span>
+                          <span className={styles.caseName}>{c.name}</span>
+                          <span className={styles.caseDesc}>{c.description}</span>
+                        </div>
+                        <div className={styles.caseArrow}>&#10132;</div>
                       </div>
-                      <div className={styles.caseInfo}>
-                        <span className={styles.caseType}>{c.type}</span>
-                        <span className={styles.caseName}>{c.name}</span>
-                        <span className={styles.caseDesc}>{c.description}</span>
-                      </div>
-                      <div className={styles.caseArrow}>&#10132;</div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* On-chain investigate button — sends submitInvestigation TX */}
             {isScanned && missionId && (
@@ -258,14 +338,11 @@ export default function InteractiveMap({ onSelectCase }) {
             )}
 
             <button className={styles.locationPanelClose} onClick={() => setSelectedMarker(null)}>
-              CLOSE
+              &#9664; BACK
             </button>
           </div>
         )
       })()}
-
-      {/* CRT overlay */}
-      <div className={styles.crtOverlay} />
 
       {/* investigating overlay */}
       {isInvestigating && (
@@ -289,7 +366,6 @@ export default function InteractiveMap({ onSelectCase }) {
               <span>DECRYPTED AUDIO CLUE</span>
             </div>
             <div className={styles.clueBody}>
-              {/* fake audio waveform */}
               <div className={styles.waveform}>
                 {Array.from({ length: 40 }).map((_, i) => (
                   <div

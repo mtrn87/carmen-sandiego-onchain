@@ -1,28 +1,80 @@
-/* ── fullscreen outcome overlay ── */
-.overlay {
+/* ── fullscreen outcome (same layout as MissionBriefing) ── */
+.briefing {
   position: absolute;
   inset: 0;
   z-index: 60;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.85);
-  animation: overlayIn 0.4s ease;
+  background: var(--dark-bg);
 }
 
-@keyframes overlayIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* ── background image ── */
+.imageContainer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
 
-/* ── terminal panel ── */
-.terminal {
+.bgImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: imagePulse 6s ease-in-out infinite;
+}
+
+.victory .bgImage {
+  opacity: 0.25;
+  filter: saturate(1.6) contrast(1.05) hue-rotate(-10deg);
+}
+
+.defeat .bgImage {
+  opacity: 0.3;
+  filter: saturate(1.3) contrast(1.1);
+}
+
+@keyframes imagePulse {
+  0%, 100% { opacity: inherit; }
+  50% { filter: saturate(1.8) contrast(1.15); }
+}
+
+/* CRT scanlines on image */
+.imageCrt {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(0, 0, 0, 0.18) 1px,
+    rgba(0, 0, 0, 0.18) 3px
+  );
+}
+
+/* vignette */
+.imageVignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.victory .imageVignette {
+  background: radial-gradient(ellipse at center, transparent 30%, rgba(0, 12, 3, 0.85) 100%);
+}
+
+.defeat .imageVignette {
+  background: radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, 0.85) 100%);
+}
+
+/* ── terminal overlay ── */
+.terminalOverlay {
   position: relative;
-  width: 600px;
+  z-index: 10;
+  width: 780px;
   max-width: 92vw;
+  max-height: 85vh;
   display: flex;
-  flex-direction: column;
-  backdrop-filter: blur(12px);
   animation: terminalIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -31,28 +83,33 @@
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* victory variant */
-.terminalVictory {
-  background: rgba(6, 6, 14, 0.94);
+.terminal {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(12px);
+}
+
+.victory .terminal {
+  background: rgba(4, 14, 6, 0.92);
   border: 1px solid rgba(0, 255, 65, 0.3);
   box-shadow:
-    0 0 60px rgba(0, 255, 65, 0.1),
-    0 0 120px rgba(0, 0, 0, 0.6),
-    inset 0 0 40px rgba(0, 0, 0, 0.3);
+    0 0 60px rgba(0, 255, 65, 0.08),
+    0 0 120px rgba(0, 0, 0, 0.5),
+    inset 0 0 40px rgba(0, 0, 0, 0.2);
 }
 
-/* defeat variant */
-.terminalDefeat {
-  background: rgba(6, 6, 14, 0.94);
-  border: 1px solid rgba(255, 42, 109, 0.3);
+.defeat .terminal {
+  background: rgba(6, 6, 14, 0.92);
+  border: 1px solid rgba(255, 42, 109, 0.25);
   box-shadow:
-    0 0 60px rgba(255, 42, 109, 0.1),
-    0 0 120px rgba(0, 0, 0, 0.6),
+    0 0 40px rgba(255, 42, 109, 0.08),
+    0 0 80px rgba(0, 0, 0, 0.5),
     inset 0 0 40px rgba(0, 0, 0, 0.3);
 }
 
-/* ── header ── */
-.header {
+/* ── terminal header ── */
+.terminalHeader {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -60,12 +117,12 @@
   border-bottom: 1px solid;
 }
 
-.terminalVictory .header {
-  border-bottom-color: rgba(0, 255, 65, 0.15);
+.victory .terminalHeader {
+  border-bottom-color: rgba(0, 255, 65, 0.2);
   background: rgba(0, 255, 65, 0.04);
 }
 
-.terminalDefeat .header {
+.defeat .terminalHeader {
   border-bottom-color: rgba(255, 42, 109, 0.15);
   background: rgba(255, 42, 109, 0.04);
 }
@@ -94,8 +151,8 @@
   letter-spacing: 1px;
 }
 
-.terminalVictory .headerTitle { color: var(--green); }
-.terminalDefeat .headerTitle { color: var(--red); }
+.victory .headerTitle { color: var(--green); }
+.defeat .headerTitle { color: var(--red); }
 
 .headerBlink {
   font-family: var(--font-mono);
@@ -104,209 +161,55 @@
   animation: blink 1.2s step-end infinite;
 }
 
-.terminalVictory .headerBlink { color: var(--green); }
-.terminalDefeat .headerBlink { color: var(--red); }
+.victory .headerBlink { color: var(--green); }
+.defeat .headerBlink { color: var(--red); }
 
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
 
-/* ── body ── */
-.body {
-  padding: 20px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+/* ── terminal body ── */
+.terminalBody {
+  padding: 16px 18px;
+  overflow-y: auto;
+  max-height: 60vh;
+  min-height: 200px;
 }
 
-/* ── big title ── */
-.title {
-  font-family: var(--font-mono);
-  font-size: 1.1rem;
-  letter-spacing: 4px;
-  text-align: center;
-  animation: titleGlow 2s ease-in-out infinite;
+.terminalBody::-webkit-scrollbar { width: 4px; }
+.terminalBody::-webkit-scrollbar-track { background: transparent; }
+
+.victory .terminalBody::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 65, 0.15);
+  border-radius: 2px;
 }
 
-.terminalVictory .title {
-  color: var(--green);
-  text-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+.defeat .terminalBody::-webkit-scrollbar-thumb {
+  background: rgba(255, 42, 109, 0.15);
+  border-radius: 2px;
 }
 
-.terminalDefeat .title {
-  color: var(--red);
-  text-shadow: 0 0 20px rgba(255, 42, 109, 0.4);
-}
-
-@keyframes titleGlow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.8; text-shadow: 0 0 30px currentColor; }
-}
-
-/* ── banner bars ── */
-.banner {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  text-align: center;
-  letter-spacing: 2px;
-  opacity: 0.5;
-}
-
-.terminalVictory .banner { color: var(--green); }
-.terminalDefeat .banner { color: var(--red); }
-
-/* ── stats grid ── */
-.stats {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 16px;
-  border: 1px solid rgba(0, 240, 255, 0.08);
-  background: rgba(0, 240, 255, 0.02);
-}
-
-.statRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.statLabel {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  color: var(--text-muted);
-  letter-spacing: 2px;
-}
-
-.statValue {
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  color: var(--cyan);
-}
-
-/* ── reward badge ── */
-.rewardBadge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border: 1px solid;
-  text-align: center;
-  animation: rewardPulse 2.5s ease-in-out infinite;
-}
-
-.rewardGold {
-  color: var(--yellow);
-  border-color: rgba(255, 230, 0, 0.3);
-  background: rgba(255, 230, 0, 0.05);
-}
-
-.rewardSilver {
-  color: var(--cyan);
-  border-color: rgba(0, 240, 255, 0.3);
-  background: rgba(0, 240, 255, 0.05);
-}
-
-.rewardBronze {
-  color: #cd7f32;
-  border-color: rgba(205, 127, 50, 0.3);
-  background: rgba(205, 127, 50, 0.05);
-}
-
-@keyframes rewardPulse {
-  0%, 100% { box-shadow: none; }
-  50% { box-shadow: 0 0 20px rgba(255, 230, 0, 0.1); }
-}
-
-.rewardIcon {
-  font-size: 1.6rem;
-}
-
-.rewardInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.rewardTier {
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  letter-spacing: 4px;
-  font-weight: bold;
-}
-
-.rewardSub {
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 1px;
-  opacity: 0.6;
-}
-
-/* ── rank promotion ── */
-.rankPromotion {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border: 1px solid rgba(0, 240, 255, 0.1);
-  background: rgba(0, 240, 255, 0.03);
-  font-family: var(--font-mono);
-}
-
-.rankArrow {
-  font-size: 0.8rem;
-  color: var(--green);
-}
-
-.rankLabel {
-  font-size: 0.62rem;
-  color: var(--text-muted);
-  letter-spacing: 2px;
-}
-
-.rankNew {
-  font-size: 0.78rem;
-  color: var(--yellow);
-  letter-spacing: 1px;
-}
-
-/* ── NFT line ── */
-.nftLine {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  color: var(--cyan);
-  text-align: center;
-  letter-spacing: 1px;
-  opacity: 0.7;
-  animation: nftFade 0.5s ease 0.8s both;
-}
-
-@keyframes nftFade {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 0.7; transform: translateY(0); }
-}
-
-/* ── defeat message ── */
-.defeatMsg {
+.line {
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  color: var(--text-muted);
-  text-align: center;
   line-height: 1.7;
-  padding: 8px 0;
+  min-height: 1.1em;
+  white-space: pre-wrap;
 }
 
-.defeatMsg strong {
-  color: var(--red);
-  font-weight: normal;
+.cursor {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  animation: blink 0.6s step-end infinite;
 }
+
+.victory .cursor { color: var(--green); }
+.defeat .cursor { color: var(--red); }
 
 /* ── action button ── */
-.actionBtn {
+.continueBtn {
   display: block;
   width: 100%;
   padding: 14px 18px;
@@ -318,7 +221,7 @@
   cursor: pointer;
   text-align: center;
   transition: all 0.2s ease;
-  animation: btnFadeIn 0.5s ease 1s both;
+  animation: btnFadeIn 0.5s ease;
 }
 
 @keyframes btnFadeIn {
@@ -326,29 +229,29 @@
   to { opacity: 1; }
 }
 
-.terminalVictory .actionBtn {
+.victory .continueBtn {
   color: var(--green);
-  border-top: 1px solid rgba(0, 255, 65, 0.12);
+  border-top: 1px solid rgba(0, 255, 65, 0.15);
   background: rgba(0, 255, 65, 0.03);
 }
 
-.terminalVictory .actionBtn:hover {
+.victory .continueBtn:hover {
   background: rgba(0, 255, 65, 0.08);
   text-shadow: 0 0 12px rgba(0, 255, 65, 0.5);
 }
 
-.terminalDefeat .actionBtn {
+.defeat .continueBtn {
   color: var(--yellow);
   border-top: 1px solid rgba(255, 230, 0, 0.12);
   background: rgba(255, 230, 0, 0.03);
 }
 
-.terminalDefeat .actionBtn:hover {
+.defeat .continueBtn:hover {
   background: rgba(255, 230, 0, 0.08);
   text-shadow: 0 0 12px rgba(255, 230, 0, 0.5);
 }
 
-.btnFlicker {
+.continueFlicker {
   animation: flicker 2s step-end infinite;
 }
 
@@ -361,33 +264,17 @@
   83% { opacity: 1; }
 }
 
-/* ── scanlines ── */
-.scanlines {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 1px,
-    rgba(0, 0, 0, 0.15) 1px,
-    rgba(0, 0, 0, 0.15) 3px
-  );
-  z-index: 1;
-}
-
 /* ── responsive ── */
 @media (max-width: 640px) {
-  .terminal {
+  .terminalOverlay {
     width: 95vw;
   }
 
-  .body {
-    padding: 14px 12px;
+  .line {
+    font-size: 0.65rem;
   }
 
-  .title {
-    font-size: 0.9rem;
-    letter-spacing: 2px;
+  .terminalBody {
+    padding: 12px;
   }
 }

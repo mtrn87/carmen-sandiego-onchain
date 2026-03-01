@@ -131,14 +131,15 @@ function generateWallet(id) {
     }))
   }
 
-  // nfts: 0-3
-  const nftCount = Math.floor(rng() * 4) // 0-3
+  // nfts: most wallets have 0, some have 1-2
+  const nftRoll = rng()
+  const nftCount = nftRoll < 0.6 ? 0 : nftRoll < 0.85 ? 1 : 2
   const nfts = []
   for (let n = 0; n < nftCount; n++) {
     const col = NFT_COLLECTIONS[Math.floor(rng() * NFT_COLLECTIONS.length)]
     const tokenId = String(Math.floor(rng() * 9999) + 1)
     const chainId = CHAINS[Math.floor(rng() * CHAINS.length)]
-    const stolen = rng() < 0.2
+    const stolen = rng() < 0.03
     const nft = {
       name: `${col.prefix} #${tokenId}`,
       collection: col.collection,

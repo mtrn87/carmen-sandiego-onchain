@@ -585,6 +585,14 @@
   box-shadow: 0 0 20px rgba(255, 42, 109, 0.08);
 }
 
+.txRowClickable {
+  cursor: pointer;
+}
+
+.txRowClickable:hover {
+  background: rgba(0, 240, 255, 0.03);
+}
+
 .txRowCapture {
   animation: capturePulse 2s ease-in-out infinite;
   border-bottom: 1px solid rgba(255, 42, 109, 0.12) !important;

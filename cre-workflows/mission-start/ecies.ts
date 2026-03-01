@@ -12,37 +12,43 @@ import { secp256k1 } from "@noble/curves/secp256k1"
 import { gcm } from "@noble/ciphers/aes"
 import { hkdf } from "@noble/hashes/hkdf"
 import { sha256 } from "@noble/hashes/sha256"
-import { randomBytes } from "@noble/ciphers/webcrypto"
 
 const IV_LENGTH = 12 // AES-GCM standard IV length
 
 /**
- * Encrypt a plaintext string with the recipient's secp256k1 public key.
+ * Deterministic ECIES encrypt.
  *
- * @param recipientPubKey - 65-byte uncompressed public key (0x04 + X + Y)
+ * @param recipientPubKey - 65-byte uncompressed secp256k1 public key (0x04 + X + Y)
  * @param plaintext - UTF-8 string to encrypt
- * @returns hex-encoded ciphertext (ephemeralPub + iv + encrypted + tag)
+ * @param seed - 32-byte entropy seed (VRF salt) for deterministic ephemeral key + IV.
+ *               Required for Javy/WASM (no Web Crypto) and for DON consensus.
+ * @returns hex-encoded ciphertext (ephemeralPub(65) + iv(12) + ciphertext + tag(16))
  */
-export function eciesEncrypt(recipientPubKey: Uint8Array, plaintext: string): string {
-  // 1. Generate ephemeral keypair
-  const ephemeralPrivKey = secp256k1.utils.randomPrivateKey()
+export function eciesEncrypt(recipientPubKey: Uint8Array, plaintext: string, seed: Uint8Array): string {
+  // 1. Derive ephemeral private key (32 bytes) + IV (12 bytes) deterministically
+  //    HKDF(sha256, seed, sha256(plaintext), "carmen-ecies-ephem", 44)
+  //    Using plaintext hash as salt ensures uniqueness per (seed, plaintext) pair.
+  const plaintextHash = sha256(new TextEncoder().encode(plaintext))
+  const derived = hkdf(sha256, seed, plaintextHash, "carmen-ecies-ephem", 44)
+  const ephemeralPrivKey = derived.slice(0, 32)
+  const iv = derived.slice(32, 44)
+
+  // 2. Compute ephemeral public key
   const ephemeralPubKey = secp256k1.getPublicKey(ephemeralPrivKey, false) // uncompressed (65 bytes)
 
-  // 2. ECDH: compute shared secret
+  // 3. ECDH: compute shared secret
   const sharedPoint = secp256k1.getSharedSecret(ephemeralPrivKey, recipientPubKey)
-  // Use X coordinate only (skip 0x04 prefix byte)
-  const sharedX = sharedPoint.slice(1, 33)
+  const sharedX = sharedPoint.slice(1, 33) // X coordinate only
 
-  // 3. HKDF: derive AES-256 key from shared secret
+  // 4. HKDF: derive AES-256 key from shared secret
   const aesKey = hkdf(sha256, sharedX, undefined, "carmen-ecies", 32)
 
-  // 4. AES-256-GCM encrypt
-  const iv = randomBytes(IV_LENGTH)
+  // 5. AES-256-GCM encrypt
   const plaintextBytes = new TextEncoder().encode(plaintext)
   const cipher = gcm(aesKey, iv)
   const ciphertext = cipher.encrypt(plaintextBytes) // includes 16-byte tag appended
 
-  // 5. Concatenate: ephemeralPubKey(65) + iv(12) + ciphertext+tag
+  // 6. Concatenate: ephemeralPubKey(65) + iv(12) + ciphertext+tag
   const result = new Uint8Array(ephemeralPubKey.length + iv.length + ciphertext.length)
   result.set(ephemeralPubKey, 0)
   result.set(iv, ephemeralPubKey.length)
