@@ -1578,7 +1578,11 @@ export async function getCityNodeInfo(chainId) {
       suspicionReasonHash: suspicion.reasonHash || suspicion[1],
     }
   } catch (err) {
-    if (!MOCK_MODE) bcWarn(`CityNode[${chainId}] cityInfo failed: ${err.message} — using mock`)
+    if (!MOCK_MODE) {
+      bcWarn(`CityNode[${chainId}] cityInfo failed: ${err.message}`)
+      throw err
+    }
+    bcWarn(`[MOCK] CityNode[${chainId}] cityInfo — using mock data`)
     return _mockCityInfo(chainId)
   }
 }
@@ -1618,7 +1622,11 @@ export async function getCityNodeLocations(cityId) {
       scanned: false,
     }))
   } catch (err) {
-    if (!MOCK_MODE) console.warn(`[cityNode] getLocations real call failed for chain ${chainId}, using mock:`, err.message)
+    if (!MOCK_MODE) {
+      console.warn(`[cityNode] getLocations failed for chain ${chainId}:`, err.message)
+      throw err
+    }
+    console.debug(`[MOCK] getLocations for chain ${chainId} — using mock data`)
     return (MOCK_LOCATIONS[chainId] || []).map((loc, i) => ({
       ...loc,
       categoryLabel: CATEGORY_MAP[loc.category] || `Category ${loc.category}`,
@@ -1660,7 +1668,11 @@ export async function getCityNodeAnomalyTxRefs(cityId) {
       }
     })
   } catch (err) {
-    if (!MOCK_MODE) console.warn(`[cityNode] getAnomalyTxRefs real call failed for chain ${chainId}, using mock:`, err.message)
+    if (!MOCK_MODE) {
+      console.warn(`[cityNode] getAnomalyTxRefs failed for chain ${chainId}:`, err.message)
+      throw err
+    }
+    console.debug(`[MOCK] getAnomalyTxRefs for chain ${chainId} — using mock data`)
     return _mockAnomalyTxRefs(chainId)
   }
 }
@@ -1885,7 +1897,11 @@ export async function getCityNodeSuspectWallets(cityId) {
       tags: decodeTags(s.tagsBitmap),
     }))
   } catch (err) {
-    if (!MOCK_MODE) console.warn(`[cityNode] getSuspectWallets real call failed for chain ${chainId}, using mock:`, err.message)
+    if (!MOCK_MODE) {
+      console.warn(`[cityNode] getSuspectWallets failed for chain ${chainId}:`, err.message)
+      throw err
+    }
+    console.debug(`[MOCK] getSuspectWallets for chain ${chainId} — using mock data`)
     return _mockSuspectWallets()
   }
 }
@@ -2167,18 +2183,31 @@ export async function cityNodeRequestClue(chainId, locationIdx, clueIndex, isSta
           }
         }, 15000, 3000)] : []),
         // Timeout fallback
-        new Promise((resolve) => setTimeout(() => {
-          if (!MOCK_MODE) console.warn(`[cityNode] GM resolve timeout — using mock clue for location ${locationIdx}, clue ${clueIndex}`)
+        new Promise((resolve, reject) => setTimeout(() => {
+          if (!MOCK_MODE) {
+            console.warn(`[cityNode] GM resolve timeout for location ${locationIdx}, clue ${clueIndex}`)
+            reject(new Error(`CRE resolve timeout for clue at location ${locationIdx}`))
+            return
+          }
+          console.debug(`[MOCK] GM resolve timeout — using mock clue for location ${locationIdx}, clue ${clueIndex}`)
           resolve(_mockClueResult(chainId, locationIdx, clueIndex, receipt.hash, receipt.blockNumber))
         }, 16000)),
       ])
       return result
-    } catch {
-      if (!MOCK_MODE) console.warn(`[cityNode] pollOnce failed — using mock clue`)
+    } catch (pollErr) {
+      if (!MOCK_MODE) {
+        console.warn(`[cityNode] pollOnce failed:`, pollErr.message)
+        throw pollErr
+      }
+      console.debug(`[MOCK] pollOnce failed — using mock clue`)
       return _mockClueResult(chainId, locationIdx, clueIndex, receipt.hash, receipt.blockNumber)
     }
   } catch (err) {
-    if (!MOCK_MODE) console.warn(`[cityNode] requestClue real call failed for chain ${chainId}, using mock:`, err.message)
+    if (!MOCK_MODE) {
+      console.warn(`[cityNode] requestClue failed for chain ${chainId}:`, err.message)
+      throw err
+    }
+    console.debug(`[MOCK] requestClue for chain ${chainId} — using mock data`)
     await new Promise((r) => setTimeout(r, 2000))
     return _mockClueResult(chainId, locationIdx, clueIndex, null, null, false)
   }
