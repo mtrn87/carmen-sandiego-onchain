@@ -241,7 +241,6 @@ export default function CaptureMode() {
   const {
     captureState,
     captureResult,
-    toggleCaptureMode,
     gameplayRequestCapture,
     citySuspectWallets,
     cityLocations,

@@ -36,6 +36,7 @@ export default function GamePage() {
     selectLocation,
     currentCityId,
     captureMode,
+    captureSelectedTx,
     disconnectWallet,
     playerNickname,
     walletAddress,

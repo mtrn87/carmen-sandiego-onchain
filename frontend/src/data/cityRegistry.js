@@ -346,7 +346,7 @@ const CUSTOM_NARRATIVES = {
   80002: {
     0: { title: 'Easter Island Relay', analysis: "Easter Island (Rapa Nui) is home to 887 monumental moai statues carved by the Rapa Nui people between 1250-1500 AD. The largest erected moai stands 10 meters tall and weighs 82 tonnes. Like these enduring sentinels, Polygon's validator nodes stand watch over the network \u2014 hundreds of validators securing billions in value through Proof of Stake consensus.", status: 'ISLAND \u2014 887 MOAI STATUES', statusColor: 'yellow' },
     1: { title: 'Gran Torre Node', analysis: "Gran Torre Santiago is the tallest building in Latin America at 300 meters with 64 floors. It was completed in 2013 and houses offices, a hotel, and a mall. Polygon scales to similar heights in the blockchain world \u2014 its zkEVM and PoS chains process thousands of transactions per second, making it one of the most scalable Ethereum L2 solutions available.", status: 'TOWER \u2014 300M / 64 FLOORS', statusColor: 'green' },
-    2: { title: 'La Moneda Vault', analysis: "La Moneda Palace has served as Chile's presidential seat since 1846. Originally built as the national mint (hence the name \"La Moneda\" meaning \"The Coin\"). This connection to currency is fitting \u2014 Polygon's MATIC token powers the entire ecosystem, and the network's governance model is as established as Chile's democratic institutions.", status: 'PALACE \u2014 \"THE COIN\" SINCE 1846', statusColor: 'yellow' },
+    2: { title: 'La Moneda Vault', analysis: "La Moneda Palace has served as Chile's presidential seat since 1846. Originally built as the national mint (hence the name \"La Moneda\" meaning \"The Coin\"). This connection to currency is fitting \u2014 Polygon's MATIC token powers the entire ecosystem, and the network's governance model is as established as Chile's democratic institutions.", status: 'PALACE \u2014 "THE COIN" SINCE 1846', statusColor: 'yellow' },
   },
   // ── Dakar (800021) — Polygon Amoy ──
   800021: {
@@ -1232,7 +1232,6 @@ export function pickRevealedCities(missionId, scanCount, excludeIds, originCityI
 
   // split into never-scanned and already-scanned
   const fresh = candidates.filter((c) => !scannedSet.has(c.id))
-  const revisit = candidates.filter((c) => scannedSet.has(c.id))
 
   const result = []
 

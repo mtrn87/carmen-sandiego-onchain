@@ -97,7 +97,6 @@ export default function ContractExplorer({ onOpenMap, onBackToCityPanel }) {
     cityLocations,
     blocksElapsed,
     backToMap,
-    backToCityPanel,
     gameplayScanAnomalies,
     gameplayRequestClue,
     cityClue,
@@ -105,7 +104,6 @@ export default function ContractExplorer({ onOpenMap, onBackToCityPanel }) {
     captureMode,
     captureSelectedTx,
     setCaptureSelectedTx,
-    toggleCaptureMode,
     gameplayLoading,
   } = useGameStore()
 

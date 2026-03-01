@@ -13,9 +13,6 @@ import GameMasterArtifact from "../abi/GameMaster.json"
 import CityNodeArtifact from "../abi/CityNode.json"
 import MissionNFTArtifact from "../abi/MissionNFT.json"
 import {
-  relayRegisterPlayer,
-  relayStartMission,
-  relaySubmitInvestigation,
   relayFlagTx as relayFlagTxService,
   relayRequestClue as relayRequestClueService,
   relayRequestDossier as relayRequestDossierService,

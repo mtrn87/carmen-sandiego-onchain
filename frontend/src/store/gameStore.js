@@ -46,7 +46,7 @@ import {
 } from '../services/contractService'
 import { decryptClue, getPublicKeyHex } from '../utils/ecies'
 import scenariosData from '../data/scenarios.json'
-import { CITY_POOL_MAP, CHAIN_DEFS, pickStartingCity, pickRevealedCities } from '../data/cityRegistry'
+import { CITY_POOL_MAP, CHAIN_DEFS, pickRevealedCities } from '../data/cityRegistry'
 import { getCarmenWallet, getCarmenLocationIdx } from '../data/walletPool'
 import { getActiveRoute } from '../data/scriptedRoutes'
 
@@ -610,26 +610,6 @@ export const useGameStore = create((set, get) => ({
 
     const newUnsubs = []
 
-    // Poll blocks elapsed every 12s (~ 1 Sepolia block)
-    const applyBlockPoll = (blocks) => {
-      const clamped = Math.min(blocks, MAX_BLOCKS)
-      // Only update if on-chain value is higher than local (actions may have
-      // pushed local ahead of chain). This avoids resetting action-based cost.
-      if (clamped > get().blocksElapsed) {
-        set({ blocksElapsed: clamped })
-      }
-      if (clamped >= MAX_BLOCKS && !get().showOutcomeModal && get().briefingDone) {
-        set((s) => ({
-          showOutcomeModal: true,
-          missionOutcome: { type: 'failed' },
-          currentMission: s.currentMission ? { ...s.currentMission, status: 'failed' } : null,
-          terminalLines: [...s.terminalLines,
-            { text: '> !! MISSION FAILED — block limit reached!', color: 'red', type: 'alert' },
-            { text: '> Carmen escaped. Start a new mission.', color: 'yellow', type: 'system' },
-          ],
-        }))
-      }
-    }
 
     try {
       const blocks = await getBlocksUsed(missionId)
@@ -1072,7 +1052,7 @@ export const useGameStore = create((set, get) => ({
    * Returns the new blocksElapsed value.
    */
   _spendBlocks: (cost, { allowExceed = false } = {}) => {
-    const { blocksElapsed, missionId } = get()
+    const { blocksElapsed } = get()
     const newBlocks = allowExceed ? blocksElapsed + cost : Math.min(blocksElapsed + cost, MAX_BLOCKS)
     set({ blocksElapsed: newBlocks })
 
@@ -1500,7 +1480,6 @@ export const useGameStore = create((set, get) => ({
 
     // call startMission on-chain — this auto-fails any active mission
     try {
-      await ensureSepoliaNetwork()
       await startMissionOnChain()
     } catch (err) {
       console.warn('[startNewMission] on-chain startMission failed:', err.message)
@@ -1663,7 +1642,7 @@ export const useGameStore = create((set, get) => ({
         visitedCityIds.includes(id)             // any visited city stays visible
       )
 
-      set((s) => ({
+      set(() => ({
         isScanning: false,
         scannedLocations: updatedScanned,
         discoveredCityIds: keptCityIds,
@@ -2093,7 +2072,7 @@ export const useGameStore = create((set, get) => ({
     }
   },
 
-  gameplayRequestClue: async (locationIdx, _clueIndex) => {
+  gameplayRequestClue: async (locationIdx) => {
     const state = get()
     const { currentCityId, cityClue, gameplayLoading } = state
     if (!currentCityId) return
