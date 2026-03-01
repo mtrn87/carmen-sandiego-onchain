@@ -1,13 +1,31 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Route, Routes } from 'react-router-dom'
-import GamePage from './pages/GamePage'
-import HelpPage from './pages/HelpPage'
-import SettingsPage from './pages/SettingsPage'
 import ErrorBoundary from './components/ErrorBoundary'
 import LoginPage from './pages/LoginPage'
-import ProfilePage from './pages/ProfilePage'
 import { useGameStore } from './store/gameStore'
 import { loadAuthSession } from './utils/authPersistence'
+
+const GamePage = lazy(() => import('./pages/GamePage'))
+const HelpPage = lazy(() => import('./pages/HelpPage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+
+function LoadingFallback() {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100vh',
+      background: '#0a0a0a',
+      color: '#00f0ff',
+      fontFamily: 'monospace',
+      fontSize: '1.1rem',
+    }}>
+      &gt; LOADING MODULE...
+    </div>
+  )
+}
 
 export default function App() {
   const { initializeWeb3AuthSession } = useGameStore()
@@ -35,17 +53,19 @@ export default function App() {
 
   return (
     <ErrorBoundary name="App">
-      <Routes>
-        <Route path="/" element={<LoginPage />} />
-        <Route path="/help" element={<HelpPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/game" element={
-          <ErrorBoundary name="GamePage">
-            <GamePage />
-          </ErrorBoundary>
-        } />
-        <Route path="/profile/:address" element={<ProfilePage />} />
-      </Routes>
+      <Suspense fallback={<LoadingFallback />}>
+        <Routes>
+          <Route path="/" element={<LoginPage />} />
+          <Route path="/help" element={<HelpPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/game" element={
+            <ErrorBoundary name="GamePage">
+              <GamePage />
+            </ErrorBoundary>
+          } />
+          <Route path="/profile/:address" element={<ProfilePage />} />
+        </Routes>
+      </Suspense>
     </ErrorBoundary>
   )
 }

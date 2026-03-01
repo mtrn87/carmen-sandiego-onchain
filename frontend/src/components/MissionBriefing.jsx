@@ -194,7 +194,7 @@ export default function MissionBriefing() {
     return (
       <div className={styles.briefing}>
         <div className={styles.imageContainer}>
-          <img src="/nft_stolen.png" alt="NFT Stolen" className={styles.bgImage} />
+          <img src="/nft_stolen.png" alt="NFT Stolen" className={styles.bgImage} loading="lazy" />
           <div className={styles.imageCrt} />
           <div className={styles.imageVignette} />
         </div>
@@ -225,7 +225,7 @@ export default function MissionBriefing() {
     <div className={styles.briefing}>
       {/* background image with CRT effect */}
       <div className={styles.imageContainer}>
-        <img src="/nft_stolen.png" alt="NFT Stolen" className={styles.bgImage} />
+        <img src="/nft_stolen.png" alt="NFT Stolen" className={styles.bgImage} loading="lazy" />
         <div className={styles.imageCrt} />
         <div className={styles.imageVignette} />
       </div>

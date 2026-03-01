@@ -276,6 +276,7 @@ export default function MissionOutcome() {
           src={isVictory ? '/worldmap.png' : '/nft_stolen.png'}
           alt=""
           className={styles.bgImage}
+          loading="lazy"
         />
         <div className={styles.imageCrt} />
         <div className={styles.imageVignette} />
