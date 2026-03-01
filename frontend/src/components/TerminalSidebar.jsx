@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useGameStore } from '../store/gameStore'
-import { getETHPrice } from '../services/contractService'
+import { getETHPrice, getPlayerGlobalProgress } from '../services/contractService'
+import { CITY_POOL } from '../data/cityRegistry'
 import styles from './TerminalSidebar.module.css'
 
 const COLOR_MAP = {
@@ -64,6 +65,18 @@ export default function TerminalSidebar() {
   } = useGameStore()
 
   const missionEnded = currentMission?.status === 'completed' || currentMission?.status === 'failed'
+
+  // Global progress from GameMaster contract
+  const [globalProgress, setGlobalProgress] = useState(null)
+
+  useEffect(() => {
+    if (!walletAddress) return
+    let cancelled = false
+    getPlayerGlobalProgress(walletAddress)
+      .then((data) => { if (!cancelled) setGlobalProgress(data) })
+      .catch(() => { if (!cancelled) setGlobalProgress(null) })
+    return () => { cancelled = true }
+  }, [walletAddress])
 
   // ETH/USD price from Chainlink Data Feed
   const [ethPriceData, setEthPriceData] = useState({ price: 0, formatted: '---', multiplier: 1.0 })
@@ -256,6 +269,27 @@ export default function TerminalSidebar() {
             <span className={styles.heistLabel}>HEIST</span>
             <span className={styles.heistValue}>{heistValueUsd.formatted}</span>
             <span className={styles.heistEth}>({heistValueUsd.eth.toFixed(4)} ETH)</span>
+          </div>
+        )}
+        {globalProgress && (
+          <div className={styles.progressSection}>
+            <div className={styles.progressRow}>
+              <span className={styles.progressLabel}>CITIES</span>
+              <div className={styles.progressTrack}>
+                <div
+                  className={styles.progressFill}
+                  style={{ width: `${Math.min(100, (globalProgress.citiesVisited / CITY_POOL.length) * 100)}%` }}
+                />
+              </div>
+              <span className={styles.progressValue}>{globalProgress.citiesVisited}/{CITY_POOL.length}</span>
+            </div>
+            <div className={styles.progressRow}>
+              <span className={styles.progressLabel}>CLUES</span>
+              <span className={styles.progressValue}>{globalProgress.totalClues}</span>
+              <span className={styles.progressDivider}>|</span>
+              <span className={styles.progressLabel}>COMMITS</span>
+              <span className={styles.progressValue}>{globalProgress.identityCommitsCount}</span>
+            </div>
           </div>
         )}
       </div>

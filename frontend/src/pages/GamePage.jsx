@@ -187,6 +187,13 @@ export default function GamePage() {
               : 'Cross-chain sync: STANDBY'}
           </span>
         )}
+        <button
+          className={styles.profileBtn}
+          onClick={() => navigate(`/profile/${walletAddress}`)}
+          disabled={!walletAddress}
+        >
+          DOSSIER
+        </button>
         <button className={styles.logoutBtn} onClick={handleLogout}>
           LOGOUT
         </button>
