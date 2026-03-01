@@ -11,7 +11,16 @@ import { useGameStore } from '../store/gameStore'
 import { getEthereumAddressFromPrivy, getUserInfoFromPrivy } from '../utils/privyProvider'
 import { saveAuthSession, clearAuthSession } from '../utils/authPersistence'
 import { initializePlayerRegistry, getPlayerData } from '../services/creService'
-import { initializeExternalProvider, getSigner } from '../services/contractService'
+import {
+  initializeExternalProvider,
+  getSigner,
+  getPlayerOnChainPublicKey,
+  registerPlayer as registerPlayerOnChain,
+  startMission as startMissionOnChain,
+  getPlayerActiveMission,
+  getMission,
+} from '../services/contractService'
+import { getPublicKeyHex } from '../utils/ecies'
 import styles from './LoginPage.module.css'
 
 const BOOT_LINES = [
@@ -87,6 +96,23 @@ export default function LoginPage() {
       })
     }
   }, [user, privyReady, wallets, createWallet])
+
+  // Re-initialize Privy EIP-1193 provider whenever wallets become available.
+  // This handles page refresh: isConnected is restored from localStorage (so the
+  // full sync effect below is skipped), but _externalEip1193 is lost (module state).
+  useEffect(() => {
+    if (!user || !wallets?.length) return
+    const wallet = wallets.find(w => w.walletClientType !== 'metamask') || wallets[0]
+    ;(async () => {
+      try {
+        await wallet.switchChain(11155111)
+        const eip1193 = await wallet.getEthereumProvider()
+        initializeExternalProvider(eip1193)
+      } catch (err) {
+        console.warn('[LoginPage] Could not re-init provider on mount:', err.message)
+      }
+    })()
+  }, [user, wallets])
 
   const handleConnect = useCallback(async () => {
     if (user) return // already authenticated, sync is in progress
@@ -387,9 +413,39 @@ export default function LoginPage() {
                         navigate('/game')
                         return
                       }
-                      // no active mission — navigate to game to start briefing
-                      setStartingMission(false)
-                      navigate('/game')
+                      // no active mission — start on-chain before showing the briefing plot
+                      setStartingMission(true)
+                      try {
+                        // register or update ECIES public key if needed
+                        const localPubKey = await getPublicKeyHex()
+                        const onChainPubKey = await getPlayerOnChainPublicKey(walletAddress)
+                        const needsRegister =
+                          !onChainPubKey ||
+                          onChainPubKey.toLowerCase() !== localPubKey.toLowerCase()
+                        if (needsRegister) {
+                          await registerPlayerOnChain(localPubKey)
+                        }
+
+                        // start mission on-chain (triggers VRF)
+                        await startMissionOnChain()
+
+                        // get the new missionId so the briefing shows the right scenario
+                        const activeMissionId = await getPlayerActiveMission(walletAddress)
+                        const mId = Number(activeMissionId)
+
+                        // quick VRF poll — 2 attempts / 6s, proceed regardless
+                        let mission = await getMission(mId)
+                        for (let i = 0; i < 2 && mission.targetHash === '0x' + '0'.repeat(64); i++) {
+                          await new Promise((r) => setTimeout(r, 3000))
+                          mission = await getMission(mId)
+                        }
+
+                        useGameStore.setState({ missionId: mId, missionData: mission })
+                        navigate('/game')
+                      } catch (err) {
+                        console.error('[LoginPage] startMission failed:', err)
+                        setStartingMission(false)
+                      }
                     }}
                   >
                     {startingMission ? 'Starting Mission...' : missionId ? 'Continue Mission' : 'Start Investigation'}

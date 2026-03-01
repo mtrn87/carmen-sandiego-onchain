@@ -75,13 +75,13 @@ export default function MissionBriefing() {
   const [skipped, setSkipped] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
 
-  // Select scenario based on missionId
+  // Select scenario based on missionId — wait until it's set on-chain
   const scenarios = scenariosData.scenarios
   const scenario = useMemo(() => {
     if (missionId && missionId > 0) {
       return scenarios[(missionId - 1) % scenarios.length]
     }
-    return scenarios[0]
+    return null
   }, [missionId, scenarios])
 
   const TYPED_LINES = useMemo(() => buildTypedLines(scenario), [scenario])
@@ -187,6 +187,38 @@ export default function MissionBriefing() {
     cyan: 'var(--cyan)',
     green: 'var(--green)',
     muted: 'var(--text-muted)',
+  }
+
+  // still waiting for missionId from blockchain
+  if (!scenario) {
+    return (
+      <div className={styles.briefing}>
+        <div className={styles.imageContainer}>
+          <img src="/nft_stolen.png" alt="NFT Stolen" className={styles.bgImage} />
+          <div className={styles.imageCrt} />
+          <div className={styles.imageVignette} />
+        </div>
+        <div className={styles.terminalOverlay}>
+          <div className={styles.terminal}>
+            <div className={styles.terminalHeader}>
+              <div className={styles.headerDots}>
+                <span className={styles.dot} data-color="red" />
+                <span className={styles.dot} data-color="yellow" />
+                <span className={styles.dot} data-color="green" />
+              </div>
+              <span className={styles.headerTitle}>acme_alert.exe &mdash; PRIORITY: CRITICAL</span>
+              <span className={styles.headerBlink}>&#9679; LIVE</span>
+            </div>
+            <div className={styles.terminalBody}>
+              <div className={styles.line} style={{ color: 'var(--cyan)' }}>
+                {'> RETRIEVING MISSION DATA FROM BLOCKCHAIN...'}
+              </div>
+              <span className={styles.cursor}>_</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

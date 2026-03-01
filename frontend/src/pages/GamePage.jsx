@@ -15,6 +15,7 @@ import { useWallets } from '@privy-io/react-auth'
 import { useGameStore } from '../store/gameStore'
 import { clearAuthSession } from '../utils/authPersistence'
 import { initializeExternalProvider, getSigner, getCCIPStatus } from '../services/contractService'
+import { CITY_POOL_MAP } from '../data/cityRegistry'
 import styles from './GamePage.module.css'
 
 export default function GamePage() {
@@ -38,6 +39,7 @@ export default function GamePage() {
     disconnectWallet,
     playerNickname,
     walletAddress,
+    backToCityPanel,
   } = useGameStore()
   const { wallets } = useWallets()
   const [showMap, setShowMap] = useState(true)

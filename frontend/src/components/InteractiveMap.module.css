@@ -310,9 +310,11 @@
 }
 
 .locationPanelContent {
+  flex: 1;
   padding: 0;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 12px;
 }
 
@@ -337,36 +339,6 @@
   border-color: rgba(0, 240, 255, 0.5);
   text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
   box-shadow: 0 0 15px rgba(0, 240, 255, 0.12);
-}
-
-.investigateBtn {
-  width: 100%;
-  padding: 14px 16px;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  color: #0f0;
-  background: rgba(0, 255, 0, 0.08);
-  border: 1px solid rgba(0, 255, 0, 0.35);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: center;
-}
-
-.investigateBtn:hover:not(:disabled) {
-  background: rgba(0, 255, 0, 0.18);
-  border-color: rgba(0, 255, 0, 0.7);
-  text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
-  box-shadow: 0 0 15px rgba(0, 255, 0, 0.15);
-}
-
-.investigateBtnDisabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  color: var(--text-muted);
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.03);
 }
 
 .locationPanelTitle {
@@ -472,6 +444,7 @@
 .investigateBtn {
   display: block;
   width: 100%;
+  margin-top: auto;
   padding: 12px 16px;
   font-family: var(--font-mono);
   font-size: 0.7rem;

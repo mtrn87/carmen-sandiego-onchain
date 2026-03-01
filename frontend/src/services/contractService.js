@@ -2069,7 +2069,7 @@ export async function cityNodeRequestClue(chainId, locationIdx, clueIndex, isSta
   if (!isCityNodeConfigured(chainId)) {
     if (MOCK_MODE) bcWarn(`CityNode[${chainId}] not configured — MOCK requestClue`)
     await new Promise((r) => setTimeout(r, 2500))
-    return _mockClueResult(cityId, locationIdx, clueIndex, null, null, isStartingClue, nodeStats)
+    return _mockClueResult(chainId, locationIdx, clueIndex, null, null, isStartingClue)
   }
 
   // Try relay (gasless) — returns basic result without event polling
@@ -2150,7 +2150,7 @@ export async function cityNodeRequestClue(chainId, locationIdx, clueIndex, isSta
   } catch (err) {
     if (!MOCK_MODE) console.warn(`[cityNode] requestClue real call failed for chain ${chainId}, using mock:`, err.message)
     await new Promise((r) => setTimeout(r, 2000))
-    return _mockClueResult(cityId, locationIdx, clueIndex, null, null, false, nodeStats)
+    return _mockClueResult(chainId, locationIdx, clueIndex, null, null, false)
   }
 }
 

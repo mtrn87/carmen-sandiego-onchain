@@ -388,58 +388,33 @@ export async function waitForPlayerRegistered(playerAddress, timeoutMs = 60000) 
  * Calls requestRegistration() which emits event for CRE to process as paymaster
  * Returns { nickname, timestamp } or throws error
  */
-export async function registerPlayerFlow(nickname, playerAddress, maxRetries = 3) {
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      creFlow(`Attempt ${attempt}/${maxRetries}...`);
-
-      // Validate nickname availability first
-      const available = await isNicknameAvailable(nickname);
-      if (!available) {
-        throw new Error("Nickname already taken");
-      }
-
-      creFlow("╔══════════════════════════════════════════════════════════╗");
-      creFlow("║  CRE Registration Flow — Chainlink Gasless UX          ║");
-      creFlow("╚══════════════════════════════════════════════════════════╝");
-      creFlow(`Player: ${playerAddress.slice(0, 10)}... | Nickname: "${nickname}"`);
-
-      // Set up listener before sending TX
-      const resultPromise = waitForPlayerRegistered(playerAddress, 120000);
-
-      // Send trigger TX (emits RegistrationRequested event for CRE)
-      // No gas required from user - CRE will process as paymaster
-      await requestRegistration(nickname);
-
-      creFlow("Step 3: Waiting for CRE WASM workflow 'player-registration' to process...");
-      creFlow("  CRE listens for RegistrationRequested → validates → calls registerPlayer()");
-
-      // Wait for CRE to process and emit PlayerRegistered
-      const result = await resultPromise;
-
-      creOK("╔══════════════════════════════════════════════════════════╗");
-      creOK(`║  Registration COMPLETE: "${result.nickname}" is now on-chain!   ║`);
-      creOK("╚══════════════════════════════════════════════════════════╝");
-      return {
-        nickname: result.nickname,
-        timestamp: result.timestamp,
-      };
-    } catch (error) {
-      lastError = error;
-      creWarn(`Attempt ${attempt} failed: ${error.message}`);
-
-      if (attempt === maxRetries) {
-        creWarn(`All ${maxRetries} attempts failed`);
-        throw new Error(`Failed after ${maxRetries} attempts: ${error.message}`);
-      }
-
-      const delayMs = Math.pow(2, attempt) * 1000;
-      creFlow(`Retrying in ${delayMs}ms...`);
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
+export async function registerPlayerFlow(nickname, playerAddress) {
+  const available = await isNicknameAvailable(nickname);
+  if (!available) {
+    throw new Error("Nickname already taken");
   }
 
-  throw lastError || new Error("Unknown error in registerPlayerFlow");
+  creFlow("╔══════════════════════════════════════════════════════════╗");
+  creFlow("║  CRE Registration Flow — Chainlink Gasless UX          ║");
+  creFlow("╚══════════════════════════════════════════════════════════╝");
+  creFlow(`Player: ${playerAddress.slice(0, 10)}... | Nickname: "${nickname}"`);
+
+  // Set up listener before sending TX so we don't miss the event
+  const resultPromise = waitForPlayerRegistered(playerAddress, 300000);
+
+  // Send trigger TX once — retrying would spam the chain with duplicate requests
+  await requestRegistration(nickname);
+
+  creFlow("Step 3: Waiting for CRE WASM workflow 'player-registration' to process...");
+  creFlow("  CRE listens for RegistrationRequested → validates → calls registerPlayer()");
+
+  const result = await resultPromise;
+
+  creOK("╔══════════════════════════════════════════════════════════╗");
+  creOK(`║  Registration COMPLETE: "${result.nickname}" is now on-chain!   ║`);
+  creOK("╚══════════════════════════════════════════════════════════╝");
+  return {
+    nickname: result.nickname,
+    timestamp: result.timestamp,
+  };
 }

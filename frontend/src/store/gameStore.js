@@ -1225,9 +1225,9 @@ export const useGameStore = create((set, get) => ({
    * before navigating here, so this just sets up the gameplay.
    */
   completeBriefing: async () => {
-    const { walletAddress, missionId: existingMissionId } = get()
+    const { missionId: existingMissionId } = get()
 
-    console.log('[completeBriefing] START', { walletAddress, existingMissionId })
+    console.log('[completeBriefing] START', { existingMissionId })
 
     set({
       terminalLines: [
@@ -1237,111 +1237,8 @@ export const useGameStore = create((set, get) => ({
     })
 
     try {
-      // Try to fetch active mission if we don't have one yet
+      // missionId is set on LoginPage before navigating — use it directly
       let mId = existingMissionId
-      if (!mId) {
-        try {
-          const { walletAddress } = get()
-          const activeMissionId = await getPlayerActiveMission(walletAddress)
-          if (activeMissionId > 0n) {
-            const abandonedId = localStorage.getItem(ABANDONED_MISSION_KEY)
-            if (abandonedId === String(activeMissionId)) {
-              console.log('[completeBriefing] mission', activeMissionId, 'was abandoned — ignoring')
-            } else {
-              mId = Number(activeMissionId)
-              const mission = await getMission(mId)
-              set({ missionId: mId, missionData: mission })
-            }
-          }
-        } catch (err) {
-          console.warn('[completeBriefing] Could not fetch active mission:', err.message)
-        }
-      }
-
-      // If still no mission, start one on-chain
-      if (!mId) {
-        console.log('[completeBriefing] No active mission found, starting mission flow...')
-
-        // Step 1: Register/update ECIES public key on-chain
-        const { walletAddress: playerAddr } = get()
-        const localPubKey = await getPublicKeyHex()
-        const onChainPubKey = await getPlayerOnChainPublicKey(playerAddr)
-        const localPubKeyLower = localPubKey.toLowerCase()
-        const onChainPubKeyLower = (onChainPubKey || '').toLowerCase()
-        const needsRegister = !onChainPubKey || onChainPubKeyLower !== localPubKeyLower
-
-        if (needsRegister) {
-          console.log('[completeBriefing] ECIES key mismatch or missing, registering...')
-          console.log('[completeBriefing]   local :', localPubKey.slice(0, 20) + '...')
-          console.log('[completeBriefing]   onchain:', (onChainPubKey || 'none').slice(0, 20) + '...')
-          set((s) => ({
-            terminalLines: [
-              ...s.terminalLines,
-              { text: '> Registering ECIES encryption key on-chain...', color: 'yellow', type: 'system' },
-            ],
-          }))
-          const regReceipt = await registerPlayerOnChain(localPubKey)
-          console.log('[completeBriefing] registerPlayer TX:', regReceipt.hash)
-          set((s) => ({
-            terminalLines: [
-              ...s.terminalLines,
-              { text: '> ECIES key registered. Secure channel established.', color: 'green', type: 'system' },
-            ],
-          }))
-        } else {
-          console.log('[completeBriefing] ECIES key matches on-chain')
-        }
-
-        // Step 2: Start mission
-        set((s) => ({
-          terminalLines: [
-            ...s.terminalLines,
-            { text: '> Starting new mission on-chain... (VRF pending)', color: 'yellow', type: 'system' },
-          ],
-        }))
-        const receipt = await startMissionOnChain()
-        console.log('[completeBriefing] startMission TX:', receipt.hash)
-
-        // Get mission ID from on-chain state
-        const { walletAddress: addr } = get()
-        let activeMissionId = await getPlayerActiveMission(addr)
-        mId = Number(activeMissionId)
-        set({ missionId: mId })
-
-        // Quick VRF check (2 attempts / 6s max) — proceed regardless for demo/hackathon
-        let mission = await getMission(mId)
-        let vrfAttempts = 0
-        while (mission.targetHash === '0x' + '0'.repeat(64) && vrfAttempts < 2) {
-          vrfAttempts++
-          set((s) => ({
-            terminalLines: [
-              ...s.terminalLines.filter(l => !l.text.includes('Waiting for VRF')),
-              { text: `> Waiting for VRF randomness... (${vrfAttempts * 3}s)`, color: 'yellow', type: 'system' },
-            ],
-          }))
-          await new Promise(r => setTimeout(r, 3000))
-          mission = await getMission(mId)
-        }
-
-        if (mission.targetHash === '0x' + '0'.repeat(64)) {
-          console.warn('[completeBriefing] VRF not fulfilled yet — proceeding without it (demo mode)')
-          set((s) => ({
-            terminalLines: [
-              ...s.terminalLines.filter(l => !l.text.includes('Waiting for VRF')),
-              { text: '> VRF pending — proceeding in demo mode.', color: 'yellow', type: 'system' },
-            ],
-          }))
-        } else {
-          set((s) => ({
-            terminalLines: [
-              ...s.terminalLines,
-              { text: `> Mission #${mId} ready! VRF fulfilled.`, color: 'green', type: 'system' },
-            ],
-          }))
-        }
-
-        set({ missionData: mission })
-      }
 
       // Initialize city discovery and load starting city
       await get().initDiscovery(mId)
