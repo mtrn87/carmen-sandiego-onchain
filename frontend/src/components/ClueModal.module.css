@@ -167,6 +167,121 @@
   font-style: italic;
 }
 
+/* media type badge */
+.mediaBadge {
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  padding: 2px 6px;
+  margin-left: auto;
+  border: 1px solid;
+}
+
+.mediaBadge[data-media="audio"] {
+  color: #ba68c8;
+  border-color: rgba(186, 104, 200, 0.5);
+  background: rgba(186, 104, 200, 0.1);
+}
+
+.mediaBadge[data-media="image"] {
+  color: #ffd740;
+  border-color: rgba(255, 215, 64, 0.5);
+  background: rgba(255, 215, 64, 0.1);
+}
+
+/* ── audio clue ── */
+.audioSection {
+  margin-bottom: 16px;
+}
+
+.audioBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid rgba(186, 104, 200, 0.3);
+  background: rgba(186, 104, 200, 0.06);
+  color: #ba68c8;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.audioBtn:hover {
+  background: rgba(186, 104, 200, 0.12);
+  border-color: rgba(186, 104, 200, 0.5);
+}
+
+.audioBtnActive {
+  background: rgba(186, 104, 200, 0.14);
+  border-color: rgba(186, 104, 200, 0.6);
+}
+
+.audioIcon {
+  font-size: 0.9rem;
+}
+
+.audioWave {
+  margin-left: auto;
+  font-size: 0.7rem;
+  animation: audioWaveAnim 1.2s steps(4) infinite;
+}
+
+@keyframes audioWaveAnim {
+  0% { content: '▁▃▅▇▅▃▁'; opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+/* ── image clue ── */
+.imageSection {
+  margin-bottom: 16px;
+}
+
+.imageContainer {
+  position: relative;
+  margin-top: 8px;
+  border: 1px solid rgba(255, 215, 64, 0.2);
+  background: rgba(0, 0, 0, 0.3);
+  min-height: 80px;
+  overflow: hidden;
+}
+
+.imageLoading {
+  padding: 24px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.1em;
+  animation: flicker 1.8s linear infinite;
+}
+
+.imageError {
+  padding: 24px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: #ff5252;
+  letter-spacing: 0.1em;
+}
+
+.clueImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.4s ease-in;
+}
+
+.clueImageVisible {
+  opacity: 1;
+}
+
 /* strength bar */
 .strengthSection {
   margin-bottom: 12px;

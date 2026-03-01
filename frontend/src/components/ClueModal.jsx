@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import styles from './ClueModal.module.css'
 
@@ -11,6 +11,12 @@ const CLUE_TYPE_COLORS = {
   DEAD_END: '#ff5252',
 }
 
+const MEDIA_TYPE_LABELS = {
+  audio: 'AUDIO INTERCEPT',
+  image: 'VISUAL INTERCEPT',
+  text: 'TEXT INTERCEPT',
+}
+
 export default function ClueModal() {
   const {
     showCityClueModal,
@@ -18,6 +24,10 @@ export default function ClueModal() {
     closeCityClueModal,
     cityLocations,
   } = useGameStore()
+  const audioRef = useRef(null)
+  const [audioPlaying, setAudioPlaying] = useState(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
+  const [imageError, setImageError] = useState(false)
 
   useEffect(() => {
     if (!showCityClueModal) return
@@ -27,6 +37,25 @@ export default function ClueModal() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [showCityClueModal, closeCityClueModal])
+
+  // Reset media state when clue changes
+  useEffect(() => {
+    setAudioPlaying(false)
+    setImageLoaded(false)
+    setImageError(false)
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+    }
+  }, [activeCityClue])
+
+  // Pause audio when modal closes
+  useEffect(() => {
+    if (!showCityClueModal && audioRef.current) {
+      audioRef.current.pause()
+      setAudioPlaying(false)
+    }
+  }, [showCityClueModal])
 
   if (!showCityClueModal || !activeCityClue) return null
 
@@ -38,6 +67,19 @@ export default function ClueModal() {
   const refShort = clue.anomalyRefId
     ? `${clue.anomalyRefId.slice(0, 10)}...`
     : '????'
+  const mediaType = clue.mediaType || 'text'
+  const mediaLabel = MEDIA_TYPE_LABELS[mediaType] || MEDIA_TYPE_LABELS.text
+
+  const handleToggleAudio = () => {
+    if (!audioRef.current) return
+    if (audioPlaying) {
+      audioRef.current.pause()
+      setAudioPlaying(false)
+    } else {
+      audioRef.current.play().catch(() => setAudioPlaying(false))
+      setAudioPlaying(true)
+    }
+  }
 
   return (
     <div className={styles.overlay} onClick={closeCityClueModal}>
@@ -72,20 +114,69 @@ export default function ClueModal() {
             </span>
           </div>
 
-          {/* source location */}
+          {/* source location + media type */}
           <div className={styles.sourceRow}>
             <span className={styles.sourceLabel}>SOURCE:</span>
             <span className={styles.sourceValue}>{locationName}</span>
+            {mediaType !== 'text' && (
+              <span className={styles.mediaBadge} data-media={mediaType}>
+                {mediaLabel}
+              </span>
+            )}
           </div>
 
-          {/* clue text */}
-          <div
-            className={
-              clue.isDeadEnd ? styles.clueTextDeadEnd : styles.clueText
-            }
-          >
-            {clue.data}
-          </div>
+          {/* clue content — text / audio / image */}
+          {mediaType === 'audio' && clue.mediaSrc ? (
+            <div className={styles.audioSection}>
+              <div className={clue.isDeadEnd ? styles.clueTextDeadEnd : styles.clueText}>
+                {clue.data}
+              </div>
+              <button
+                className={`${styles.audioBtn} ${audioPlaying ? styles.audioBtnActive : ''}`}
+                onClick={handleToggleAudio}
+              >
+                <span className={styles.audioIcon}>
+                  {audioPlaying ? '■' : '▶'}
+                </span>
+                {audioPlaying ? 'STOP PLAYBACK' : 'PLAY INTERCEPTED AUDIO'}
+                {audioPlaying && <span className={styles.audioWave}>▁▃▅▇▅▃▁</span>}
+              </button>
+              <audio
+                ref={audioRef}
+                src={clue.mediaSrc}
+                preload="none"
+                onEnded={() => setAudioPlaying(false)}
+              />
+            </div>
+          ) : mediaType === 'image' && clue.mediaSrc ? (
+            <div className={styles.imageSection}>
+              <div className={clue.isDeadEnd ? styles.clueTextDeadEnd : styles.clueText}>
+                {clue.data}
+              </div>
+              <div className={styles.imageContainer}>
+                {!imageLoaded && !imageError && (
+                  <div className={styles.imageLoading}>DECRYPTING VISUAL DATA...</div>
+                )}
+                {imageError && (
+                  <div className={styles.imageError}>VISUAL DATA CORRUPTED — DECRYPTION FAILED</div>
+                )}
+                <img
+                  className={`${styles.clueImage} ${imageLoaded ? styles.clueImageVisible : ''}`}
+                  src={clue.mediaSrc}
+                  alt="Intercepted visual evidence"
+                  loading="lazy"
+                  onLoad={() => setImageLoaded(true)}
+                  onError={() => setImageError(true)}
+                />
+              </div>
+            </div>
+          ) : (
+            <div
+              className={clue.isDeadEnd ? styles.clueTextDeadEnd : styles.clueText}
+            >
+              {clue.data}
+            </div>
+          )}
 
           {/* strength bar */}
           <div className={styles.strengthSection}>
