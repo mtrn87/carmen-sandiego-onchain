@@ -14,11 +14,14 @@ export default function LocationDetail() {
   const {
     cityLocations,
     currentLocationIdx,
+    currentCityId,
     clearLocation,
     gameplayInspectLocation,
     gameplayScanAnomalies,
     gameplayRequestClue,
     gameplayLoading,
+    cityClue,
+    isInvestigating,
   } = useGameStore()
 
   if (currentLocationIdx === null || !cityLocations[currentLocationIdx]) return null
@@ -60,28 +63,19 @@ export default function LocationDetail() {
         </div>
       </div>
 
-      {/* clue slots */}
-      <div className={styles.clueSlots}>
-        <span className={styles.slotsLabel}>CLUE SLOTS</span>
-        <div className={styles.slots}>
-          {loc.clueSlots.map((clue, i) => (
-            <div key={i} className={`${styles.slot} ${clue ? styles.slotFilled : ''} ${clue?.isDeadEnd ? styles.slotDeadEnd : ''}`}>
-              {clue ? (
-                <>
-                  <span className={styles.slotIcon}>{CLUE_TYPE_ICONS[clue.clueType] || '\u{1F50D}'}</span>
-                  <span className={styles.slotType}>{clue.clueType}</span>
-                  <span className={styles.slotStrength}>STR: {clue.strength}</span>
-                </>
-              ) : (
-                <>
-                  <span className={styles.slotEmpty}>#{i + 1}</span>
-                  <span className={styles.slotEmptyLabel}>EMPTY</span>
-                </>
-              )}
+      {/* city clue */}
+      {cityClue && cityClue[currentCityId] && (
+        <div className={styles.clueSlots}>
+          <span className={styles.slotsLabel}>CITY INTEL</span>
+          <div className={styles.slots}>
+            <div className={`${styles.slot} ${styles.slotFilled}`}>
+              <span className={styles.slotIcon}>🔍</span>
+              <span className={styles.slotType}>{cityClue[currentCityId].type?.toUpperCase() || 'TEXT'}</span>
+              <span className={styles.slotStrength}>{cityClue[currentCityId].text?.slice(0, 60)}...</span>
             </div>
-          ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* action buttons */}
       <div className={styles.actions}>
@@ -99,18 +93,22 @@ export default function LocationDetail() {
         >
           {loc.scanned ? 'SCANNED' : 'SCAN (3 E)'}
         </button>
-        {[0, 1, 2].map((ci) => (
-          <button
-            key={ci}
-            className={`${styles.actionBtn} ${styles.clueBtn} ${loc.clueSlots[ci] ? styles.actionDone : ''}`}
-            disabled={!loc.scanned || loc.clueSlots[ci] !== null || gameplayLoading}
-            onClick={() => gameplayRequestClue(currentLocationIdx, ci)}
-          >
-            {loc.clueSlots[ci]
-              ? `CLUE #${ci + 1} \u2713`
-              : `REQ CLUE #${ci + 1} (5 E)`}
-          </button>
-        ))}
+        {(() => {
+          const hasCityClue = cityClue && cityClue[currentCityId]
+          return (
+            <button
+              className={`${styles.actionBtn} ${styles.clueBtn} ${hasCityClue ? styles.actionDone : ''}`}
+              disabled={!loc.scanned || isInvestigating || hasCityClue}
+              onClick={() => gameplayRequestClue(currentLocationIdx)}
+            >
+              {isInvestigating
+                ? '⏳ INVESTIGATING...'
+                : hasCityClue
+                ? 'INTEL RECEIVED ✓'
+                : 'INVESTIGATE CITY (5 E)'}
+            </button>
+          )
+        })()}
       </div>
     </div>
   )

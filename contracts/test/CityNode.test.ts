@@ -953,64 +953,69 @@ describe("CityNode", function () {
     });
 
     it("should regenerate exactly 1 energy after exactly 15 minutes", async function () {
-      await cityNode.connect(player).inspectLocation(0); // 10 -> 9
+      await cityNode.connect(player).inspectLocation(0); // 20 -> 19
       await time.increase(15 * 60); // exactly 15 minutes
       const energy = await cityNode.getEnergy(player.address);
-      expect(energy).to.equal(10); // 9 + 1 = 10
+      expect(energy).to.equal(20); // 19 + 1 = 20 (back to MAX)
     });
 
     it("should NOT regenerate energy before 15 minutes", async function () {
-      await cityNode.connect(player).inspectLocation(0); // 10 -> 9
+      await cityNode.connect(player).inspectLocation(0); // 20 -> 19
       await time.increase(14 * 60 + 59); // 14:59
       const energy = await cityNode.getEnergy(player.address);
-      expect(energy).to.equal(9); // no regen yet
+      expect(energy).to.equal(19); // no regen yet
     });
 
     it("should regenerate multiple ticks correctly", async function () {
-      // Spend 5 energy
-      await cityNode.connect(player).inspectLocation(0); // 10->9
-      await cityNode.connect(player).inspectLocation(1); // 9->8
-      await cityNode.connect(player).inspectLocation(2); // 8->7
-      await cityNode.connect(player).scanAnomalies(0);   // 7->5 (scan costs 2)
-
-      // Inspect location 0 is already done, doing scan needs inspect first
+      // Spend 9 energy: 3 inspects (3) + 1 scan (6) = 9, leaving 11
+      await cityNode.connect(player).inspectLocation(0); // 20->19
+      await cityNode.connect(player).inspectLocation(1); // 19->18
+      await cityNode.connect(player).inspectLocation(2); // 18->17
       await cityNode.connect(owner).addAnomalyTxRef(makeTxRef(1));
+      await cityNode.connect(player).scanAnomalies(0);   // 17->11 (scan costs 6)
 
       // advance 45 minutes = 3 regen ticks
       await time.increase(45 * 60);
       const energy = await cityNode.getEnergy(player.address);
-      expect(energy).to.equal(8); // 5 + 3 = 8
+      expect(energy).to.equal(14); // 11 + 3 = 14
     });
 
-    it("should cap regeneration at MAX_ENERGY (10)", async function () {
-      await cityNode.connect(player).inspectLocation(0); // 10 -> 9
+    it("should cap regeneration at MAX_ENERGY (20)", async function () {
+      await cityNode.connect(player).inspectLocation(0); // 20 -> 19
       // advance 24 hours (96 regen ticks)
       await time.increase(24 * 60 * 60);
       const energy = await cityNode.getEnergy(player.address);
-      expect(energy).to.equal(10); // capped at MAX
+      expect(energy).to.equal(20); // capped at MAX
     });
 
     it("should not exceed MAX_ENERGY even with massive time elapsed", async function () {
-      await cityNode.connect(player).inspectLocation(0); // 10 -> 9
+      await cityNode.connect(player).inspectLocation(0); // 20 -> 19
       // advance 7 days
       await time.increase(7 * 24 * 60 * 60);
       const energy = await cityNode.getEnergy(player.address);
-      expect(energy).to.equal(10);
+      expect(energy).to.equal(20);
     });
 
     it("should handle zero-energy state with regeneration", async function () {
       await cityNode.connect(owner).addAnomalyTxRef(makeTxRef(1));
 
-      // Exhaust all energy: inspect*3 (3) + scan*3 (6) + flagTx (1) = 10
-      await cityNode.connect(player).inspectLocation(0); // 10->9
-      await cityNode.connect(player).inspectLocation(1); // 9->8
-      await cityNode.connect(player).inspectLocation(2); // 8->7
-      await cityNode.connect(player).scanAnomalies(0);   // 7->5
-      await cityNode.connect(player).scanAnomalies(1);   // 5->3
-      await cityNode.connect(player).scanAnomalies(2);   // 3->1
-
-      const refId = ethers.keccak256(ethers.toUtf8Bytes("tx1"));
-      await cityNode.connect(player).flagTx(refId);      // 1->0
+      // Exhaust all 20 energy:
+      // inspect(0,1,2)=3 + scan(0,1)=12 + 5 flags=5 → total 20
+      await cityNode.connect(player).inspectLocation(0); // 20->19
+      await cityNode.connect(player).inspectLocation(1); // 19->18
+      await cityNode.connect(player).inspectLocation(2); // 18->17
+      await cityNode.connect(player).scanAnomalies(0);   // 17->11 (scan costs 6)
+      await cityNode.connect(player).scanAnomalies(1);   // 11->5
+      const rd1 = ethers.keccak256(ethers.toUtf8Bytes("tx_drain_1"));
+      const rd2 = ethers.keccak256(ethers.toUtf8Bytes("tx_drain_2"));
+      const rd3 = ethers.keccak256(ethers.toUtf8Bytes("tx_drain_3"));
+      const rd4 = ethers.keccak256(ethers.toUtf8Bytes("tx_drain_4"));
+      const rd5 = ethers.keccak256(ethers.toUtf8Bytes("tx_drain_5"));
+      await cityNode.connect(player).flagTx(rd1);        // 5->4
+      await cityNode.connect(player).flagTx(rd2);        // 4->3
+      await cityNode.connect(player).flagTx(rd3);        // 3->2
+      await cityNode.connect(player).flagTx(rd4);        // 2->1
+      await cityNode.connect(player).flagTx(rd5);        // 1->0
 
       let energy = await cityNode.getEnergy(player.address);
       expect(energy).to.equal(0);
@@ -1020,12 +1025,11 @@ describe("CityNode", function () {
       energy = await cityNode.getEnergy(player.address);
       expect(energy).to.equal(1);
 
-      // can now inspect again
-      // reset progress first to inspect again
+      // reset progress (energy → MAX = 20), then spend 1
       await cityNode.connect(owner).resetPlayerProgress(player.address);
       await cityNode.connect(player).inspectLocation(0);
       energy = await cityNode.getEnergy(player.address);
-      expect(energy).to.equal(9); // was 10 after reset, then -1
+      expect(energy).to.equal(19); // was 20 after reset, then -1
     });
   });
 
@@ -1110,47 +1114,29 @@ describe("CityNode", function () {
     });
 
     it("should reject inspect when at 0 energy", async function () {
-      // Drain energy to 0
-      await cityNode.connect(player).inspectLocation(0); // 10->9
-      await cityNode.connect(player).inspectLocation(1); // 9->8
-      await cityNode.connect(player).inspectLocation(2); // 8->7
-      await cityNode.connect(player).scanAnomalies(0);   // 7->5
-      await cityNode.connect(player).scanAnomalies(1);   // 5->3
-      await cityNode.connect(player).scanAnomalies(2);   // 3->1
+      // Drain energy to 0: inspect(0,1,2)=3 + scan(0,1)=12 + 5 flags=5 → total 20
+      const drain = async (signer: any, prefix: string) => {
+        await cityNode.connect(signer).inspectLocation(0); // 20->19
+        await cityNode.connect(signer).inspectLocation(1); // 19->18
+        await cityNode.connect(signer).inspectLocation(2); // 18->17
+        await cityNode.connect(signer).scanAnomalies(0);   // 17->11
+        await cityNode.connect(signer).scanAnomalies(1);   // 11->5
+        for (let i = 1; i <= 5; i++) {
+          const r = ethers.keccak256(ethers.toUtf8Bytes(`${prefix}_${i}`));
+          await cityNode.connect(signer).flagTx(r);
+        }
+      };
 
-      const refId = ethers.keccak256(ethers.toUtf8Bytes("tx1"));
-      await cityNode.connect(player).flagTx(refId);      // 1->0
-
+      await drain(player, "pd1");
       expect(await cityNode.getEnergy(player.address)).to.equal(0);
 
-      // All actions should fail
-      await cityNode.connect(owner).resetPlayerProgress(player.address);
       // Reset resets energy too, so re-drain
-      await cityNode.connect(player).inspectLocation(0);
-      await cityNode.connect(player).inspectLocation(1);
-      await cityNode.connect(player).inspectLocation(2);
-      await cityNode.connect(player).scanAnomalies(0);
-      await cityNode.connect(player).scanAnomalies(1);
-      await cityNode.connect(player).scanAnomalies(2);
-      await cityNode.connect(player).flagTx(refId);
-
+      await cityNode.connect(owner).resetPlayerProgress(player.address);
+      await drain(player, "pd2");
       expect(await cityNode.getEnergy(player.address)).to.equal(0);
 
-      // Now test: all actions should fail
-      await cityNode.connect(owner).resetPlayerProgress(player.address);
-      // resetPlayerProgress resets energy but we want to test at 0
-      // Let's just verify the reject works by not resetting
-
-      // Actually, let's create a fresh player at 0 energy
-      // Drain otherUser's energy
-      await cityNode.connect(otherUser).inspectLocation(0);
-      await cityNode.connect(otherUser).inspectLocation(1);
-      await cityNode.connect(otherUser).inspectLocation(2);
-      await cityNode.connect(otherUser).scanAnomalies(0);
-      await cityNode.connect(otherUser).scanAnomalies(1);
-      await cityNode.connect(otherUser).scanAnomalies(2);
-      await cityNode.connect(otherUser).flagTx(refId);
-
+      // Drain otherUser to test capture rejection
+      await drain(otherUser, "od1");
       expect(await cityNode.getEnergy(otherUser.address)).to.equal(0);
 
       // requestCapture costs 3 energy → should fail
@@ -1162,15 +1148,16 @@ describe("CityNode", function () {
     });
 
     it("should allow action after partial regen from 0", async function () {
-      // Drain otherUser to 0
-      await cityNode.connect(otherUser).inspectLocation(0);
-      await cityNode.connect(otherUser).inspectLocation(1);
-      await cityNode.connect(otherUser).inspectLocation(2);
-      await cityNode.connect(otherUser).scanAnomalies(0);
-      await cityNode.connect(otherUser).scanAnomalies(1);
-      await cityNode.connect(otherUser).scanAnomalies(2);
-      const refId = ethers.keccak256(ethers.toUtf8Bytes("tx1"));
-      await cityNode.connect(otherUser).flagTx(refId);
+      // Drain otherUser to 0: inspect(0,1,2)=3 + scan(0,1)=12 + 5 flags=5 → total 20
+      await cityNode.connect(otherUser).inspectLocation(0); // 20->19
+      await cityNode.connect(otherUser).inspectLocation(1); // 19->18
+      await cityNode.connect(otherUser).inspectLocation(2); // 18->17
+      await cityNode.connect(otherUser).scanAnomalies(0);   // 17->11
+      await cityNode.connect(otherUser).scanAnomalies(1);   // 11->5
+      for (let i = 1; i <= 5; i++) {
+        const r = ethers.keccak256(ethers.toUtf8Bytes(`regen_drain_${i}`));
+        await cityNode.connect(otherUser).flagTx(r);
+      }
 
       expect(await cityNode.getEnergy(otherUser.address)).to.equal(0);
 
@@ -1179,8 +1166,8 @@ describe("CityNode", function () {
       expect(await cityNode.getEnergy(otherUser.address)).to.equal(1);
 
       // Can now flag again (costs 1)
-      const refId2 = ethers.keccak256(ethers.toUtf8Bytes("tx2"));
-      await cityNode.connect(otherUser).flagTx(refId2);
+      const refId3 = ethers.keccak256(ethers.toUtf8Bytes("regen_after_1"));
+      await cityNode.connect(otherUser).flagTx(refId3);
       expect(await cityNode.getEnergy(otherUser.address)).to.equal(0);
     });
   });

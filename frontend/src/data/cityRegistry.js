@@ -2,13 +2,31 @@
 // Each city maps to a blockchain chain. Multiple cities can share the same real chainId.
 
 export const CHAIN_DEFS = {
-  421614:   { name: 'Arbitrum Sepolia', color: '#28A0F0', icon: '/blockchain_icon/arbitrum.png', symbol: 'ETH' },
-  97:       { name: 'BNB Testnet',      color: '#F0B90B', icon: '/blockchain_icon/bnb.png',      symbol: 'BNB' },
-  84532:    { name: 'Base Sepolia',      color: '#0052FF', icon: '/blockchain_icon/base.png',     symbol: 'ETH' },
-  51:       { name: 'XDC Apothem',       color: '#00AEEF', icon: '/blockchain_icon/xdc.png',      symbol: 'TXDC' },
-  80002:    { name: 'Polygon Amoy',      color: '#8247E5', icon: '/blockchain_icon/polygon.png',  symbol: 'MATIC' },
-  11155111: { name: 'Ethereum Sepolia',  color: '#627EEA', icon: '/blockchain_icon/eth.png',      symbol: 'ETH' },
+  421614:   { name: 'Arbitrum Sepolia', color: '#28A0F0', icon: '/blockchain_icon/arbitrum.png', symbol: 'ETH',  deployable: true,  comingSoon: false },
+  97:       { name: 'BNB Testnet',      color: '#F0B90B', icon: '/blockchain_icon/bnb.png',      symbol: 'BNB',  deployable: false, comingSoon: true  },
+  84532:    { name: 'Base Sepolia',     color: '#0052FF', icon: '/blockchain_icon/base.png',      symbol: 'ETH',  deployable: true,  comingSoon: false },
+  51:       { name: 'XDC Apothem',      color: '#00AEEF', icon: '/blockchain_icon/xdc.png',       symbol: 'TXDC', deployable: true,  comingSoon: false },
+  80002:    { name: 'Polygon Amoy',     color: '#8247E5', icon: '/blockchain_icon/polygon.png',   symbol: 'MATIC',deployable: false, comingSoon: true  },
+  11155111: { name: 'Ethereum Sepolia', color: '#627EEA', icon: '/blockchain_icon/eth.png',       symbol: 'ETH',  deployable: false, comingSoon: true  },
+  31337:    { name: 'Hardhat Local',    color: '#999999', icon: '/blockchain_icon/hardhat.png',   symbol: 'ETH',  deployable: true,  comingSoon: false },
 }
+
+// ─── CityNode configuration per deployable chain ───
+// deployable=true means a CityNode contract can be deployed on that chain
+export const CITYNODE_CONFIG = {
+  421614: { rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc', deployable: true  },
+  84532:  { rpcUrl: 'https://sepolia.base.org',               deployable: true  },
+  51:     { rpcUrl: 'https://erpc.apothem.network',           deployable: true  },
+  97:     { rpcUrl: 'https://data-seed-prebsc-1-e.bnbchain.org:8545', deployable: false },
+  80002:  { rpcUrl: 'https://rpc-amoy.polygon.technology',    deployable: false },
+  11155111:{ rpcUrl: 'https://rpc.sepolia.org',               deployable: false },
+}
+
+// ─── Hardhat local virtual CityNode mapping ───
+// When chainId===31337, each city (by cityId) has its own CityNode contract deployed locally.
+// Key = cityId of the city that this local CityNode represents.
+// Env var: VITE_HARDHAT_CITYNODE_{cityId}_ADDRESS
+export const HARDHAT_CITY_IDS = [421614, 84532, 51, 97, 80002, 11155111]
 
 // ─── 17 cities pool ───
 // id = unique city identifier used across the app

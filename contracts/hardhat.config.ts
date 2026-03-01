@@ -43,6 +43,16 @@ const config: HardhatUserConfig = {
       accounts: [PRIVATE_KEY],
       chainId: 51,
     },
+    polygonAmoy: {
+      url: process.env.POLYGON_AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
+      accounts: [PRIVATE_KEY],
+      chainId: 80002,
+    },
+    bnbTestnet: {
+      url: process.env.BNB_TESTNET_RPC_URL || "https://data-seed-prebsc-1-e.bnbchain.org:8545",
+      accounts: [PRIVATE_KEY],
+      chainId: 97,
+    },
   },
   etherscan: {
     apiKey: {

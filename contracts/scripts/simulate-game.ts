@@ -100,12 +100,12 @@ async function main() {
   await gameMaster.connect(owner).setMissionNFT(await missionNFT.getAddress());
   await log(`${C.green}  \u2713${C.reset} ${C.bold}gameMaster.setMissionNFT()${C.reset} \u2190 without this, NFTs won't mint!`);
 
-  // CityNodes (3 cities)
+  // CityNodes (3 cities) — 6 args: name, countryCode, chainId, cityId, gameMaster, ccipRouter
   const CityNodeFactory = await ethers.getContractFactory("CityNode");
-  await CityNodeFactory.deploy("Tokyo", "JP", 421614, 1, creOracle.address);
-  await CityNodeFactory.deploy("Paris", "FR", 84532, 2, creOracle.address);
-  await CityNodeFactory.deploy("London", "GB", 51, 3, creOracle.address);
-  await log(`${C.green}  \u2713${C.reset} CityNodes: Tokyo (JP) | Paris (FR) | London (GB)`);
+  await CityNodeFactory.deploy("Tokyo", "JP", 421614, 421614, creOracle.address, ethers.ZeroAddress);
+  await CityNodeFactory.deploy("Paris", "FR", 84532, 84532, creOracle.address, ethers.ZeroAddress);
+  await CityNodeFactory.deploy("Sydney", "AU", 51, 51, creOracle.address, ethers.ZeroAddress);
+  await log(`${C.green}  \u2713${C.reset} CityNodes: Tokyo (Arbitrum) | Paris (Base) | Sydney (XDC)`);
 
   // Set Proxy as CRE Oracle
   await gameMaster.setCREOracle(await proxy.getAddress());

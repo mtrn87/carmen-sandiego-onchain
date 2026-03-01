@@ -6,7 +6,7 @@
  */
 
 import { ethers } from "ethers"
-import { CITY_POOL, CITY_POOL_MAP, getMockLocations, getMockClueData, getCountryCode } from '../data/cityRegistry'
+import { CITY_POOL, CITY_POOL_MAP, CHAIN_DEFS, CITYNODE_CONFIG, HARDHAT_CITY_IDS, getMockLocations, getMockClueData, getCountryCode } from '../data/cityRegistry'
 import { WALLET_POOL, pickTxWallets, getCarmenWalletIndex } from '../data/walletPool'
 import { getActiveRoute, getCityRole, getNextCity, getNearestPathCity } from '../data/scriptedRoutes'
 import GameMasterArtifact from "../abi/GameMaster.json"
@@ -69,27 +69,49 @@ if (!GAME_MASTER_ADDRESS) {
 export const SEPOLIA_CHAIN_ID = 11155111
 export const HARDHAT_CHAIN_ID = 31337
 
-const DEFAULT_CITY_NODE_RPCS = {
-  421614: "https://sepolia-rollup.arbitrum.io/rpc",
-  84532: "https://sepolia.base.org",
-  51: "https://erpc.apothem.network",
-}
-
+// CITY_NODE_META: all cities with chain metadata + deployable status
 const CITY_NODE_META = Object.fromEntries(
-  Object.entries(CITY_POOL_MAP).map(([id, city]) => [Number(id), { name: city.name, chain: city.chain }])
+  Object.entries(CITY_POOL_MAP).map(([id, city]) => [
+    Number(id),
+    {
+      name: city.name,
+      chain: city.chain,
+      chainId: city.chainId,
+      deployable: CHAIN_DEFS[city.chainId]?.deployable ?? false,
+      comingSoon: CHAIN_DEFS[city.chainId]?.comingSoon ?? false,
+    },
+  ])
 )
 
-const CITY_NODE_ADDRESSES = {
-  421614: import.meta.env.VITE_CITYNODE_TOKYO_ADDRESS,
-  84532: import.meta.env.VITE_CITYNODE_PARIS_ADDRESS,
-  51: import.meta.env.VITE_CITYNODE_LONDON_ADDRESS,
-}
+// CITY_NODE_ADDRESSES: chainId → deployed contract address (real chains only)
+// Env var format: VITE_CITYNODE_{CHAIN_NAME_UPPERCASE_UNDERSCORED}_ADDRESS
+const CITY_NODE_ADDRESSES = Object.fromEntries(
+  Object.entries(CITYNODE_CONFIG)
+    .filter(([, cfg]) => cfg.deployable)
+    .map(([chainId]) => {
+      const chainName = CHAIN_DEFS[chainId]?.name?.toUpperCase().replace(/\s+/g, '_') ?? chainId
+      return [Number(chainId), import.meta.env[`VITE_CITYNODE_${chainName}_ADDRESS`] || null]
+    })
+)
 
-const CITY_NODE_RPC_URLS = {
-  421614: import.meta.env.VITE_ARBITRUM_SEPOLIA_RPC_URL || DEFAULT_CITY_NODE_RPCS[421614],
-  84532: import.meta.env.VITE_BASE_SEPOLIA_RPC_URL || DEFAULT_CITY_NODE_RPCS[84532],
-  51: import.meta.env.VITE_XDC_APOTHEM_RPC_URL || DEFAULT_CITY_NODE_RPCS[51],
-}
+// CITY_NODE_RPC_URLS: chainId → RPC URL (env override or default)
+// Env var format: VITE_{CHAIN_NAME_UPPERCASE_UNDERSCORED}_RPC_URL
+const CITY_NODE_RPC_URLS = Object.fromEntries(
+  Object.entries(CITYNODE_CONFIG).map(([chainId, cfg]) => {
+    const chainName = CHAIN_DEFS[chainId]?.name?.toUpperCase().replace(/\s+/g, '_') ?? chainId
+    return [Number(chainId), import.meta.env[`VITE_${chainName}_RPC_URL`] || cfg.rpcUrl || null]
+  })
+)
+
+// HARDHAT_CITYNODE_ADDRESSES: cityId → local Hardhat CityNode address
+// Used when chainId === 31337 (local Hardhat node).
+// Env var format: VITE_HARDHAT_CITYNODE_{cityId}_ADDRESS
+const HARDHAT_CITYNODE_ADDRESSES = Object.fromEntries(
+  HARDHAT_CITY_IDS.map((cityId) => [
+    cityId,
+    import.meta.env[`VITE_HARDHAT_CITYNODE_${cityId}_ADDRESS`] || null,
+  ])
+)
 
 /**
  * Resolve a cityId (unique, e.g. 512 for Rio) to the real blockchain chainId (e.g. 51 for XDC).
@@ -346,16 +368,19 @@ export function getConfiguredCityNodes() {
   })
 }
 
-function getCityNodeReadContract(chainId) {
-  const address = CITY_NODE_ADDRESSES[chainId]
-  const rpcUrl = CITY_NODE_RPC_URLS[chainId]
+function getCityNodeReadContract(chainId, cityId) {
+  let address, rpcUrl
 
-  if (!address) {
-    throw new Error(`CityNode address not configured for chainId ${chainId}`)
+  if (chainId === 31337) {
+    address = cityId ? HARDHAT_CITYNODE_ADDRESSES[cityId] : null
+    rpcUrl = import.meta.env.VITE_HARDHAT_LOCAL_RPC_URL || 'http://localhost:8545'
+  } else {
+    address = CITY_NODE_ADDRESSES[chainId]
+    rpcUrl = CITY_NODE_RPC_URLS[chainId]
   }
-  if (!rpcUrl) {
-    throw new Error(`RPC URL not configured for chainId ${chainId}`)
-  }
+
+  if (!address) throw new Error(`CityNode address not configured for chainId ${chainId}`)
+  if (!rpcUrl) throw new Error(`RPC URL not configured for chainId ${chainId}`)
 
   const provider = new ethers.JsonRpcProvider(rpcUrl)
   return new ethers.Contract(address, CITY_NODE_GAMEPLAY_ABI, provider)
@@ -1314,8 +1339,10 @@ export async function ensureCityNodeNetwork(chainId) {
  * Get signer-connected CityNode gameplay contract.
  * Switches the wallet to the correct chain first.
  */
-async function getCityNodeWriteContract(chainId) {
-  const address = CITY_NODE_ADDRESSES[chainId]
+async function getCityNodeWriteContract(chainId, cityId) {
+  const address = chainId === 31337
+    ? (cityId ? HARDHAT_CITYNODE_ADDRESSES[cityId] : null)
+    : CITY_NODE_ADDRESSES[chainId]
   if (!address) throw new Error(`CityNode address not configured for chain ${chainId}`)
   await ensureCityNodeNetwork(chainId)
   const eip1193 = _externalEip1193 || window.ethereum
@@ -1344,8 +1371,12 @@ async function getCityNodeWriteContract(chainId) {
  * Check if a CityNode contract is configured (address + rpc).
  * Returns false when MOCK_MODE is enabled, forcing all functions to use mock data.
  */
-function isCityNodeConfigured(chainId) {
+function isCityNodeConfigured(chainId, cityId) {
   if (MOCK_MODE) return false
+  // Hardhat local: look up by cityId
+  if (chainId === 31337) {
+    return Boolean(cityId && HARDHAT_CITYNODE_ADDRESSES[cityId])
+  }
   return Boolean(CITY_NODE_ADDRESSES[chainId] && CITY_NODE_RPC_URLS[chainId])
 }
 

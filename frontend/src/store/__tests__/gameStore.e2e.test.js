@@ -179,6 +179,7 @@ describe('gameStore E2E — Full Mission Lifecycle', () => {
         walletAddress: PLAYER_ADDR,
         isConnected: true,
         missionId: 1,
+        briefingDone: true,
         currentMission: { id: 'mission-1', status: 'active' },
       })
 

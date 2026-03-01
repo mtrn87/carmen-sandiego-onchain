@@ -100,6 +100,7 @@ export default function ContractExplorer({ onOpenMap, onBackToCityPanel }) {
     backToCityPanel,
     gameplayScanAnomalies,
     gameplayRequestClue,
+    cityClue,
     walletAddress,
     captureMode,
     captureSelectedTx,
@@ -782,11 +783,11 @@ export default function ContractExplorer({ onOpenMap, onBackToCityPanel }) {
                     <span className={styles.methodDesc}>{currentLocation.name} — 2 BLOCKS</span>
                   </div>
                   <button
-                    className={`${styles.methodExecBtn} ${currentLocation.clueSlots?.[0] ? styles.methodDone : ''}`}
-                    onClick={() => gameplayRequestClue(currentLocationIdx, 0)}
-                    disabled={currentLocation.clueSlots?.[0] !== null}
+                    className={`${styles.methodExecBtn} ${cityClue?.[currentCityId] ? styles.methodDone : ''}`}
+                    onClick={() => gameplayRequestClue(currentLocationIdx)}
+                    disabled={Boolean(cityClue?.[currentCityId])}
                   >
-                    {currentLocation.clueSlots?.[0] ? 'RESOLVED' : 'EXECUTE'}
+                    {cityClue?.[currentCityId] ? 'RESOLVED' : 'EXECUTE'}
                   </button>
                 </div>
 

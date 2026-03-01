@@ -197,16 +197,13 @@ export default function CityView() {
                     >
                       scanAnomalies({i}) — 2 E
                     </button>
-                    {[0, 1, 2].map((ci) => (
-                      <button
-                        key={ci}
-                        className={`${styles.methodBtn} ${loc.clueSlots[ci] ? styles.methodDone : ''}`}
-                        disabled={!loc.scanned || loc.clueSlots[ci] !== null}
-                        onClick={() => gameplayRequestClue(i, ci)}
-                      >
-                        requestClue({i}, {ci}) — 2 E
-                      </button>
-                    ))}
+                    <button
+                      className={`${styles.methodBtn}`}
+                      disabled={!loc.scanned}
+                      onClick={() => gameplayRequestClue(i)}
+                    >
+                      investigateCity({i}) — 5 E
+                    </button>
                   </div>
                 </div>
               ))}

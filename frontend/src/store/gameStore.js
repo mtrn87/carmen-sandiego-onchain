@@ -57,6 +57,9 @@ function resolveChainId(cityPoolId) {
 }
 
 const MISSION_PLOT_STORAGE_KEY = 'carmen_current_mission_plot'
+
+// Chain IDs registered as valid CityNodes in the deployed GameMaster contract
+const VALID_INVESTIGATION_CHAINS = new Set([421614, 84532, 51])
 const PROGRESS_STORAGE_KEY = 'carmen_investigation_progress'
 const SNAPSHOT_STORAGE_KEY = 'carmen_game_snapshot'
 const ABANDONED_MISSION_KEY = 'carmen_abandoned_mission'
@@ -309,6 +312,7 @@ export const useGameStore = create((set, get) => ({
   currentMission: null,
   locations: CITY_LOCATIONS,
   clues: [],
+  cityClue: {}, // keyed by cityId, each value = { id, text, type, timestamp }
   evidence: [],
   scannedLocations: [],
   isScanning: false,
@@ -666,11 +670,13 @@ export const useGameStore = create((set, get) => ({
             decrypted: true,
           }
 
+          const cid = get().currentCityId
           set((s) => ({
             isInvestigating: false,
             clues: [...s.clues, newClue],
             activeClue: newClue,
             showClueModal: true,
+            cityClue: cid ? { ...s.cityClue, [cid]: newClue } : s.cityClue,
             missionEvents: [...s.missionEvents, {
               name: 'ClueReceived',
               block: 'latest',
@@ -2087,88 +2093,72 @@ export const useGameStore = create((set, get) => ({
     }
   },
 
-  gameplayRequestClue: async (locationIdx, clueIndex) => {
-    const { currentCityId, startLocationIdx, gameplayLoading } = get()
+  gameplayRequestClue: async (locationIdx, _clueIndex) => {
+    const state = get()
+    const { currentCityId, cityClue, gameplayLoading } = state
     if (!currentCityId) return
-    if (gameplayLoading) return
+    if (gameplayLoading || state.isInvestigating) return
     if (get()._isMissionExpired()) return
+
+    // if city already has a clue, show it directly without a new tx
+    const existingClue = cityClue[currentCityId]
+    if (existingClue) {
+      set({
+        showClueModal: true,
+        activeClue: existingClue,
+      })
+      return
+    }
 
     const newBlocks = get()._spendBlocks(5)
     if (newBlocks >= MAX_BLOCKS) return
 
+    const chainId = resolveChainId(currentCityId)
+    const isOnChainCity = VALID_INVESTIGATION_CHAINS.has(chainId)
+
     set((s) => ({
-      gameplayLoading: true,
       terminalLines: [...s.terminalLines,
-        { text: `> REQUEST CLUE ${clueIndex + 1}/3: ${s.cityLocations[locationIdx]?.name}`, color: 'cyan', type: 'action' },
+        { text: `> REQUESTING CITY INTEL${isOnChainCity ? ' via CRE...' : ' (mock)...'}`, color: 'cyan', type: 'action' },
         { text: `> +5 BLOCKS (${newBlocks} total)`, color: 'yellow', type: 'system' },
-        { text: '> PENDING GM...', color: 'muted', type: 'system' },
       ],
     }))
 
+    if (isOnChainCity) {
+      // on-chain cities: delegate to investigate — CRE responds via ClueReceived event listener
+      await get().investigate(currentCityId)
+      return
+    }
+
+    // non-configured cities: use mock clue from CityNode mock layer
     try {
-      // first clue at the starting location is always strong (guaranteed lead)
-      const isStartingClue = locationIdx === startLocationIdx && clueIndex === 0
-      const result = await cityNodeRequestClue(resolveChainId(currentCityId), locationIdx, clueIndex, isStartingClue)
-
-      const isDeadEnd = result.clueType === 'DEAD_END'
-      const newClue = {
-        id: `city-clue-${Date.now()}`,
-        locationIdx,
-        clueIndex,
-        clueType: result.clueType,
-        data: result.clueData,
-        strength: result.strength,
-        anomalyRefId: result.anomalyRefId,
-        cityId: get().currentCityId,
-        isDeadEnd,
+      set({ gameplayLoading: true })
+      const isStartingClue = locationIdx === get().startLocationIdx
+      const result = await cityNodeRequestClue(chainId, locationIdx, 0, isStartingClue)
+      const mockClue = {
+        id: `clue-${Date.now()}`,
+        locationId: null,
+        text: result.clueData,
+        type: 'text',
         timestamp: Date.now(),
+        decrypted: true,
       }
-
-      // Build evidence item when strength exceeds threshold
-      const EVIDENCE_THRESHOLD = 65
-      const isEvidence = !isDeadEnd && result.strength > EVIDENCE_THRESHOLD
-      const evidenceItem = isEvidence ? {
-        id: `evidence-${Date.now()}`,
-        icon: result.clueType === 'FUNDING_TRAIL' ? 'receipt'
-          : result.clueType === 'IDENTITY_COMMIT' ? 'hot'
-          : result.clueType === 'RELATIONSHIP' ? 'key'
-          : result.clueType === 'TECHNICAL_SIGNATURE' ? 'key'
-          : 'receipt',
-        name: `${result.clueType} [STR ${result.strength}]`,
-        rarity: result.strength >= 86 ? 'legendary' : result.strength >= 76 ? 'epic' : 'rare',
-        description: result.clueData,
-      } : null
-
       set((s) => ({
         gameplayLoading: false,
-        showCityClueModal: true,
-        activeCityClue: newClue,
-        cityLocations: s.cityLocations.map((loc, i) =>
-          i === locationIdx
-            ? { ...loc, clueSlots: loc.clueSlots.map((slot, ci) => ci === clueIndex ? newClue : slot) }
-            : loc
-        ),
-        cityEvidence: [...s.cityEvidence, newClue],
-        evidence: evidenceItem ? [...s.evidence, evidenceItem] : s.evidence,
+        isInvestigating: false,
+        showClueModal: true,
+        activeClue: mockClue,
+        clues: [...s.clues, mockClue],
+        cityClue: { ...s.cityClue, [currentCityId]: mockClue },
         terminalLines: [...s.terminalLines,
-          isDeadEnd
-            ? { text: `> DEAD END at clue #${clueIndex + 1}. No actionable intel.`, color: 'red', type: 'alert' }
-            : { text: `> GM RESOLVED: CLUE #${clueIndex + 1} (${result.clueType})`, color: 'green', type: 'system' },
-          isDeadEnd
-            ? { text: `> Consolation hint available.`, color: 'muted', type: 'system' }
-            : { text: `> HIT: ${result.clueData}`, color: 'yellow', type: 'alert' },
-          { text: `> Strength: ${result.strength}/100 | Anomaly: ref#${result.anomalyRefId?.slice(2, 6) || '????'}`, color: 'muted', type: 'system' },
-          ...(isEvidence
-            ? [{ text: `> EVIDENCE COLLECTED! Strength ${result.strength} > ${EVIDENCE_THRESHOLD} threshold.`, color: 'green', type: 'alert' }]
-            : []),
+          { text: `> INTEL RECEIVED (mock): ${result.clueType}`, color: 'green', type: 'system' },
+          { text: `> ${result.clueData}`, color: 'yellow', type: 'alert' },
         ],
       }))
-      saveProgress(get())
     } catch (error) {
       set((s) => ({
         gameplayLoading: false,
         terminalLines: [...s.terminalLines,
-          { text: `> !! CLUE REQUEST FAILED: ${error.message}`, color: 'red', type: 'alert' },
+          { text: `> !! INTEL REQUEST FAILED: ${error.message}`, color: 'red', type: 'alert' },
         ],
       }))
     }

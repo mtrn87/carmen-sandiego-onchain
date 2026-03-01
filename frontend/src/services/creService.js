@@ -399,8 +399,8 @@ export async function registerPlayerFlow(nickname, playerAddress) {
   creFlow("╚══════════════════════════════════════════════════════════╝");
   creFlow(`Player: ${playerAddress.slice(0, 10)}... | Nickname: "${nickname}"`);
 
-  // Set up listener before sending TX so we don't miss the event
-  const resultPromise = waitForPlayerRegistered(playerAddress, 300000);
+  // Set up listener before sending TX so we don't miss the event (30s max)
+  const resultPromise = waitForPlayerRegistered(playerAddress, 30000);
 
   // Send trigger TX once — retrying would spam the chain with duplicate requests
   await requestRegistration(nickname);
@@ -408,13 +408,16 @@ export async function registerPlayerFlow(nickname, playerAddress) {
   creFlow("Step 3: Waiting for CRE WASM workflow 'player-registration' to process...");
   creFlow("  CRE listens for RegistrationRequested → validates → calls registerPlayer()");
 
-  const result = await resultPromise;
-
-  creOK("╔══════════════════════════════════════════════════════════╗");
-  creOK(`║  Registration COMPLETE: "${result.nickname}" is now on-chain!   ║`);
-  creOK("╚══════════════════════════════════════════════════════════╝");
-  return {
-    nickname: result.nickname,
-    timestamp: result.timestamp,
-  };
+  try {
+    const result = await resultPromise;
+    creOK("╔══════════════════════════════════════════════════════════╗");
+    creOK(`║  Registration COMPLETE: "${result.nickname}" is now on-chain!   ║`);
+    creOK("╚══════════════════════════════════════════════════════════╝");
+    return { nickname: result.nickname, timestamp: result.timestamp };
+  } catch (err) {
+    // CRE did not respond in time — TX was submitted, registration is pending on-chain.
+    // The CRE workflow will process it asynchronously. Proceed so the user isn't blocked.
+    creWarn(`CRE did not confirm in 30s (${err.message}). TX submitted — registration is pending.`);
+    return { nickname, timestamp: Date.now(), pending: true };
+  }
 }

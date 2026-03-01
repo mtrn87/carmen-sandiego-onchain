@@ -16,8 +16,6 @@ export default function InteractiveMap({ onSelectCase }) {
     showClueModal,
     activeClue,
     closeClueModal,
-    isInvestigating,
-    investigate,
     scannedLocations,
     isScanning,
     scanLocation,
@@ -316,25 +314,6 @@ export default function InteractiveMap({ onSelectCase }) {
                 </div>
               )}
 
-              {/* On-chain investigate button — at bottom of right panel */}
-              {isScanned && missionId && (
-                <button
-                  className={`${styles.investigateBtn} ${isInvestigating ? styles.investigateBtnDisabled : ''}`}
-                  style={{ '--chain-color': loc.chainColor }}
-                  disabled={isInvestigating}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    investigate(loc.id)
-                    setSelectedMarker(null)
-                  }}
-                >
-                  {isInvestigating ? (
-                    <>&#9203; INVESTIGATING...</>
-                  ) : (
-                    <>&#128269; INVESTIGATE CITY</>
-                  )}
-                </button>
-              )}
             </div>
 
             <button className={styles.locationPanelClose} onClick={() => setSelectedMarker(null)}>
@@ -343,19 +322,6 @@ export default function InteractiveMap({ onSelectCase }) {
           </div>
         )
       })()}
-
-      {/* investigating overlay */}
-      {isInvestigating && (
-        <div className={styles.investigatingOverlay}>
-          <div className={styles.investigatingContent}>
-            <div className={styles.scanLine} />
-            <span className={styles.investigatingText}>INVESTIGATING...</span>
-            <span className={styles.investigatingSub}>
-              Waiting for CRE workflow response
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* clue modal */}
       {showClueModal && activeClue && (
