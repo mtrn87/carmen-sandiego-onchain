@@ -440,6 +440,27 @@ The `carmen-moves` workflow runs every 3 minutes via CronCapability. It reads al
 
 ---
 
+## Documentation
+
+For detailed documentation, see the [docs/](docs/) directory:
+
+| Document | Description |
+|----------|-------------|
+| [Documentation Index](docs/INDEX.md) | Complete navigation guide for all documentation |
+| [Technical Overview](docs/TECHNICAL_OVERVIEW.md) | In-depth technical breakdown for hackathon evaluators |
+| [System Diagrams](docs/SYSTEM_DIAGRAMS.md) | Visual architecture and flow diagrams (Mermaid) |
+| [System Flows](docs/SYSTEM_FLOWS.md) | Step-by-step flows for all major interactions |
+| [Innovation](docs/INNOVATION.md) | Why this project is innovative and unique |
+| [Security Audit](docs/SECURITY_AUDIT.md) | Smart contract security analysis |
+| [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) | Complete setup and deployment instructions |
+| [Gameplay Balance](docs/GAMEPLAY_BALANCE.md) | Game economy parameters and balance analysis |
+| [Contracts API](docs/contracts-api.md) | Smart contract API reference |
+| [Frontend Architecture](docs/frontend-architecture.md) | Frontend design patterns and component structure |
+| [Game Flow](GAME_FLOW.md) | Complete 9-phase game flow documentation |
+| [E2E Test Guide](E2E_TEST_GUIDE.md) | End-to-end testing scenarios |
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
