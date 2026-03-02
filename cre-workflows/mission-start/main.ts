@@ -130,6 +130,7 @@ const GameMasterABI = parseAbi([
   "function getMissionFragmentCount(uint256) view returns (uint8)",
   "function deriveCarmenWallet(bytes32) view returns (address)",
   "event InvestigationSubmitted(uint256 indexed missionId, address indexed player, uint256 chainId)",
+  "event WalletCaptureSubmitted(uint256 indexed missionId, address indexed player, address submittedWallet)",
 ])
 
 // ============================================================
@@ -159,6 +160,7 @@ function getScenario(missionId: bigint): Scenario {
 const ACTION_RECEIVE_CLUE = 1
 const ACTION_RESOLVE_CAPTURE = 2
 const ACTION_RECEIVE_WALLET_FRAGMENT = 4
+const ACTION_RESOLVE_WALLET_CAPTURE = 5
 
 const ZERO_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -606,6 +608,123 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
 }
 
 // ============================================================
+//  Handler: WalletCaptureSubmitted — player submits wallet guess
+// ============================================================
+const onWalletCaptureSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record<string, never> => {
+  const config = runtime.config
+
+  const network = getNetwork({
+    chainFamily: "evm",
+    chainSelectorName: config.chainSelectorName,
+    isTestnet: true,
+  })
+  if (!network) throw new Error(`Network not found: ${config.chainSelectorName}`)
+
+  const evmClient = new EVMClient(network.chainSelector.selector)
+  const gm = config.gameMasterAddress
+
+  // Decode WalletCaptureSubmitted event
+  const topics = log.topics.map((t) => bytesToHex(t)) as [`0x${string}`, ...`0x${string}`[]]
+  const data = bytesToHex(log.data)
+
+  const decoded = decodeEventLog({
+    abi: GameMasterABI,
+    data,
+    topics,
+    eventName: "WalletCaptureSubmitted",
+  })
+
+  const { missionId, submittedWallet } = decoded.args as {
+    missionId: bigint; player: string; submittedWallet: string
+  }
+  const mid = Number(missionId)
+  runtime.log(`WalletCaptureSubmitted: mission=${mid}, wallet=${submittedWallet}`)
+
+  // Read salt
+  const saltData = readContract(evmClient, runtime, gm, encodeFunctionData({
+    abi: GameMasterABI,
+    functionName: "getMissionSalt",
+    args: [missionId],
+  }))
+  const salt = decodeFunctionResult({
+    abi: GameMasterABI,
+    functionName: "getMissionSalt",
+    data: bytesToHex(saltData),
+  }) as `0x${string}`
+
+  // Read valid cities to find Carmen's chain
+  const citiesData = readContract(evmClient, runtime, gm, encodeFunctionData({
+    abi: GameMasterABI,
+    functionName: "getValidCities",
+  }))
+  const validCities = decodeFunctionResult({
+    abi: GameMasterABI,
+    functionName: "getValidCities",
+    data: bytesToHex(citiesData),
+  }) as bigint[]
+
+  // Read targetHash
+  const missionData = readContract(evmClient, runtime, gm, encodeFunctionData({
+    abi: GameMasterABI,
+    functionName: "getMission",
+    args: [missionId],
+  }))
+  const [, , targetHash] = decodeFunctionResult({
+    abi: GameMasterABI,
+    functionName: "getMission",
+    data: bytesToHex(missionData),
+  }) as [string, bigint, string, number, number, number]
+
+  // Find which chain matches targetHash (reveals Carmen's chain)
+  let revealedChainId = 0n
+  for (const cityChainId of validCities) {
+    const candidateHash = keccak256(
+      encodeAbiParameters(parseAbiParameters("uint256,bytes32"), [cityChainId, salt])
+    )
+    if (candidateHash === targetHash) {
+      revealedChainId = cityChainId
+      break
+    }
+  }
+
+  if (revealedChainId === 0n) {
+    runtime.log(`Could not find Carmen's chain for mission ${mid}, skipping.`)
+    return {}
+  }
+
+  // Build proxy payload: resolveWalletCapture(missionId, submittedWallet, revealedChainId, salt)
+  const captureData = encodeAbiParameters(
+    parseAbiParameters("uint256, address, uint256, bytes32"),
+    [missionId, submittedWallet as `0x${string}`, revealedChainId, salt]
+  )
+  const captureReport = encodeAbiParameters(
+    parseAbiParameters("uint8, bytes"),
+    [ACTION_RESOLVE_WALLET_CAPTURE, captureData as `0x${string}`]
+  )
+
+  const reportResponse = runtime
+    .report({
+      encodedPayload: hexToBase64(captureReport),
+      encoderName: "evm",
+      signingAlgo: "ecdsa",
+      hashingAlgo: "keccak256",
+    })
+    .result()
+
+  evmClient
+    .writeReport(runtime, {
+      receiver: config.proxyAddress,
+      report: reportResponse,
+      gasConfig: { gasLimit: config.gasLimit },
+    })
+    .result()
+
+  runtime.log(`Wallet capture resolved for mission ${mid}!`)
+
+  return {}
+}
+
+// ============================================================
 //  Workflow initialization
 // ============================================================
 const initWorkflow = (config: Config) => {
@@ -617,15 +736,22 @@ const initWorkflow = (config: Config) => {
   if (!network) throw new Error(`Network not found: ${config.chainSelectorName}`)
 
   const evmClient = new EVMClient(network.chainSelector.selector)
-  const eventHash = keccak256(toBytes("InvestigationSubmitted(uint256,address,uint256)"))
+  const investigationHash = keccak256(toBytes("InvestigationSubmitted(uint256,address,uint256)"))
+  const walletCaptureHash = keccak256(toBytes("WalletCaptureSubmitted(uint256,address,address)"))
 
   return [
     handler(
       evmClient.logTrigger({
         addresses: [hexToBase64(config.gameMasterAddress)],
-        topics: [{ values: [hexToBase64(eventHash)] }],
+        topics: [{ values: [hexToBase64(investigationHash), hexToBase64(walletCaptureHash)] }],
       }),
-      onInvestigationSubmitted
+      (runtime: Runtime<Config>, log: EVMLog) => {
+        const topic0 = bytesToHex(log.topics[0])
+        if (topic0 === investigationHash) return onInvestigationSubmitted(runtime, log)
+        if (topic0 === walletCaptureHash) return onWalletCaptureSubmitted(runtime, log)
+        runtime.log(`Unknown topic: ${topic0}`)
+        return {}
+      }
     ),
   ]
 }

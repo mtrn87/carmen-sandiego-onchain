@@ -572,6 +572,21 @@ export async function submitInvestigation(chainId) {
 }
 
 /**
+ * Submit a reconstructed wallet address for capture (requires >= 3 fragments).
+ * Emits WalletCaptureSubmitted event for CRE to process.
+ * @param {string} walletAddress - The reconstructed wallet address
+ * @returns {Promise<object>} Transaction receipt
+ */
+export async function submitWalletCapture(walletAddress) {
+  bcWrite(`GameMaster.submitWalletCapture(wallet=${walletAddress.slice(0, 10)}...) → CRE validates wallet`)
+  const contract = await getContract()
+  const tx = await contract.submitWalletCapture(walletAddress)
+  const receipt = await tx.wait()
+  bcResult(`submitWalletCapture confirmed ✓ tx: ${receipt.hash.slice(0, 18)}`)
+  return receipt
+}
+
+/**
  * Get mission data.
  * @param {number|bigint} missionId
  * @returns {{ player, startBlock, targetHash, cluesReceived, investigationsCount, status }}

@@ -221,6 +221,20 @@ contract GameMaster is VRFConsumerBaseV2Plus, IGameMaster, Pausable {
         emit InvestigationSubmitted(missionId, msg.sender, chainId);
     }
 
+    /**
+     * @notice Player submits a reconstructed wallet address for capture.
+     *         Requires >= 3 wallet fragments collected. Emits event for CRE
+     *         to pick up and call resolveWalletCapture() via proxy.
+     * @param submittedWallet The wallet address the player reconstructed from fragments.
+     */
+    function submitWalletCapture(address submittedWallet) external whenNotPaused hasActiveMission(msg.sender) {
+        uint256 missionId = activePlayerMission[msg.sender];
+        require(missionFragmentCount[missionId] >= 3, "Need 3+ fragments");
+        require(submittedWallet != address(0), "Invalid wallet");
+
+        emit WalletCaptureSubmitted(missionId, msg.sender, submittedWallet);
+    }
+
     // ============================================================
     //                   CRE CALLBACKS
     // ============================================================

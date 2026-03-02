@@ -72,6 +72,7 @@ interface IGameMaster {
     // --- Wallet Evidence Events ---
     event WalletFragmentReceived(uint256 indexed missionId, uint8 fragmentIndex, uint8 startIndex, uint8 length, bytes32 contentHash, string ipfsPointer);
     event WalletCaseBuilt(uint256 indexed missionId, address indexed player, address submittedWallet, bool valid);
+    event WalletCaptureSubmitted(uint256 indexed missionId, address indexed player, address submittedWallet);
 
     // --- Chainlink Data Feed Events ---
     event PriceFeedSet(address indexed priceFeed);
