@@ -6,6 +6,7 @@ import {
   getPlayerIdentityCommits,
   getPlayerCityClueCount,
   getPlayerMissionTrophies,
+  getRegistryPlayer,
   CITY_MAP,
   MISSION_NFT_ADDRESS,
 } from '../services/contractService'
@@ -37,6 +38,7 @@ export default function ProfilePage() {
   const [stats, setStats] = useState(null)
   const [identityCommits, setIdentityCommits] = useState([])
   const [cityClues, setCityClues] = useState({})
+  const [registryProfile, setRegistryProfile] = useState(null)
 
   const targetAddress = address || walletAddress
 
@@ -47,15 +49,17 @@ export default function ProfilePage() {
       setLoading(true)
       setError(null)
       try {
-        const [progressData, playerTrophies, commits] = await Promise.all([
+        const [progressData, playerTrophies, commits, regProfile] = await Promise.all([
           getPlayerGlobalProgress(targetAddress),
           getPlayerMissionTrophies(targetAddress),
           getPlayerIdentityCommits(targetAddress).catch(() => []),
+          getRegistryPlayer(targetAddress).catch(() => null),
         ])
 
         setProgress(progressData)
         setTrophies(playerTrophies)
         setIdentityCommits(commits)
+        setRegistryProfile(regProfile)
 
         // Fetch per-city clue counts
         const cityIds = Object.keys(CITY_MAP)
@@ -129,7 +133,7 @@ export default function ProfilePage() {
             <span className={styles.dot} data-color="green" />
           </div>
           <span className={styles.headerTitle}>
-            // AGENT_DOSSIER — {targetAddress.slice(0, 6)}...{targetAddress.slice(-4)}
+            // AGENT_DOSSIER — {registryProfile?.nickname || `${targetAddress.slice(0, 6)}...${targetAddress.slice(-4)}`}
           </span>
           <span className={styles.blink}>●</span>
         </div>
@@ -146,6 +150,35 @@ export default function ProfilePage() {
 
           {!loading && !error && stats && (
             <>
+              {/* ── Registry Profile ── */}
+              {registryProfile && (
+                <div className={styles.section}>
+                  <h2 className={styles.sectionTitle}>&#9656; AGENT PROFILE</h2>
+                  <div className={styles.statsGrid}>
+                    <div className={styles.statCard}>
+                      <span className={styles.statValue}>{registryProfile.nickname}</span>
+                      <span className={styles.statLabel}>CODENAME</span>
+                    </div>
+                    <div className={styles.statCard}>
+                      <span className={styles.statValue}>{registryProfile.rankLabel}</span>
+                      <span className={styles.statLabel}>RANK</span>
+                    </div>
+                    <div className={styles.statCard}>
+                      <span className={styles.statValue}>{registryProfile.totalReward}</span>
+                      <span className={styles.statLabel}>TOTAL REWARD</span>
+                    </div>
+                    <div className={styles.statCard}>
+                      <span className={styles.statValue}>
+                        {registryProfile.missionsAttempted > 0
+                          ? Math.round((registryProfile.missionsCompleted / registryProfile.missionsAttempted) * 100)
+                          : 0}%
+                      </span>
+                      <span className={styles.statLabel}>WIN RATE</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ── Stats Grid ── */}
               <div className={styles.section}>
                 <h2 className={styles.sectionTitle}>&#9656; MISSION STATISTICS</h2>
