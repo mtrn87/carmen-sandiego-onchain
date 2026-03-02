@@ -509,8 +509,8 @@ const onMissionStarted = (runtime: Runtime<Config>, log: EVMLog): Record<string,
   const contentHash = keccak256(toBytes(briefingText))
 
   const clueData = encodeAbiParameters(
-    parseAbiParameters("uint256, uint8, bytes32, string"),
-    [missionId, 0, contentHash as `0x${string}`, encryptedBriefing]
+    parseAbiParameters("uint256, uint8, bytes32, string, uint8"),
+    [missionId, 0, contentHash as `0x${string}`, encryptedBriefing, 0]
   )
   const clueReport = encodeAbiParameters(
     parseAbiParameters("uint8, bytes"),
