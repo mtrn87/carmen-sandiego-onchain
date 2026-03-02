@@ -10,7 +10,8 @@ import {IGameMaster} from "./interfaces/IGameMaster.sol";
  *         decoded actions to GameMaster.
  *         Actions: 1=receiveClue, 2=resolveCapture, 3=updateTarget,
  *                  4=receiveWalletFragment, 5=resolveWalletCapture,
- *                  6=setMissionTokenURI
+ *                  6=setMissionTokenURI, 7=resolveClueOnCity,
+ *                  8=resolveDossierOnCity, 9=resolveCaptureOnCity
  */
 contract GameMasterProxy is ReceiverTemplate {
     IGameMaster public gameMaster;
@@ -21,6 +22,9 @@ contract GameMasterProxy is ReceiverTemplate {
     uint8 public constant ACTION_RECEIVE_WALLET_FRAGMENT = 4;
     uint8 public constant ACTION_RESOLVE_WALLET_CAPTURE = 5;
     uint8 public constant ACTION_SET_TOKEN_URI = 6;
+    uint8 public constant ACTION_RESOLVE_CLUE_ON_CITY = 7;
+    uint8 public constant ACTION_RESOLVE_DOSSIER_ON_CITY = 8;
+    uint8 public constant ACTION_RESOLVE_CAPTURE_ON_CITY = 9;
 
     event ActionForwarded(uint8 action, uint256 missionId);
 
@@ -66,6 +70,21 @@ contract GameMasterProxy is ReceiverTemplate {
                 abi.decode(data, (uint256, string));
             gameMaster.setMissionTokenURI(missionId, uri);
             emit ActionForwarded(action, missionId);
+        } else if (action == ACTION_RESOLVE_CLUE_ON_CITY) {
+            (address cityNode, uint256 requestId, uint8 clueType, bytes32 clueDataHash, bytes32 anomalyRefId) =
+                abi.decode(data, (address, uint256, uint8, bytes32, bytes32));
+            gameMaster.resolveClueOnCity(cityNode, requestId, clueType, clueDataHash, anomalyRefId);
+            emit ActionForwarded(action, requestId);
+        } else if (action == ACTION_RESOLVE_DOSSIER_ON_CITY) {
+            (address cityNode, uint256 requestId, bytes32 dossierHash, uint8 confidence, bytes32 nextObjectiveHintHash) =
+                abi.decode(data, (address, uint256, bytes32, uint8, bytes32));
+            gameMaster.resolveDossierOnCity(cityNode, requestId, dossierHash, confidence, nextObjectiveHintHash);
+            emit ActionForwarded(action, requestId);
+        } else if (action == ACTION_RESOLVE_CAPTURE_ON_CITY) {
+            (address cityNode, uint256 requestId, bool success, uint8 reasonCode, bytes32 gmNoteHash) =
+                abi.decode(data, (address, uint256, bool, uint8, bytes32));
+            gameMaster.resolveCaptureOnCity(cityNode, requestId, success, reasonCode, gmNoteHash);
+            emit ActionForwarded(action, requestId);
         } else {
             revert UnknownAction(action);
         }
