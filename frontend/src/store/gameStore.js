@@ -43,6 +43,7 @@ import {
   getCityNodeEnergy,
   MAX_ENERGY,
   ENERGY_REGEN_INTERVAL,
+  submitWalletCapture as submitWalletCaptureOnChain,
 } from '../services/contractService'
 import { decryptClue, getPublicKeyHex } from '../utils/ecies'
 import scenariosData from '../data/scenarios.json'
@@ -2426,12 +2427,11 @@ export const useGameStore = create((set, get) => ({
     }))
 
     try {
-      // Submit investigation on the city where Carmen is — CRE will handle the wallet capture resolution
-      // For now, this is stored locally. The CRE workflow or a separate tx would call resolveWalletCapture.
+      await submitWalletCaptureOnChain(walletAddress)
       set((s) => ({
         terminalLines: [
           ...s.terminalLines,
-          { text: '> Wallet evidence submitted. Awaiting CRE validation...', color: 'cyan', type: 'system' },
+          { text: '> Wallet evidence submitted on-chain. Awaiting CRE oracle validation...', color: 'cyan', type: 'system' },
         ],
       }))
     } catch (error) {
