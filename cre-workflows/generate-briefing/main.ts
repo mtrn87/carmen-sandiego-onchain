@@ -485,6 +485,18 @@ const onMissionStarted = (runtime: Runtime<Config>, log: EVMLog): Record<string,
 
   runtime.log(`Opening clue ready (${briefingText.length} chars)`)
 
+  // TODO: When CRE supports async handlers, generate TTS audio narration:
+  // import { generateBriefingAudio } from "../src/tts"
+  // let briefingAudioUri: string | null = null
+  // if (config.elevenLabsApiKey && config.elevenLabsApiKey !== "YOUR_ELEVENLABS_API_KEY") {
+  //   try {
+  //     briefingAudioUri = await generateBriefingAudio(briefingText, config.elevenLabsApiKey)
+  //     runtime.log(`Briefing audio generated (${briefingAudioUri.length} chars data URI)`)
+  //   } catch (e) {
+  //     runtime.log(`TTS failed, continuing without audio: ${e}`)
+  //   }
+  // }
+
   // ── Step 6: ECIES-encrypt the clue ──
   const pubKeyBytes = parsePubKey(playerPubKeyHex, runtime.log)
   if (!pubKeyBytes) return {}
