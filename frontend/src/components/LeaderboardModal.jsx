@@ -113,6 +113,7 @@ export default function LeaderboardModal({ onClose }) {
               <div className={styles.tableHeader}>
                 <span className={styles.colRank}>#</span>
                 <span className={styles.colAgent}>AGENT</span>
+                <span className={styles.colStat}>RANK</span>
                 <span className={styles.colStat}>MISSIONS</span>
                 <span className={styles.colStat}>REWARDS</span>
                 <span className={styles.colStat}>AVG BLK</span>
@@ -133,6 +134,7 @@ export default function LeaderboardModal({ onClose }) {
                       <span className={styles.agentName}>{entry.nickname}</span>
                       <span className={styles.agentAddr}>{entry.address.slice(0, 10)}...</span>
                     </span>
+                    <span className={styles.colStat}>{entry.rankLabel || '-'}</span>
                     <span className={styles.colStat}>{entry.missionsCompleted}</span>
                     <span className={`${styles.colStat} ${styles[getRewardTier(entry.totalReward)]}`}>
                       {entry.totalReward}

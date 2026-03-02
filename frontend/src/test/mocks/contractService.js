@@ -81,9 +81,16 @@ export const ENERGY_REGEN_INTERVAL = 900
 
 // Profile / MissionNFT mocks
 export const MISSION_NFT_ADDRESS = '0xMOCK_NFT_ADDRESS'
+export const PLAYER_REGISTRY_ADDRESS = '0xMOCK_REGISTRY_ADDRESS'
 export const getPlayerGlobalProgress = vi.fn(async () => ({ citiesVisited: 2, totalClues: 5, identityCommitsCount: 3 }))
 export const getMissionNFTBalance = vi.fn(async () => 0)
 export const getMissionRecord = vi.fn(async () => null)
 export const getMissionNFTTokenURI = vi.fn(async () => null)
 export const getMissionToTokenId = vi.fn(async () => null)
 export const getPlayerMissionTrophies = vi.fn(async () => [])
+export const getRegistryPlayer = vi.fn(async () => null)
+export const getRegistryPlayerRank = vi.fn(async () => null)
+export const getRegistryPlayerScore = vi.fn(async () => null)
+export const isNicknameAvailable = vi.fn(async () => true)
+export const getRegistryPlayerMissions = vi.fn(async () => [])
+export const getRegistryPlayerWinRate = vi.fn(async () => null)

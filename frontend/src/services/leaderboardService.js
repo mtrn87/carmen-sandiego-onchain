@@ -7,8 +7,10 @@
 
 import { ethers } from "ethers"
 import MissionNFTArtifact from "../abi/MissionNFT.json"
+import PlayerRegistryArtifact from "../abi/PlayerRegistry.json"
 
 const MISSION_NFT_ADDRESS = import.meta.env.VITE_MISSION_NFT_ADDRESS
+const PLAYER_REGISTRY_ADDRESS = import.meta.env.VITE_PLAYER_REGISTRY_ADDRESS
 const RPC_URL = import.meta.env.VITE_ALCHEMY_RPC_URL_SEPOLIA || "https://rpc.sepolia.org"
 
 /**
@@ -85,10 +87,15 @@ async function aggregateEvents(events, nftContract) {
     }
   }
 
+  // Enrich with PlayerRegistry nicknames and ranks if available
+  const nicknames = await fetchPlayerNicknames(Array.from(playerMap.keys()))
+
   return Array.from(playerMap.values())
     .map((e) => ({
       address: e.address,
-      nickname: shortenAddress(e.address),
+      nickname: nicknames[e.address]?.nickname || shortenAddress(e.address),
+      rank: nicknames[e.address]?.rank ?? null,
+      rankLabel: nicknames[e.address]?.rankLabel ?? null,
       missionsCompleted: e.missionsCompleted,
       totalReward: Number(e.totalReward),
       avgBlocks: e.missionsCompleted > 0 ? Math.round(Number(e.totalBlocks) / e.missionsCompleted) : 0,
@@ -100,6 +107,34 @@ async function aggregateEvents(events, nftContract) {
 
 function shortenAddress(addr) {
   return addr.slice(0, 6) + "..." + addr.slice(-4)
+}
+
+const RANK_LABELS = ['Rookie', 'Detective', 'Senior Detective', 'Inspector', 'Chief Inspector', 'Commissioner']
+
+/**
+ * Fetch nicknames and ranks from PlayerRegistry for a list of addresses.
+ * Returns { [address]: { nickname, rank, rankLabel } }. Gracefully returns {} on failure.
+ */
+async function fetchPlayerNicknames(addresses) {
+  if (!PLAYER_REGISTRY_ADDRESS || addresses.length === 0) return {}
+  try {
+    const provider = new ethers.JsonRpcProvider(RPC_URL)
+    const registry = new ethers.Contract(PLAYER_REGISTRY_ADDRESS, PlayerRegistryArtifact.abi, provider)
+    const results = await Promise.all(
+      addresses.map(async (addr) => {
+        try {
+          const p = await registry.getPlayer(addr)
+          if (p.wallet === ethers.ZeroAddress) return [addr, null]
+          return [addr, { nickname: p.nickname, rank: Number(p.rank), rankLabel: RANK_LABELS[Number(p.rank)] || 'Unknown' }]
+        } catch {
+          return [addr, null]
+        }
+      })
+    )
+    return Object.fromEntries(results.filter(([, v]) => v !== null))
+  } catch {
+    return {}
+  }
 }
 
 /**

@@ -12,6 +12,7 @@ import { getActiveRoute, getCityRole, getNextCity, getNearestPathCity } from '..
 import GameMasterArtifact from "../abi/GameMaster.json"
 import CityNodeArtifact from "../abi/CityNode.json"
 import MissionNFTArtifact from "../abi/MissionNFT.json"
+import PlayerRegistryArtifact from "../abi/PlayerRegistry.json"
 import {
   relayFlagTx as relayFlagTxService,
   relayRequestClue as relayRequestClueService,
@@ -2693,6 +2694,116 @@ export async function getCCIPSyncStatus(cityChainId) {
     }
   } catch (err) {
     bcWarn(`CCIP sync status unavailable for chain ${cityChainId}: ${err.message}`)
+    return null
+  }
+}
+
+// ============================================================
+//  PlayerRegistry Integration
+// ============================================================
+
+export const PLAYER_REGISTRY_ADDRESS = import.meta.env.VITE_PLAYER_REGISTRY_ADDRESS || null
+
+const RANK_LABELS = ['Rookie', 'Detective', 'Senior Detective', 'Inspector', 'Chief Inspector', 'Commissioner']
+
+async function getPlayerRegistryContract() {
+  if (!PLAYER_REGISTRY_ADDRESS) return null
+  const provider = await getReadProvider()
+  return new ethers.Contract(PLAYER_REGISTRY_ADDRESS, PlayerRegistryArtifact.abi, provider)
+}
+
+/** Get full player profile from PlayerRegistry. Returns null if not registered or contract not deployed. */
+export async function getRegistryPlayer(playerAddress) {
+  const contract = await getPlayerRegistryContract()
+  if (!contract) return null
+  try {
+    bcRead(`PlayerRegistry.getPlayer(${playerAddress.slice(0, 8)}...)`)
+    const p = await contract.getPlayer(playerAddress)
+    if (p.wallet === ethers.ZeroAddress) return null
+    const result = {
+      wallet: p.wallet,
+      nickname: p.nickname,
+      rank: Number(p.rank),
+      rankLabel: RANK_LABELS[Number(p.rank)] || 'Unknown',
+      missionsCompleted: Number(p.missionsCompleted),
+      missionsAttempted: Number(p.missionsAttempted),
+      totalReward: Number(p.totalReward),
+      totalCluesCollected: Number(p.totalCluesCollected),
+      totalInvestigations: Number(p.totalInvestigations),
+      registeredAt: Number(p.registeredAt),
+      isActive: p.isActive,
+    }
+    bcResult(`Player ${result.nickname}: rank=${result.rankLabel}, missions=${result.missionsCompleted}`)
+    return result
+  } catch (err) {
+    bcWarn(`PlayerRegistry.getPlayer failed: ${err.message}`)
+    return null
+  }
+}
+
+/** Get player rank from PlayerRegistry. */
+export async function getRegistryPlayerRank(playerAddress) {
+  const contract = await getPlayerRegistryContract()
+  if (!contract) return null
+  try {
+    const rank = await contract.getPlayerRank(playerAddress)
+    return { rank: Number(rank), rankLabel: RANK_LABELS[Number(rank)] || 'Unknown' }
+  } catch {
+    return null
+  }
+}
+
+/** Get player score from PlayerRegistry. */
+export async function getRegistryPlayerScore(playerAddress) {
+  const contract = await getPlayerRegistryContract()
+  if (!contract) return null
+  try {
+    return Number(await contract.getPlayerScore(playerAddress))
+  } catch {
+    return null
+  }
+}
+
+/** Check if a nickname is available. */
+export async function isNicknameAvailable(nickname) {
+  const contract = await getPlayerRegistryContract()
+  if (!contract) return true
+  try {
+    return await contract.isNicknameAvailable(nickname)
+  } catch {
+    return true
+  }
+}
+
+/** Get player mission history from PlayerRegistry. */
+export async function getRegistryPlayerMissions(playerAddress) {
+  const contract = await getPlayerRegistryContract()
+  if (!contract) return []
+  try {
+    bcRead(`PlayerRegistry.getPlayerMissions(${playerAddress.slice(0, 8)}...)`)
+    const missions = await contract.getPlayerMissions(playerAddress)
+    return missions.map((m) => ({
+      missionId: Number(m.missionId),
+      capturedChainId: Number(m.capturedChainId),
+      cluesCollected: Number(m.cluesCollected),
+      investigationsUsed: Number(m.investigationsUsed),
+      blocksUsed: Number(m.blocksUsed),
+      reward: Number(m.reward),
+      timestamp: Number(m.timestamp),
+      success: m.success,
+    }))
+  } catch {
+    return []
+  }
+}
+
+/** Get player win rate from PlayerRegistry. */
+export async function getRegistryPlayerWinRate(playerAddress) {
+  const contract = await getPlayerRegistryContract()
+  if (!contract) return null
+  try {
+    return Number(await contract.getPlayerWinRate(playerAddress))
+  } catch {
     return null
   }
 }
