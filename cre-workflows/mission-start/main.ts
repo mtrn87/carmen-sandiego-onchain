@@ -428,6 +428,18 @@ const onInvestigationSubmitted = (runtime: Runtime<Config>, log: EVMLog): Record
   const strength = calculateStrength(salt, Number(cluesReceived), isCorrectCity)
   runtime.log(`Clue strength: ${strength} (threshold=65, correct=${isCorrectCity})`)
 
+  // TODO: When CRE supports async handlers, generate TTS audio for clue:
+  // import { generateClueAudio } from "../src/tts"
+  // let clueAudioUri: string | null = null
+  // if (config.elevenLabsApiKey && config.elevenLabsApiKey !== "YOUR_ELEVENLABS_API_KEY") {
+  //   try {
+  //     clueAudioUri = await generateClueAudio(clueText, config.elevenLabsApiKey)
+  //     runtime.log(`Clue audio generated (${clueAudioUri.length} chars data URI)`)
+  //   } catch (e) {
+  //     runtime.log(`TTS failed, continuing without audio: ${e}`)
+  //   }
+  // }
+
   // ── Step 7: Encrypt clue with ECIES ──
   const contentHash = keccak256(toBytes(clueText))
 

@@ -561,6 +561,18 @@ const onCarmenCaptured = (runtime: Runtime<Config>, log: EVMLog): Record<string,
     runtime.log("No AI API key — using enriched finale")
   }
 
+  // TODO: When CRE supports async handlers, generate TTS audio for finale narration:
+  // import { generateCarmenAudio } from "../src/tts"
+  // let finaleAudioUri: string | null = null
+  // if (config.elevenLabsApiKey && config.elevenLabsApiKey !== "YOUR_ELEVENLABS_API_KEY") {
+  //   try {
+  //     finaleAudioUri = await generateCarmenAudio(narrative, config.elevenLabsApiKey)
+  //     runtime.log(`Finale audio generated (${finaleAudioUri.length} chars data URI)`)
+  //   } catch (e) {
+  //     runtime.log(`TTS failed, continuing without audio: ${e}`)
+  //   }
+  // }
+
   // ── Step 6: Generate SVG trophy ──
   const svgImage = generateTrophySVG(
     missionId, scenario, tier, cityName, blocksUsed, cluesReceived, evidenceCount,

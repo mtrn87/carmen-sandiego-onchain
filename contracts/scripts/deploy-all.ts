@@ -395,6 +395,7 @@ async function main() {
     ...baseConfig,
     openaiApiKey: "YOUR_OPENAI_API_KEY",
     openaiModel: "gpt-4o-mini",
+    elevenLabsApiKey: "YOUR_ELEVENLABS_API_KEY",
   };
 
   const playerRegistryConfig: Record<string, any> = {
