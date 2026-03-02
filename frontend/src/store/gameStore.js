@@ -1187,7 +1187,7 @@ export const useGameStore = create((set, get) => ({
           ],
         }))
         // Fallback: use the mock CityNode clue generator which produces contextual scenario clues
-        const { currentCityId, startLocationIdx = 0 } = get()
+        const { currentCityId } = get()
         const resolvedChain = resolveChainId(currentCityId)
         try {
           const result = await cityNodeRequestClue(resolvedChain, 0, 0, true)
