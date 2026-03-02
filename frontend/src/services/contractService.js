@@ -2696,3 +2696,46 @@ export async function getCCIPSyncStatus(cityChainId) {
     return null
   }
 }
+
+// ============================================================
+//  Missing Event Listeners (Issue #100)
+// ============================================================
+
+/**
+ * Listen for RewardCalculatedWithMarketData events for a specific mission.
+ * Emitted on successful capture with base reward, ETH price, and final reward.
+ */
+export async function onRewardCalculated(missionId, callback) {
+  const contract = await getReadContract()
+  const filter = contract.filters.RewardCalculatedWithMarketData(missionId)
+  return pollEvents(contract, filter, (ev) => {
+    const a = ev.args
+    _bcEvent(`RewardCalculatedWithMarketData: mission=${Number(a[0])}, base=${Number(a[1])}, ethPrice=${a[2]}, final=${Number(a[3])}`)
+    callback({
+      missionId: Number(a[0]),
+      baseReward: Number(a[1]),
+      ethPrice: a[2].toString(),
+      finalReward: Number(a[3]),
+    })
+  })
+}
+
+/**
+ * Listen for MissionNFTMinted events for a specific player.
+ * Emitted when a trophy NFT is minted after capture.
+ */
+export async function onMissionNFTMinted(playerAddress, callback) {
+  const nftContract = await getMissionNFTContract()
+  if (!nftContract) return () => {}
+  const filter = nftContract.filters.MissionNFTMinted(null, null, playerAddress)
+  return pollEvents(nftContract, filter, (ev) => {
+    const a = ev.args
+    _bcEvent(`MissionNFTMinted: token=${Number(a[0])}, mission=${Number(a[1])}, player=${a[2]}, reward=${Number(a[3])}`)
+    callback({
+      tokenId: Number(a[0]),
+      missionId: Number(a[1]),
+      player: a[2],
+      reward: Number(a[3]),
+    })
+  })
+}

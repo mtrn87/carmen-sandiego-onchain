@@ -75,6 +75,8 @@ export const onDossierResolvedOnCity = vi.fn(async () => vi.fn())
 export const onCaptureResolvedOnCity = vi.fn(async () => vi.fn())
 export const onMissionNFTSet = vi.fn(async () => vi.fn())
 export const onTxFlagged = vi.fn(async () => vi.fn())
+export const onRewardCalculated = vi.fn(async () => vi.fn())
+export const onMissionNFTMinted = vi.fn(async () => vi.fn())
 export const getCityNodeEnergy = vi.fn(async () => 10)
 export const MAX_ENERGY = 10
 export const ENERGY_REGEN_INTERVAL = 900
