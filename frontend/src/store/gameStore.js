@@ -651,18 +651,23 @@ export const useGameStore = create((set, get) => ({
           }
 
           const cid = get().currentCityId
+          const clueMediaType = ['text', 'audio', 'image'][event.clueType] || 'text'
+          // For audio/image clues, the decrypted text is a media URL
+          const mediaSrc = clueMediaType !== 'text' ? text : null
           // activeCityClue format for ClueModal (always rendered at GamePage level)
           const creActiveCityClue = {
             id: newClue.id,
             locationIdx: get().currentLocationIdx ?? 0,
             clueIndex: 0,
             clueType: 'BEHAVIOR_FINGERPRINT',
-            data: text,
+            data: clueMediaType !== 'text' ? `[${clueMediaType.toUpperCase()} INTERCEPT]` : text,
             strength: 85,
             anomalyRefId: null,
             cityId: cid,
             isDeadEnd: false,
             timestamp: Date.now(),
+            mediaType: clueMediaType,
+            mediaSrc,
           }
           set((s) => ({
             isInvestigating: false,
@@ -1186,7 +1191,8 @@ export const useGameStore = create((set, get) => ({
         const resolvedChain = resolveChainId(currentCityId)
         try {
           const result = await cityNodeRequestClue(resolvedChain, 0, 0, true)
-          const cacheClue = { id: `city-clue-cre-fb-${Date.now()}`, text: result.clueData, type: 'text', timestamp: Date.now() }
+          const fbMediaType = result.mediaType || 'text'
+          const cacheClue = { id: `city-clue-cre-fb-${Date.now()}`, text: result.clueData, type: fbMediaType, timestamp: Date.now() }
           const activeCityClue = {
             id: cacheClue.id,
             clueType: result.clueType,
@@ -1195,6 +1201,8 @@ export const useGameStore = create((set, get) => ({
             cityId: currentCityId,
             isDeadEnd: false,
             timestamp: Date.now(),
+            mediaType: fbMediaType,
+            mediaSrc: result.mediaSrc || null,
           }
           set((s) => ({
             showCityClueModal: true,
@@ -2209,6 +2217,7 @@ export const useGameStore = create((set, get) => ({
       const isStartingClue = locationIdx === get().startLocationIdx
       const result = await cityNodeRequestClue(chainId, locationIdx, 0, isStartingClue)
       const isDeadEnd = result.clueType === 'DEAD_END'
+      const resultMediaType = result.mediaType || 'text'
       // activeCityClue format matches ClueModal (always rendered at GamePage level)
       const activeCityClue = {
         id: `city-clue-${Date.now()}`,
@@ -2221,9 +2230,11 @@ export const useGameStore = create((set, get) => ({
         cityId: currentCityId,
         isDeadEnd,
         timestamp: Date.now(),
+        mediaType: resultMediaType,
+        mediaSrc: result.mediaSrc || null,
       }
       // cityClue cache stores .text for LocationDetail display
-      const cacheClue = { id: activeCityClue.id, text: result.clueData, type: 'text', timestamp: Date.now() }
+      const cacheClue = { id: activeCityClue.id, text: result.clueData, type: resultMediaType, timestamp: Date.now() }
       set((s) => ({
         gameplayLoading: false,
         isInvestigating: false,
