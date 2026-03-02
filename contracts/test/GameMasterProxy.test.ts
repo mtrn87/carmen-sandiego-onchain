@@ -650,14 +650,14 @@ describe("GameMasterProxy", function () {
       expect(clues.length).to.equal(1);
     });
 
-    it("should reject unknown action codes (0, 10, 255)", async function () {
+    it("should reject unknown action codes (0, 12, 255)", async function () {
       const data = ethers.AbiCoder.defaultAbiCoder().encode(["uint256"], [1]);
       const metadata = ethers.AbiCoder.defaultAbiCoder().encode(
         ["bytes32", "bytes10", "address"],
         [ethers.ZeroHash, "0x00000000000000000000", ethers.ZeroAddress]
       );
 
-      for (const actionCode of [0, 10, 255]) {
+      for (const actionCode of [0, 12, 255]) {
         const report = ethers.AbiCoder.defaultAbiCoder().encode(
           ["uint8", "bytes"],
           [actionCode, data]

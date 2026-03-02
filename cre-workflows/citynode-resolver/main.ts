@@ -77,18 +77,20 @@ const GameMasterABI = parseAbi([
   "function getValidCities() view returns (uint256[])",
   "function getPlayerPublicKey(address) view returns (bytes)",
   "function getMissionClues(uint256) view returns ((uint8,bytes32,string,uint256,uint8)[])",
+  "function getPlayerActiveMission(address) view returns (uint256)",
 ])
 
 const CityNodeABI = parseAbi([
-  "event ClueRequested(address indexed player, uint256 indexed missionId, uint8 locationIdx, uint8 clueIdx)",
-  "event DossierRequested(address indexed player, uint256 indexed missionId, bytes32 suspectId)",
-  "event CaptureRequested(address indexed player, uint256 indexed missionId, uint8 locationIdx, bytes32 txHash)",
+  "event ClueRequested(uint256 indexed requestId, address indexed player, uint8 idx, uint8 clueIndex)",
+  "event DossierRequested(uint256 indexed requestId, address indexed player, uint256 cityId)",
+  "event CaptureRequested(uint256 indexed requestId, address indexed player, address suspectWallet, bytes32 evidenceBundleHash)",
 ])
 
 // GameMasterProxy action codes (match GameMasterProxy._processReport)
 const ACTION_RESOLVE_CLUE_ON_CITY = 7
 const ACTION_RESOLVE_DOSSIER_ON_CITY = 8
 const ACTION_RESOLVE_CAPTURE_ON_CITY = 9
+const ACTION_TRACK_PLAYER_CLUE = 10
 
 // ============================================================
 //  Scenario data (imported at build time)
@@ -155,9 +157,9 @@ const onCityNodeEvent = (runtime: Runtime<Config>, log: EVMLog): Record<string, 
   const data = bytesToHex(log.data)
   const cityNodeAddress = bytesToHex(log.address)
 
-  const clueRequestedTopic = keccak256(toBytes("ClueRequested(address,uint256,uint8,uint8)"))
-  const dossierRequestedTopic = keccak256(toBytes("DossierRequested(address,uint256,bytes32)"))
-  const captureRequestedTopic = keccak256(toBytes("CaptureRequested(address,uint256,uint8,bytes32)"))
+  const clueRequestedTopic = keccak256(toBytes("ClueRequested(uint256,address,uint8,uint8)"))
+  const dossierRequestedTopic = keccak256(toBytes("DossierRequested(uint256,address,uint256)"))
+  const captureRequestedTopic = keccak256(toBytes("CaptureRequested(uint256,address,address,bytes32)"))
 
   if (topic0 === clueRequestedTopic) {
     handleClueRequested(runtime, evmClient, config, gm, cityNodeAddress, topics, data)
@@ -187,11 +189,25 @@ function handleClueRequested(
     data: data as `0x${string}`,
     topics,
   })
-  const { player, missionId, locationIdx, clueIdx } = decoded.args as {
-    player: string; missionId: bigint; locationIdx: number; clueIdx: number
+  const { requestId, player, idx, clueIndex } = decoded.args as {
+    requestId: bigint; player: string; idx: number; clueIndex: number
   }
+
+  // Lookup missionId from player's active mission
+  const missionIdData = readContract(evmClient, runtime, gm, encodeFunctionData({
+    abi: GameMasterABI, functionName: "getPlayerActiveMission", args: [player as `0x${string}`],
+  }))
+  const missionId = decodeFunctionResult({
+    abi: GameMasterABI, functionName: "getPlayerActiveMission", data: bytesToHex(missionIdData),
+  }) as bigint
   const mid = Number(missionId)
-  runtime.log(`ClueRequested: mission=${mid}, player=${player.slice(0, 10)}..., loc=${locationIdx}, clue=${clueIdx}`)
+
+  runtime.log(`ClueRequested: mission=${mid}, requestId=${requestId}, player=${player.slice(0, 10)}..., loc=${idx}, clue=${clueIndex}`)
+
+  if (mid === 0) {
+    runtime.log(`Player ${player.slice(0, 10)}... has no active mission, skipping.`)
+    return
+  }
 
   // Read mission status
   const missionData = readContract(evmClient, runtime, gm, encodeFunctionData({
@@ -239,19 +255,19 @@ function handleClueRequested(
   const cluePool = scenario
     ? (isCorrectCity ? scenario.clues.true : scenario.clues.false)
     : []
-  const clueHash = keccak256(toBytes(`${salt}-${mid}-clue-${locationIdx}-${clueIdx}`))
+  const clueHash = keccak256(toBytes(`${salt}-${mid}-clue-${idx}-${clueIndex}`))
   const clueType = cluePool.length > 0
     ? cluePool[parseInt(clueHash.slice(2, 10), 16) % cluePool.length].type
     : 0
-  const clueDataHash = keccak256(toBytes(`${salt}-cluedata-${mid}-${locationIdx}-${clueIdx}`))
-  const anomalyRefId = keccak256(toBytes(`${salt}-anomaly-${mid}-${locationIdx}`))
+  const clueDataHash = keccak256(toBytes(`${salt}-cluedata-${mid}-${idx}-${clueIndex}`))
+  const anomalyRefId = keccak256(toBytes(`${salt}-anomaly-${mid}-${idx}`))
 
   // Build proxy payload: resolveClueOnCity(address cityNode, uint256 requestId, uint8 clueType, bytes32 clueDataHash, bytes32 anomalyRefId)
   const innerData = encodeAbiParameters(
     parseAbiParameters("address, uint256, uint8, bytes32, bytes32"),
     [
       cityNodeAddress as `0x${string}`,
-      missionId,
+      requestId,
       clueType,
       clueDataHash as `0x${string}`,
       anomalyRefId as `0x${string}`,
@@ -262,7 +278,7 @@ function handleClueRequested(
     [ACTION_RESOLVE_CLUE_ON_CITY, innerData as `0x${string}`]
   )
 
-  // Send report
+  // Send resolveClueOnCity report
   const reportResponse = runtime
     .report({
       encodedPayload: hexToBase64(reportPayload),
@@ -280,7 +296,40 @@ function handleClueRequested(
     })
     .result()
 
-  runtime.log(`Clue resolved: mission=${mid}, type=${clueType}, correct=${isCorrectCity}, strength=${strength}`)
+  // Send trackPlayerClue report (action 10) for global progress tracking
+  const cityNodeId = keccak256(toBytes(cityNodeAddress))
+  const identityCommitHash = clueType === 2 ? clueDataHash : "0x0000000000000000000000000000000000000000000000000000000000000000"
+  const trackData = encodeAbiParameters(
+    parseAbiParameters("address, bytes32, bytes32"),
+    [
+      player as `0x${string}`,
+      cityNodeId as `0x${string}`,
+      identityCommitHash as `0x${string}`,
+    ]
+  )
+  const trackPayload = encodeAbiParameters(
+    parseAbiParameters("uint8, bytes"),
+    [ACTION_TRACK_PLAYER_CLUE, trackData as `0x${string}`]
+  )
+
+  const trackReportResponse = runtime
+    .report({
+      encodedPayload: hexToBase64(trackPayload),
+      encoderName: "evm",
+      signingAlgo: "ecdsa",
+      hashingAlgo: "keccak256",
+    })
+    .result()
+
+  evmClient
+    .writeReport(runtime, {
+      receiver: config.proxyAddress,
+      report: trackReportResponse,
+      gasConfig: { gasLimit: config.gasLimit },
+    })
+    .result()
+
+  runtime.log(`Clue resolved: mission=${mid}, type=${clueType}, correct=${isCorrectCity}, strength=${strength}, tracked=true`)
 }
 
 // ── DossierRequested handler ──
@@ -298,11 +347,25 @@ function handleDossierRequested(
     data: data as `0x${string}`,
     topics,
   })
-  const { player, missionId, suspectId } = decoded.args as {
-    player: string; missionId: bigint; suspectId: string
+  const { requestId, player, cityId } = decoded.args as {
+    requestId: bigint; player: string; cityId: bigint
   }
+
+  // Lookup missionId from player's active mission
+  const missionIdData = readContract(evmClient, runtime, gm, encodeFunctionData({
+    abi: GameMasterABI, functionName: "getPlayerActiveMission", args: [player as `0x${string}`],
+  }))
+  const missionId = decodeFunctionResult({
+    abi: GameMasterABI, functionName: "getPlayerActiveMission", data: bytesToHex(missionIdData),
+  }) as bigint
   const mid = Number(missionId)
-  runtime.log(`DossierRequested: mission=${mid}, suspect=${suspectId.slice(0, 10)}...`)
+
+  runtime.log(`DossierRequested: mission=${mid}, requestId=${requestId}, cityId=${cityId}`)
+
+  if (mid === 0) {
+    runtime.log(`Player ${player.slice(0, 10)}... has no active mission, skipping.`)
+    return
+  }
 
   // Read salt for deterministic confidence
   const saltData = readContract(evmClient, runtime, gm, encodeFunctionData({
@@ -312,11 +375,11 @@ function handleDossierRequested(
     abi: GameMasterABI, functionName: "getMissionSalt", data: bytesToHex(saltData),
   }) as string
 
-  // Deterministic confidence from salt + suspect
-  const confHash = keccak256(toBytes(`${salt}-dossier-${suspectId}`))
+  // Deterministic confidence from salt + cityId
+  const confHash = keccak256(toBytes(`${salt}-dossier-${cityId}`))
   const confidence = 30 + (parseInt(confHash.slice(2, 10), 16) % 61) // 30–90
 
-  const dossierHash = keccak256(toBytes(`${salt}-dossier-content-${mid}-${suspectId}`))
+  const dossierHash = keccak256(toBytes(`${salt}-dossier-content-${mid}-${cityId}`))
   const nextObjectiveHintHash = keccak256(toBytes(`${salt}-next-objective-${mid}`))
 
   // Build proxy payload: resolveDossierOnCity(address cityNode, uint256 requestId, bytes32 dossierHash, uint8 confidence, bytes32 nextObjectiveHintHash)
@@ -324,7 +387,7 @@ function handleDossierRequested(
     parseAbiParameters("address, uint256, bytes32, uint8, bytes32"),
     [
       cityNodeAddress as `0x${string}`,
-      missionId,
+      requestId,
       dossierHash as `0x${string}`,
       confidence,
       nextObjectiveHintHash as `0x${string}`,
@@ -370,11 +433,25 @@ function handleCaptureRequested(
     data: data as `0x${string}`,
     topics,
   })
-  const { player, missionId } = decoded.args as {
-    player: string; missionId: bigint; locationIdx: number; txHash: string
+  const { requestId, player, suspectWallet, evidenceBundleHash } = decoded.args as {
+    requestId: bigint; player: string; suspectWallet: string; evidenceBundleHash: string
   }
+
+  // Lookup missionId from player's active mission
+  const missionIdData = readContract(evmClient, runtime, gm, encodeFunctionData({
+    abi: GameMasterABI, functionName: "getPlayerActiveMission", args: [player as `0x${string}`],
+  }))
+  const missionId = decodeFunctionResult({
+    abi: GameMasterABI, functionName: "getPlayerActiveMission", data: bytesToHex(missionIdData),
+  }) as bigint
   const mid = Number(missionId)
-  runtime.log(`CaptureRequested: mission=${mid}, player=${player.slice(0, 10)}...`)
+
+  runtime.log(`CaptureRequested: mission=${mid}, requestId=${requestId}, player=${player.slice(0, 10)}...`)
+
+  if (mid === 0) {
+    runtime.log(`Player ${player.slice(0, 10)}... has no active mission, skipping.`)
+    return
+  }
 
   // Read mission target
   const missionData = readContract(evmClient, runtime, gm, encodeFunctionData({
@@ -424,7 +501,7 @@ function handleCaptureRequested(
     parseAbiParameters("address, uint256, bool, uint8, bytes32"),
     [
       cityNodeAddress as `0x${string}`,
-      missionId,
+      requestId,
       captureSuccess,
       reasonCode,
       gmNoteHash as `0x${string}`,
@@ -469,9 +546,9 @@ const initWorkflow = (config: Config) => {
   const evmClient = new EVMClient(network.chainSelector.selector)
 
   // Listen for all 3 CityNode event types
-  const clueRequestedTopic = keccak256(toBytes("ClueRequested(address,uint256,uint8,uint8)"))
-  const dossierRequestedTopic = keccak256(toBytes("DossierRequested(address,uint256,bytes32)"))
-  const captureRequestedTopic = keccak256(toBytes("CaptureRequested(address,uint256,uint8,bytes32)"))
+  const clueRequestedTopic = keccak256(toBytes("ClueRequested(uint256,address,uint8,uint8)"))
+  const dossierRequestedTopic = keccak256(toBytes("DossierRequested(uint256,address,uint256)"))
+  const captureRequestedTopic = keccak256(toBytes("CaptureRequested(uint256,address,address,bytes32)"))
 
   return [
     handler(

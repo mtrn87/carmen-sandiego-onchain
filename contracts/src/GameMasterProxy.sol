@@ -11,7 +11,8 @@ import {IGameMaster} from "./interfaces/IGameMaster.sol";
  *         Actions: 1=receiveClue, 2=resolveCapture, 3=updateTarget,
  *                  4=receiveWalletFragment, 5=resolveWalletCapture,
  *                  6=setMissionTokenURI, 7=resolveClueOnCity,
- *                  8=resolveDossierOnCity, 9=resolveCaptureOnCity
+ *                  8=resolveDossierOnCity, 9=resolveCaptureOnCity,
+ *                  10=trackPlayerClue, 11=broadcastCarmenMoveToAll
  */
 contract GameMasterProxy is ReceiverTemplate {
     IGameMaster public gameMaster;
@@ -25,6 +26,8 @@ contract GameMasterProxy is ReceiverTemplate {
     uint8 public constant ACTION_RESOLVE_CLUE_ON_CITY = 7;
     uint8 public constant ACTION_RESOLVE_DOSSIER_ON_CITY = 8;
     uint8 public constant ACTION_RESOLVE_CAPTURE_ON_CITY = 9;
+    uint8 public constant ACTION_TRACK_PLAYER_CLUE = 10;
+    uint8 public constant ACTION_BROADCAST_CARMEN_MOVE = 11;
 
     event ActionForwarded(uint8 action, uint256 missionId);
 
@@ -85,6 +88,16 @@ contract GameMasterProxy is ReceiverTemplate {
                 abi.decode(data, (address, uint256, bool, uint8, bytes32));
             gameMaster.resolveCaptureOnCity(cityNode, requestId, success, reasonCode, gmNoteHash);
             emit ActionForwarded(action, requestId);
+        } else if (action == ACTION_TRACK_PLAYER_CLUE) {
+            (address player, bytes32 cityNodeId, bytes32 identityCommitHash) =
+                abi.decode(data, (address, bytes32, bytes32));
+            gameMaster.trackPlayerClue(player, cityNodeId, identityCommitHash);
+            emit ActionForwarded(action, 0);
+        } else if (action == ACTION_BROADCAST_CARMEN_MOVE) {
+            (bytes32 locationHash) =
+                abi.decode(data, (bytes32));
+            gameMaster.broadcastCarmenMoveToAll(locationHash);
+            emit ActionForwarded(action, 0);
         } else {
             revert UnknownAction(action);
         }

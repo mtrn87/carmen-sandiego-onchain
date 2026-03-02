@@ -120,8 +120,9 @@ const GameMasterABI = parseAbi([
   "function getValidCities() view returns (uint256[])",
 ])
 
-// Action code — must match GameMasterProxy.sol constant
+// Action codes — must match GameMasterProxy.sol constants
 const ACTION_UPDATE_TARGET = 3
+const ACTION_BROADCAST_CARMEN_MOVE = 11
 
 const ZERO_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -221,7 +222,34 @@ function moveCarmenForMission(
     })
     .result()
 
-  runtime.log(`  [${missionId}] Carmen moved: ${currentCity} -> ${newCity}`)
+  // Send broadcastCarmenMoveToAll report (action 11) for CCIP cross-chain sync
+  const broadcastData = encodeAbiParameters(
+    parseAbiParameters("bytes32"),
+    [newTargetHash]
+  )
+  const broadcastReport = encodeAbiParameters(
+    parseAbiParameters("uint8, bytes"),
+    [ACTION_BROADCAST_CARMEN_MOVE, broadcastData as `0x${string}`]
+  )
+
+  const broadcastResponse = runtime
+    .report({
+      encodedPayload: hexToBase64(broadcastReport),
+      encoderName: "evm",
+      signingAlgo: "ecdsa",
+      hashingAlgo: "keccak256",
+    })
+    .result()
+
+  evmClient
+    .writeReport(runtime, {
+      receiver: config.proxyAddress,
+      report: broadcastResponse,
+      gasConfig: { gasLimit: config.gasLimit },
+    })
+    .result()
+
+  runtime.log(`  [${missionId}] Carmen moved: ${currentCity} -> ${newCity} (broadcast sent)`)
   return true
 }
 

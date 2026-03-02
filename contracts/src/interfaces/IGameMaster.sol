@@ -45,6 +45,7 @@ interface IGameMaster {
     function resolveDossierOnCity(address cityNode, uint256 requestId, bytes32 dossierHash, uint8 confidence, bytes32 nextObjectiveHintHash) external;
     function resolveCaptureOnCity(address cityNode, uint256 requestId, bool success, uint8 reasonCode, bytes32 gmNoteHash) external;
     function trackPlayerClue(address player, bytes32 cityNodeId, bytes32 identityCommitHash) external;
+    function broadcastCarmenMoveToAll(bytes32 locationHash) external;
 
     // --- View Functions ---
     function getPlayerGlobalProgress(address player) external view returns (uint8 citiesVisited, uint256 totalClues, uint256 identityCommitsCount);
