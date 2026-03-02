@@ -6,9 +6,9 @@
 const { ethers } = require("ethers");
 
 const config = {
-  rpcUrl: "https://eth-sepolia.g.alchemy.com/v2/cZgx1scPSDR68tWHfflr7",
+  rpcUrl: process.env.SEPOLIA_RPC_URL || "https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_KEY",
   playerRegistryAddress: "0x40cfae50af62D18480bb588b7554b07d6dFE13e7",
-  privateKey: "92b92ccf8a873edf89831e43332af068192844fffef8ff20f405e3f7b737e3fa",
+  privateKey: process.env.PRIVATE_KEY || "your_private_key_here",
 };
 
 async function debugSignature() {

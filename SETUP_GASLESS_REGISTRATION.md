@@ -294,7 +294,7 @@ Frontend (5173)
 | `VITE_CHAINLINK_FUNCTIONS_URL` | URL do servidor relayer | `http://localhost:3001/relay` |
 | `SEPOLIA_RPC_URL` | RPC para servidor | `https://eth-sepolia.g.alchemy.com/v2/...` |
 | `PLAYER_REGISTRY_ADDRESS` | Endereço do contrato | `0x40cfae...` |
-| `CHAINLINK_FUNCTIONS_PRIVATE_KEY` | Private key do servidor | `92b92ccf...` |
+| `CHAINLINK_FUNCTIONS_PRIVATE_KEY` | Private key do servidor | `your_private_key...` |
 | `PORT` | Porta do servidor | `3001` |
 
 ## 🚀 Deploy em Produção
