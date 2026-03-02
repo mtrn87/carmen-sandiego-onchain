@@ -8,47 +8,54 @@ Visual representations of system architecture, data flows, and gameplay mechanic
 
 ```mermaid
 graph TB
-    subgraph Frontend["🎮 Frontend (React)"]
+    subgraph Frontend["Frontend (React)"]
         UI["React UI<br/>Zustand Store<br/>Privy Auth"]
         Wallet["Embedded Wallet<br/>Google OAuth<br/>ECIES Encryption"]
     end
 
-    subgraph Relayer["🔗 Relayer Server (3001)"]
+    subgraph Relayer["Relayer Server (3001)"]
         Validate["Validate Signature<br/>ECDSA Recovery"]
         Register["Call registerPlayer()<br/>Pay Gas"]
     end
 
-    subgraph Sepolia["⛓️ Sepolia (HQ)"]
-        GameMaster["GameMaster.sol<br/>VRF Consumer<br/>State Manager"]
+    subgraph Sepolia["Sepolia (HQ)"]
+        GameMaster["GameMaster.sol<br/>VRF Consumer<br/>Commit-Reveal State"]
         Registry["PlayerRegistry.sol<br/>Player Data<br/>Nonce Tracking"]
         Proxy["GameMasterProxy<br/>CRE Report Router<br/>Keystone Validator"]
         NFT["MissionNFT.sol<br/>ERC-721 Trophy"]
+        CCIPRouter["CCIP Router<br/>Cross-Chain Messaging"]
     end
 
-    subgraph VRF["🎲 Chainlink VRF v2.5"]
+    subgraph VRF["Chainlink VRF v2.5"]
         Random["Randomness<br/>Coordinator"]
     end
 
-    subgraph CRE["🤖 CRE Workflows"]
-        BriefingWF["generate-briefing<br/>OpenAI + ElevenLabs"]
-        ClueWF["generate-clue<br/>OpenAI + ElevenLabs"]
-        CarmenWF["carmen-moves<br/>Cron-based"]
-        FinaleWF["generate-finale<br/>Personalized Story"]
+    subgraph DataFeeds["Chainlink Data Feeds"]
+        PriceFeed["ETH/USD<br/>AggregatorV3"]
     end
 
-    subgraph Keystone["🔐 Keystone Router"]
+    subgraph CRE["CRE Workflows"]
+        MissionStartWF["mission-start<br/>Brute-force hash + ECIES encrypt"]
+        BriefingWF["generate-briefing<br/>Mission narrative"]
+        FinaleWF["generate-finale<br/>Personalized ending"]
+        CarmenWF["carmen-moves<br/>Cron every 3 min"]
+        PlayerRegWF["player-registration<br/>Gasless registration"]
+        PlayerCheckWF["player-check<br/>Player state validation"]
+        CityResolverWF["citynode-resolver<br/>Clue/Dossier/Capture routing"]
+    end
+
+    subgraph Keystone["Keystone Router"]
         Sign["Sign Reports<br/>Validate Signatures"]
     end
 
-    subgraph Cities["🌍 City Chains"]
-        Tokyo["CityNode (Arbitrum)<br/>Tokyo"]
-        Paris["CityNode (Base)<br/>Paris"]
+    subgraph Cities["City Chains"]
+        Tokyo["CityNode (Arbitrum Sepolia)<br/>Tokyo"]
+        Paris["CityNode (Base Sepolia)<br/>Paris"]
+        Sydney["CityNode (XDC Apothem)<br/>Sydney"]
     end
 
-    subgraph AI["🧠 AI Services"]
-        OpenAI["OpenAI GPT-4o-mini<br/>Text Generation"]
-        ElevenLabs["ElevenLabs<br/>Audio Generation"]
-        IPFS["IPFS/Pinata<br/>Content Storage"]
+    subgraph AI["AI Services"]
+        OpenAI["OpenAI GPT-4o-mini<br/>(coded, CRE v2 ready)"]
     end
 
     Frontend -->|"Google OAuth"| Wallet
@@ -56,30 +63,33 @@ graph TB
     Relayer -->|"POST /relay"| Validate
     Validate -->|"registerPlayer()"| Register
     Register -->|"Call Contract"| Registry
-    
+
     Frontend -->|"startMission()"| GameMaster
     GameMaster -->|"Request VRF"| Random
     Random -->|"Callback"| GameMaster
-    
+
     GameMaster -->|"submitInvestigation()"| GameMaster
     GameMaster -->|"Emit Events"| CRE
-    
-    CRE -->|"HTTP Fetch"| AI
-    AI -->|"Generate Content"| IPFS
-    
+
+    CRE -->|"HTTP Fetch"| OpenAI
+
     CRE -->|"Sign Report"| Keystone
     Keystone -->|"Validate & Route"| Proxy
     Proxy -->|"receiveClue()"| GameMaster
-    
-    GameMaster -->|"Cross-chain Call"| Cities
-    Cities -->|"updateCarmenPresence()"| Cities
-    
+
+    GameMaster -->|"broadcastCarmenMove()"| CCIPRouter
+    CCIPRouter -->|"CCIP _ccipReceive()"| Tokyo
+    CCIPRouter -->|"CCIP _ccipReceive()"| Paris
+    CCIPRouter -->|"CCIP _ccipReceive()"| Sydney
+
     GameMaster -->|"Mint NFT"| NFT
-    
+    GameMaster -->|"Read ETH/USD"| PriceFeed
+
     style Frontend fill:#e1f5ff
     style Relayer fill:#fff3e0
     style Sepolia fill:#f3e5f5
     style VRF fill:#e8f5e9
+    style DataFeeds fill:#e8f5e9
     style CRE fill:#fce4ec
     style Keystone fill:#f1f8e9
     style Cities fill:#ede7f6
@@ -92,41 +102,41 @@ graph TB
 
 ```mermaid
 sequenceDiagram
-    participant User as 👤 User
-    participant Frontend as 🎮 Frontend
-    participant Privy as 🔐 Privy
-    participant Relayer as 🔗 Relayer (3001)
-    participant Contract as ⛓️ PlayerRegistry
-    participant Storage as 💾 localStorage
+    participant User as User
+    participant Frontend as Frontend
+    participant Privy as Privy
+    participant Relayer as Relayer (3001)
+    participant Contract as PlayerRegistry
+    participant Storage as localStorage
 
     User->>Frontend: Click "Login with Google"
     Frontend->>Privy: Google OAuth
     Privy-->>Frontend: Embedded Wallet Created
     Frontend->>User: Show Nickname Modal
-    
+
     User->>Frontend: Enter Nickname "detective"
     Frontend->>Frontend: Create messageHash<br/>keccak256(address, nickname, nonce, contractAddr)
     Frontend->>Privy: signMessage(messageHash)
     Privy-->>Frontend: signature = 0x...
-    
+
     Frontend->>Relayer: POST /relay<br/>{address, nickname, signature, nonce}
-    
+
     Relayer->>Relayer: Validate Signature<br/>ECDSA Recovery
     alt Signature Valid
         Relayer->>Contract: registerPlayer(address, nickname)
         Contract->>Contract: Verify Caller is GameMaster
         Contract->>Contract: Create Player Struct
         Contract->>Contract: Store in Mapping
-        Contract-->>Relayer: ✓ txHash
+        Contract-->>Relayer: txHash
         Relayer-->>Frontend: {success: true, txHash, blockNumber}
-        
+
         Frontend->>Storage: Save player_registered_address
         Frontend->>Storage: Save player_nickname
-        Frontend->>User: ✓ Registration Complete!
+        Frontend->>User: Registration Complete!
         Frontend->>Frontend: Navigate to /game
     else Signature Invalid
         Relayer-->>Frontend: {success: false, error: "Invalid signature"}
-        Frontend->>User: ✗ Registration Failed
+        Frontend->>User: Registration Failed
     end
 ```
 
@@ -136,88 +146,80 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Player as 👤 Player
-    participant Frontend as 🎮 Frontend
-    participant GameMaster as ⛓️ GameMaster
-    participant VRF as 🎲 VRF
-    participant CRE as 🤖 CRE
-    participant AI as 🧠 AI Services
-    participant Keystone as 🔐 Keystone
+    participant Player as Player
+    participant Frontend as Frontend
+    participant GameMaster as GameMaster
+    participant VRF as VRF
+    participant CRE as CRE
+    participant AI as OpenAI (coded, CRE v2 ready)
+    participant Keystone as Keystone
+    participant CCIP as CCIP Router
+    participant CityNode as CityNodes
 
     Player->>Frontend: Click "Start Mission"
     Frontend->>GameMaster: startMission()
     GameMaster->>GameMaster: Create Mission Struct
-    GameMaster->>VRF: Request Randomness
-    GameMaster-->>Frontend: ✓ Mission Started
-    
+    GameMaster->>VRF: requestRandomWords()
+    GameMaster-->>Frontend: Mission Created
+
     VRF->>VRF: Generate Random Number
     VRF->>GameMaster: fulfillRandomWords(randomWords)
-    GameMaster->>GameMaster: Set Carmen Location<br/>Pick City from randomWords
+    GameMaster->>GameMaster: salt = keccak256(vrfWord, missionId)
+    GameMaster->>GameMaster: targetHash = keccak256(chainId, salt)
+    GameMaster->>GameMaster: Store targetHash on-chain (commit-reveal)
     GameMaster->>GameMaster: Emit MissionStarted Event
-    
-    CRE->>CRE: Listen for MissionStarted
+
+    Note over CRE: generate-briefing workflow<br/>LogTrigger: MissionStarted
+
     CRE->>GameMaster: Read getMissionSalt(), getPlayerPubKey()
-    CRE->>CRE: Brute-force hash → city selection
-    CRE->>CRE: Select clue from database
-    CRE->>CRE: ECIES encrypt clue with player pubKey
-    
-    CRE->>AI: Call OpenAI for briefing narrative
-    AI-->>CRE: Briefing text
-    CRE->>AI: Call ElevenLabs for audio
-    AI-->>CRE: Audio file
-    
-    CRE->>AI: Upload to IPFS
-    AI-->>CRE: IPFS hash
-    
-    CRE->>Keystone: Sign Report<br/>{missionId, clueHash, cluePtr}
-    Keystone-->>CRE: Signed Report
-    
-    CRE->>GameMaster: Send via Keystone Router
-    GameMaster->>GameMaster: Verify Keystone Signature
-    GameMaster->>GameMaster: receiveClue(missionId, clueHash, cluePtr)
+    CRE->>CRE: Select scenario-based template narrative
+    CRE->>CRE: ECIES encrypt briefing with player pubKey
+    CRE->>Keystone: Sign Report
+    Keystone->>GameMaster: Keystone Forwarder -> GameMasterProxy -> receiveClue()
     GameMaster->>GameMaster: Emit ClueReceived Event
-    
-    Frontend->>GameMaster: Listen for ClueReceived
-    Frontend->>Frontend: Fetch clue from IPFS
-    Frontend->>Frontend: ECIES decrypt with player privKey
-    Frontend->>Player: Display Briefing + Audio
-    
+
+    Frontend->>GameMaster: Listen for ClueReceived event
+    Frontend->>Frontend: Read encrypted data from on-chain event
+    Frontend->>Frontend: ECIES decrypt with player privKey (IndexedDB)
+    Frontend->>Player: Display Mission Briefing
+
     Player->>Frontend: Click City to Investigate
     Frontend->>GameMaster: submitInvestigation(chainId)
-    GameMaster->>VRF: Request Randomness (clue type)
-    
-    VRF->>GameMaster: fulfillRandomWords(randomWords)
-    GameMaster->>GameMaster: Determine Clue Type (text/audio)
-    GameMaster->>GameMaster: Emit InvestigationSubmitted
-    
-    CRE->>CRE: Listen for InvestigationSubmitted
-    CRE->>AI: Call OpenAI for clue
-    AI-->>CRE: Clue text
-    CRE->>AI: Call ElevenLabs if audio
-    AI-->>CRE: Audio file
-    CRE->>AI: Upload to IPFS
-    
+    GameMaster->>GameMaster: Emit InvestigationSubmitted Event
+
+    Note over CRE: mission-start workflow<br/>LogTrigger: InvestigationSubmitted
+
+    CRE->>GameMaster: Read getMissionSalt(), getPlayerPubKey()
+    CRE->>CRE: Brute-force 3 chain IDs -> find Carmen city
+    CRE->>CRE: Decide true/false clue (CRE as trusted arbiter)
+    CRE->>CRE: Select scenario-based template clue
+    CRE->>CRE: ECIES encrypt clue with player pubKey
     CRE->>Keystone: Sign Report
-    CRE->>GameMaster: Send Clue via Keystone
-    GameMaster->>Frontend: ClueReceived Event
-    Frontend->>Player: Display Clue
-    
+    Keystone->>GameMaster: Keystone Forwarder -> GameMasterProxy -> receiveClue()
+    GameMaster->>GameMaster: Emit ClueReceived Event
+
+    Frontend->>GameMaster: Listen for ClueReceived event
+    Frontend->>Frontend: Read encrypted clue from on-chain event
+    Frontend->>Frontend: ECIES decrypt with player privKey
+    Frontend->>Player: Display Investigation Clue
+
     Player->>Frontend: Click "Capture Carmen"
     Frontend->>GameMaster: captureCarmen(missionId)
-    GameMaster->>GameMaster: Verify Carmen Location
+    GameMaster->>GameMaster: Verify against targetHash (reveal phase)
     alt Carmen Found
         GameMaster->>GameMaster: Calculate Reward (blocks used)
         GameMaster->>GameMaster: Mint NFT Trophy
         GameMaster->>GameMaster: Emit CarmenCaptured
-        
-        CRE->>CRE: Listen for CarmenCaptured
-        CRE->>AI: Generate personalized ending
-        AI-->>CRE: Finale narrative
-        CRE->>AI: Upload to IPFS
-        
-        Frontend->>Player: ✓ Mission Complete!<br/>Display Trophy + Reward
+
+        Note over CRE: generate-finale workflow<br/>LogTrigger: CarmenCaptured
+
+        CRE->>CRE: Generate personalized ending
+        CRE->>Keystone: Sign Report
+        Keystone->>GameMaster: Deliver finale on-chain
+
+        Frontend->>Player: Mission Complete! Display Trophy + Reward
     else Wrong Location
-        GameMaster-->>Frontend: ✗ Carmen Not Here
+        GameMaster-->>Frontend: Carmen Not Here
         Frontend->>Player: Try Another City
     end
 ```
@@ -228,58 +230,63 @@ sequenceDiagram
 
 ```mermaid
 graph TB
-    subgraph Events["📡 On-Chain Events"]
-        E1["MissionStarted"]
-        E2["InvestigationSubmitted"]
-        E3["CarmenCaptured"]
-        E4["Cron 3min"]
+    subgraph Events["On-Chain Events / Triggers"]
+        E1["InvestigationSubmitted<br/>(LogTrigger)"]
+        E2["MissionStarted<br/>(LogTrigger)"]
+        E3["CarmenCaptured<br/>(LogTrigger)"]
+        E4["Cron 3min<br/>(CronCapability)"]
+        E5["RegistrationRequested<br/>(LogTrigger)"]
+        E6["PlayerCheckRequested<br/>(LogTrigger)"]
+        E7["ClueRequested /<br/>DossierRequested /<br/>CaptureRequested<br/>(LogTrigger)"]
     end
 
-    subgraph Workflows["🤖 CRE Workflows"]
+    subgraph Workflows["CRE Workflows"]
         W1["mission-start<br/>Brute-force hash<br/>Select clue<br/>ECIES encrypt"]
-        W2["generate-briefing<br/>Call OpenAI<br/>Call ElevenLabs<br/>Upload IPFS"]
-        W3["generate-clue<br/>Call OpenAI<br/>Call ElevenLabs<br/>Upload IPFS"]
-        W4["carmen-moves<br/>Pick random city<br/>Update presence<br/>Write to CityNode"]
-        W5["generate-finale<br/>Personalized story<br/>Call OpenAI<br/>Upload IPFS"]
+        W2["generate-briefing<br/>Scenario-based narrative<br/>ECIES encrypt"]
+        W3["generate-finale<br/>Personalized ending<br/>ECIES encrypt"]
+        W4["carmen-moves<br/>Pick random city<br/>Trigger broadcastCarmenMove()<br/>CCIP to CityNodes"]
+        W5["player-registration<br/>Gasless registration<br/>Validate + register"]
+        W6["player-check<br/>Player state validation<br/>Read on-chain data"]
+        W7["citynode-resolver<br/>Route clue/dossier/capture<br/>Cross-chain resolution"]
     end
 
-    subgraph ExternalAPIs["🌐 External APIs"]
-        API1["OpenAI GPT-4o-mini<br/>Text Generation"]
-        API2["ElevenLabs<br/>Audio Generation"]
-        API3["IPFS/Pinata<br/>Content Storage"]
-        API4["Alchemy RPC<br/>Read Contract State"]
+    subgraph ExternalAPIs["External APIs"]
+        API1["OpenAI GPT-4o-mini<br/>(coded, CRE v2 ready)"]
+        API4["Alchemy / Public RPCs<br/>Cross-chain reads"]
     end
 
-    subgraph OnChainWrites["⛓️ On-Chain Writes"]
-        Write1["receiveClue()<br/>via Keystone"]
-        Write2["updateTarget()<br/>Carmen moves"]
+    subgraph OnChainWrites["On-Chain Writes"]
+        Write1["receiveClue()<br/>via Keystone Forwarder<br/>-> GameMasterProxy<br/>-> GameMaster"]
+        Write2["broadcastCarmenMove()<br/>-> CCIP Router<br/>-> CityNode._ccipReceive()"]
+        Write3["registerPlayer()<br/>via Keystone"]
     end
 
     E1 -->|"Trigger"| W1
-    E1 -->|"Trigger"| W2
-    E2 -->|"Trigger"| W3
-    E3 -->|"Trigger"| W5
+    E2 -->|"Trigger"| W2
+    E3 -->|"Trigger"| W3
     E4 -->|"Trigger"| W4
+    E5 -->|"Trigger"| W5
+    E6 -->|"Trigger"| W6
+    E7 -->|"Trigger"| W7
 
-    W1 -->|"Encrypt"| W2
-    W2 -->|"HTTP Fetch"| API1
-    W2 -->|"HTTP Fetch"| API2
-    W2 -->|"Upload"| API3
+    W1 -->|"Read contract state"| API4
+    W1 -->|"Sign & Send"| Write1
+
+    W2 -->|"Read contract state"| API4
     W2 -->|"Sign & Send"| Write1
 
-    W3 -->|"HTTP Fetch"| API1
-    W3 -->|"HTTP Fetch"| API2
-    W3 -->|"Upload"| API3
+    W3 -->|"HTTP Fetch (coded, v2)"| API1
     W3 -->|"Sign & Send"| Write1
 
     W4 -->|"Read State"| API4
     W4 -->|"Sign & Send"| Write2
 
-    W5 -->|"HTTP Fetch"| API1
-    W5 -->|"Upload"| API3
+    W5 -->|"Sign & Send"| Write3
 
-    Write1 -->|"Keystone Router"| OnChainWrites
-    Write2 -->|"Keystone Router"| OnChainWrites
+    W6 -->|"Read State"| API4
+
+    W7 -->|"Read State"| API4
+    W7 -->|"Sign & Send"| Write1
 
     style Events fill:#e3f2fd
     style Workflows fill:#f3e5f5
@@ -293,48 +300,53 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph Sepolia["⛓️ Sepolia (HQ)"]
-        GM["GameMaster.sol<br/>Carmen Location<br/>Mission State"]
+    subgraph Sepolia["Sepolia (HQ)"]
+        GM["GameMaster.sol<br/>Commit-Reveal State<br/>targetHash on-chain"]
         Proxy["GameMasterProxy<br/>CRE Report Router"]
+        Router["CCIP Router<br/>Cross-Chain Messaging"]
     end
 
-    subgraph Arbitrum["⛓️ Arbitrum Sepolia<br/>(Tokyo)"]
+    subgraph Arbitrum["Arbitrum Sepolia (Tokyo)"]
         Tokyo["CityNode.sol<br/>Carmen Presence<br/>Investigation Results"]
     end
 
-    subgraph Base["⛓️ Base Sepolia<br/>(Paris)"]
+    subgraph Base["Base Sepolia (Paris)"]
         Paris["CityNode.sol<br/>Carmen Presence<br/>Investigation Results"]
     end
 
-    subgraph CRE["🤖 CRE Workflows"]
-        CarmenMoves["carmen-moves<br/>Cron: Every 3 min<br/>Pick random city<br/>Update presence"]
+    subgraph XDC["XDC Apothem (Sydney)"]
+        Sydney["CityNode.sol<br/>Carmen Presence<br/>Investigation Results"]
     end
 
-    subgraph Keystone["🔐 Keystone Router"]
+    subgraph CRE["CRE Workflows"]
+        CarmenMoves["carmen-moves<br/>CronCapability: Every 3 min<br/>Pick random city<br/>Trigger broadcastCarmenMove()"]
+    end
+
+    subgraph Keystone["Keystone Router"]
         Sign["Sign Cross-Chain<br/>Call Report"]
     end
 
     GM -->|"Read: getMission()"| CarmenMoves
     GM -->|"Read: getValidCities()"| CarmenMoves
-    
+
     CarmenMoves -->|"Determine new city"| CarmenMoves
     CarmenMoves -->|"Sign Report"| Sign
-    
-    Sign -->|"Route to Arbitrum"| Tokyo
-    Sign -->|"Route to Base"| Paris
-    
-    Tokyo -->|"updateCarmenPresence()"| Tokyo
-    Paris -->|"updateCarmenPresence()"| Paris
-    
-    Tokyo -->|"Player queries"| Tokyo
-    Paris -->|"Player queries"| Paris
-    
-    Tokyo -->|"Cross-chain read"| GM
-    Paris -->|"Cross-chain read"| GM
+
+    Sign -->|"Keystone -> GameMaster"| GM
+    GM -->|"broadcastCarmenMove()"| Router
+
+    Router -->|"CCIP _ccipReceive()"| Tokyo
+    Router -->|"CCIP _ccipReceive()"| Paris
+    Router -->|"CCIP _ccipReceive()"| Sydney
+
+    Tokyo -->|"Player investigates"| Tokyo
+    Paris -->|"Player investigates"| Paris
+    Sydney -->|"Player investigates"| Sydney
 
     style Sepolia fill:#f3e5f5
     style Arbitrum fill:#e8f5e9
     style Base fill:#c8e6c9
+    style XDC fill:#b2dfdb
     style CRE fill:#fce4ec
     style Keystone fill:#f1f8e9
 ```
@@ -345,33 +357,38 @@ graph TB
 
 ```mermaid
 sequenceDiagram
-    participant Player as 👤 Player
-    participant Frontend as 🎮 Frontend
-    participant CRE as 🤖 CRE
-    participant IPFS as 💾 IPFS
+    participant Player as Player
+    participant Frontend as Frontend
+    participant Contract as GameMaster (on-chain)
+    participant CRE as CRE Workflow
+    participant Keystone as Keystone Forwarder
+    participant Proxy as GameMasterProxy
 
     Player->>Frontend: Register (generate ECIES keypair)
-    Frontend->>Frontend: Generate ECIES keypair
+    Frontend->>Frontend: Generate secp256k1 ECIES keypair
     Frontend->>Frontend: Store privKey in IndexedDB
-    Frontend->>Frontend: Send pubKey to contract
+    Frontend->>Contract: setPlayerPubKey(pubKey)
 
-    CRE->>Frontend: Read getPlayerPubKey(address)
-    Frontend-->>CRE: pubKey = 0x...
+    Note over CRE: Triggered by InvestigationSubmitted or MissionStarted
 
-    CRE->>CRE: Generate clue text
-    CRE->>CRE: ECIES encrypt clue
-    CRE->>IPFS: Upload encrypted clue
-    IPFS-->>CRE: IPFS hash
+    CRE->>Contract: Read getPlayerPubKey(address)
+    Contract-->>CRE: pubKey = 0x04...
 
-    CRE->>Frontend: Send clueHash + IPFS pointer
+    CRE->>CRE: Generate clue / briefing content
+    CRE->>CRE: ECIES encrypt with player pubKey (secp256k1)
 
-    Frontend->>IPFS: Fetch encrypted clue
-    IPFS-->>Frontend: Encrypted data
+    CRE->>Keystone: Sign Report with encrypted payload
+    Keystone->>Proxy: Forward signed report
+    Proxy->>Contract: receiveClue(missionId, encryptedData)
+    Contract->>Contract: Emit ClueReceived(missionId, encryptedData)
 
-    Frontend->>Frontend: ECIES decrypt with privKey
+    Frontend->>Contract: Listen for ClueReceived event
+    Contract-->>Frontend: Event with encrypted data (on-chain)
+
+    Frontend->>Frontend: ECIES decrypt with privKey (IndexedDB)
     Frontend->>Player: Display decrypted clue
 
-    Note over Frontend,CRE: Only player can decrypt!
+    Note over Frontend,CRE: Only the player can decrypt -- privKey never leaves the browser
 ```
 
 ---
@@ -380,40 +397,52 @@ sequenceDiagram
 
 ```mermaid
 graph TB
-    subgraph Player["👤 Player"]
-        Action["Call startMission()<br/>or submitInvestigation()"]
+    subgraph Player["Player"]
+        Action["Call startMission()"]
     end
 
-    subgraph GameMaster["⛓️ GameMaster.sol"]
-        Request["Request VRF<br/>requestRandomWords()"]
-        Callback["Callback<br/>fulfillRandomWords()"]
-        Logic["Determine Outcome<br/>Based on randomWords"]
+    subgraph GameMaster["GameMaster.sol"]
+        Request["requestRandomWords()<br/>VRF v2.5 request"]
+        Callback["fulfillRandomWords()<br/>Receive randomWords"]
+        GenSalt["Generate Salt<br/>salt = keccak256(vrfWord, missionId)"]
+        ComputeHash["Compute Target Hash<br/>targetHash = keccak256(chainId, salt)"]
+        StoreHash["Store targetHash on-chain<br/>(commit phase)"]
+        EmitEvent["Emit MissionStarted Event"]
     end
 
-    subgraph VRF["🎲 Chainlink VRF v2.5"]
+    subgraph VRF["Chainlink VRF v2.5"]
         Coordinator["VRF Coordinator"]
         Generate["Generate Random<br/>Cryptographically Secure"]
         Verify["Verify Proof<br/>On-Chain"]
     end
 
+    subgraph CREResolve["CRE Off-Chain Resolution"]
+        ReadSalt["Read getMissionSalt()"]
+        BruteForce["Brute-force 3 chain IDs<br/>keccak256(chainId, salt) == targetHash"]
+        FindCity["Determine Carmen city"]
+    end
+
     Player -->|"tx"| Action
     Action -->|"Call"| Request
     Request -->|"Request ID"| Coordinator
-    
+
     Coordinator -->|"Off-chain"| Generate
     Generate -->|"Proof + Output"| Verify
     Verify -->|"Valid?"| Callback
-    
-    Callback -->|"randomWords"| Logic
-    Logic -->|"Carmen Location"| Logic
-    Logic -->|"Clue Type"| Logic
-    Logic -->|"Clue Veracity"| Logic
-    
-    Logic -->|"Emit Event"| Player
+
+    Callback -->|"randomWords"| GenSalt
+    GenSalt -->|"salt"| ComputeHash
+    ComputeHash -->|"targetHash"| StoreHash
+    StoreHash --> EmitEvent
+
+    EmitEvent -->|"Trigger CRE"| ReadSalt
+    ReadSalt --> BruteForce
+    BruteForce --> FindCity
 
     style Player fill:#e1f5ff
     style GameMaster fill:#f3e5f5
     style VRF fill:#e8f5e9
+    style CREResolve fill:#fce4ec
 ```
 
 ---
@@ -422,51 +451,63 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph Mission["🎮 Mission"]
+    subgraph Mission["Mission"]
         Start["Mission Starts<br/>Block N"]
         Capture["Carmen Captured<br/>Block N+X"]
     end
 
-    subgraph Calculation["📊 Reward Calculation"]
+    subgraph Calculation["Reward Calculation"]
         BlocksUsed["Blocks Used = N+X - N"]
         Tier["Determine Tier<br/>Based on Blocks"]
     end
 
-    subgraph Rewards["🏆 Rewards"]
+    subgraph DataFeed["Chainlink Data Feeds"]
+        PriceFeed["ETH/USD AggregatorV3<br/>Read latest price"]
+        MarketBonus["_applyMarketBonus()<br/>If ETH > $2500<br/>Apply bonus multiplier"]
+    end
+
+    subgraph Rewards["Rewards"]
         Gold["Gold: 0-20 blocks<br/>100 points<br/>Rare NFT"]
         Silver["Silver: 21-35 blocks<br/>75 points<br/>Uncommon NFT"]
         Bronze["Bronze: 36-50 blocks<br/>50 points<br/>Common NFT"]
-        Failed["Failed: 51+ blocks<br/>0 points<br/>No NFT"]
+        Copper["Copper: 51-200 blocks<br/>25 points<br/>Basic NFT"]
+        Failed["Failed: 200+ blocks<br/>0 points<br/>No NFT"]
     end
 
-    subgraph NFT["🎁 NFT Mint"]
+    subgraph NFT["NFT Mint"]
         Mint["Mint MissionNFT<br/>ERC-721 Trophy<br/>Metadata: Blocks Used<br/>Metadata: Tier"]
         Store["Store in Player<br/>Wallet"]
     end
 
     Start -->|"Record Block"| BlocksUsed
     Capture -->|"Record Block"| BlocksUsed
-    
+
     BlocksUsed -->|"Calculate"| Tier
-    
+
     Tier -->|"0-20"| Gold
     Tier -->|"21-35"| Silver
     Tier -->|"36-50"| Bronze
-    Tier -->|"51+"| Failed
-    
-    Gold -->|"Mint"| Mint
-    Silver -->|"Mint"| Mint
-    Bronze -->|"Mint"| Mint
+    Tier -->|"51-200"| Copper
+    Tier -->|"200+"| Failed
+
+    Gold -->|"Check Price"| PriceFeed
+    Silver -->|"Check Price"| PriceFeed
+    Bronze -->|"Check Price"| PriceFeed
+    Copper -->|"Check Price"| PriceFeed
     Failed -->|"No Mint"| Failed
-    
+
+    PriceFeed --> MarketBonus
+    MarketBonus -->|"Final Points"| Mint
+
     Mint -->|"Transfer"| Store
 
     style Mission fill:#e1f5ff
     style Calculation fill:#fff9c4
+    style DataFeed fill:#e8f5e9
     style Rewards fill:#f3e5f5
     style NFT fill:#e8f5e9
 ```
 
 ---
 
-**Last Updated:** February 2026
+**Last Updated:** March 2026

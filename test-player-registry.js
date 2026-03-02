@@ -12,7 +12,7 @@ async function testPlayerRegistry() {
   try {
     // Connect to Sepolia
     const provider = new ethers.JsonRpcProvider(
-      "https://eth-sepolia.g.alchemy.com/v2/cZgx1scPSDR68tWHfflr7"
+      process.env.SEPOLIA_RPC_URL || "https://eth-sepolia.g.alchemy.com/v2/YOUR_ALCHEMY_KEY"
     );
 
     // Use a test account (you'll need to replace with your actual private key)
