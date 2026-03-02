@@ -1,0 +1,31 @@
+# ==========================================================================
+# CRE WORKFLOW SETTINGS FILE — citynode-resolver
+# ==========================================================================
+# Listens for CityNode events (ClueRequested, DossierRequested,
+# CaptureRequested) on remote chains and resolves them by calling
+# GameMaster functions on Sepolia via GameMasterProxy.
+#
+# TRIGGER: LogTrigger on CityNode contracts (Arbitrum Sepolia, Base Sepolia, XDC Apothem)
+# DELIVERY: writeReport to GameMasterProxy on Ethereum Sepolia
+#
+# NOTE: This workflow requires multi-chain LogTrigger support.
+# Each CityNode chain needs its own LogTrigger configuration
+# in the CRE deployment. See project.yaml for RPC config.
+
+# ==========================================================================
+staging-settings:
+  user-workflow:
+    workflow-name: "carmen-citynode-resolver-staging"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.staging.json"
+    secrets-path: ""
+
+# ==========================================================================
+production-settings:
+  user-workflow:
+    workflow-name: "carmen-citynode-resolver-production"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.production.json"
+    secrets-path: ""

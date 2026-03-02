@@ -23,6 +23,8 @@
 #   4. carmen-moves          — Carmen relocation (CronCapability: every 3 min)
 #   5. player-registration  — Gasless onboarding (LogTrigger: RegistrationRequested)
 #   6. player-check         — Player verification (LogTrigger: PlayerCheckRequested)
+#   7. citynode-resolver    — Cross-chain CityNode request resolver
+#                              (LogTrigger: ClueRequested/DossierRequested/CaptureRequested)
 #
 # RPC CONFIGURATION:
 #   Each workflow reads from and writes to Ethereum Sepolia, where the
