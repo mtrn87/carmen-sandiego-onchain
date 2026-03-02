@@ -25,6 +25,8 @@ import {
   onCaptureResolvedOnCity,
   onMissionNFTSet,
   onTxFlagged,
+  onRewardCalculated,
+  onMissionNFTMinted,
   getMissionFragmentCount,
   getMissionEvidenceCount,
   CITY_MAP,
@@ -328,6 +330,7 @@ export const useGameStore = create((set, get) => ({
   lastKnownLocation: null,
   terminalLines: [],
   missionNFTTokenId: null,
+  rewardBreakdown: null,
   isInvestigating: false,
   showClueModal: false,
   activeClue: null,
@@ -1054,6 +1057,58 @@ export const useGameStore = create((set, get) => ({
           }))
         })
         newUnsubs.push(unsubTxFlagged)
+      }
+
+      // Listen for RewardCalculatedWithMarketData (reward breakdown)
+      const unsubReward = await onRewardCalculated(missionId, (event) => {
+        set((s) => ({
+          rewardBreakdown: {
+            baseReward: event.baseReward,
+            ethPrice: event.ethPrice,
+            finalReward: event.finalReward,
+          },
+          missionEvents: [...s.missionEvents, {
+            name: 'RewardCalculatedWithMarketData',
+            block: 'latest',
+            color: 'green',
+            data: {
+              missionId: event.missionId,
+              baseReward: event.baseReward,
+              ethPrice: event.ethPrice,
+              finalReward: event.finalReward,
+            },
+          }],
+          terminalLines: [
+            ...s.terminalLines,
+            { text: `> REWARD CALCULATED: base=${event.baseReward} | ETH price=${event.ethPrice} | final=${event.finalReward}`, color: 'green', type: 'system' },
+          ],
+        }))
+      })
+      newUnsubs.push(unsubReward)
+
+      // Listen for MissionNFTMinted (real-time NFT mint notification)
+      if (walletAddress) {
+        const unsubNFTMint = await onMissionNFTMinted(walletAddress, (event) => {
+          set((s) => ({
+            missionNFTTokenId: event.tokenId,
+            missionEvents: [...s.missionEvents, {
+              name: 'MissionNFTMinted',
+              block: 'latest',
+              color: 'cyan',
+              data: {
+                tokenId: event.tokenId,
+                missionId: event.missionId,
+                reward: event.reward,
+              },
+            }],
+            terminalLines: [
+              ...s.terminalLines,
+              { text: `> 🏆 MISSION NFT #${event.tokenId} MINTED! Reward: ${event.reward} pts.`, color: 'cyan', type: 'alert' },
+              { text: '> View your trophy in your Agent Dossier.', color: 'muted', type: 'system' },
+            ],
+          }))
+        })
+        newUnsubs.push(unsubNFTMint)
       }
 
       set({ _unsubscribers: newUnsubs })
