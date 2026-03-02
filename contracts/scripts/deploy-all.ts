@@ -6,6 +6,20 @@ import * as path from "path";
 //  City definitions for CityNode deployment + configuration
 // ============================================================
 
+// ClueType enum values from ICityNode.sol
+const ClueType = {
+  BEHAVIOR_FINGERPRINT: 0,
+  RELATIONSHIP: 1,
+  IDENTITY_COMMIT: 2,
+  FUNDING_TRAIL: 3,
+  TECHNICAL_SIGNATURE: 4,
+  DEAD_END: 5,
+};
+
+function h(text: string): string {
+  return ethers.keccak256(ethers.toUtf8Bytes(text));
+}
+
 interface CityDef {
   name: string;
   countryCode: string;
@@ -16,6 +30,8 @@ interface CityDef {
   locations: { name: string; description: string; category: number; fakeLevel: number; riskLevel: number }[];
   anomalies: { from: string; to: string; methodSig: string; value: bigint; anomalyType: number }[];
   suspects: { wallet: string; suspicionLevel: number; tagsBitmap: number }[];
+  hints: { locationIdx: number; clueIndex: number; hash: string; strength: number }[];
+  clueSchema: number[];
 }
 
 const CITY_DEFS: CityDef[] = [
@@ -39,6 +55,21 @@ const CITY_DEFS: CityDef[] = [
       { wallet: "0xca12e500000000000000000000000000000f0001", suspicionLevel: 80, tagsBitmap: 0b1101 },
       { wallet: "0xca12e500000000000000000000000000000f0002", suspicionLevel: 45, tagsBitmap: 0b0010 },
     ],
+    hints: [
+      // Location 0: Senso-ji Temple Node
+      { locationIdx: 0, clueIndex: 0, hash: h("gas prices always multiples of 7 gwei — Carmen's known signature"), strength: 85 },
+      { locationIdx: 0, clueIndex: 1, hash: h("wallet interacts with a temple-based NFT gallery — CryptoPunk spotted"), strength: 90 },
+      { locationIdx: 0, clueIndex: 2, hash: h("identity commit hash links to known Carmen alias on Arbitrum"), strength: 95 },
+      // Location 1: Tokyo Tower Beacon
+      { locationIdx: 1, clueIndex: 0, hash: h("hardware wallet serial numbers trace back to a known Carmen alias"), strength: 80 },
+      { locationIdx: 1, clueIndex: 1, hash: h("freshly minted token used as payment — same pattern as the heist"), strength: 75 },
+      { locationIdx: 1, clueIndex: 2, hash: h("NFT provenance trail shows transfer to cold wallet labeled sakura-vault"), strength: 70 },
+      // Location 2: Chochin Market
+      { locationIdx: 2, clueIndex: 0, hash: h("departure records show movement but destination encrypted"), strength: 15 },
+      { locationIdx: 2, clueIndex: 1, hash: h("token swap patterns appear planted — classic misdirection"), strength: 20 },
+      { locationIdx: 2, clueIndex: 2, hash: h("no outbound bridge activity from this market — dead end"), strength: 10 },
+    ],
+    clueSchema: [ClueType.BEHAVIOR_FINGERPRINT, ClueType.FUNDING_TRAIL, ClueType.IDENTITY_COMMIT],
   },
   {
     name: "Paris",
@@ -60,6 +91,21 @@ const CITY_DEFS: CityDef[] = [
       { wallet: "0xca12e500000000000000000000000000000f0003", suspicionLevel: 70, tagsBitmap: 0b0111 },
       { wallet: "0xca12e500000000000000000000000000000f0004", suspicionLevel: 55, tagsBitmap: 0b1010 },
     ],
+    hints: [
+      // Location 0: Eiffel Tower Relay
+      { locationIdx: 0, clueIndex: 0, hash: h("beacon detects bridge relays but no direct match to suspect"), strength: 25 },
+      { locationIdx: 0, clueIndex: 1, hash: h("Eurostar booking data shows no red-coat passenger — likely misdirection"), strength: 15 },
+      { locationIdx: 0, clueIndex: 2, hash: h("relay traffic is legitimate cross-chain activity — not anomalous"), strength: 10 },
+      // Location 1: Louvre Custody Router
+      { locationIdx: 1, clueIndex: 0, hash: h("funded from CEX with specific amount pattern matching Carmen — 4200 ETH reference"), strength: 65 },
+      { locationIdx: 1, clueIndex: 1, hash: h("uses CREATE2 with salt containing cityId — infrastructure fingerprint"), strength: 75 },
+      { locationIdx: 1, clueIndex: 2, hash: h("bridge outbound tx shows movement EAST — she left Paris heading to Tokyo"), strength: 80 },
+      // Location 2: Notre-Dame Gate
+      { locationIdx: 2, clueIndex: 0, hash: h("departure records are heavily masked, no useful forensic data"), strength: 5 },
+      { locationIdx: 2, clueIndex: 1, hash: h("cross-chain egress traffic is normal volume — no anomaly"), strength: 10 },
+      { locationIdx: 2, clueIndex: 2, hash: h("ticket purchases don't match any known Carmen alias — dead end"), strength: 8 },
+    ],
+    clueSchema: [ClueType.FUNDING_TRAIL, ClueType.TECHNICAL_SIGNATURE, ClueType.RELATIONSHIP],
   },
   {
     name: "Sydney",
@@ -81,6 +127,21 @@ const CITY_DEFS: CityDef[] = [
       { wallet: "0xca12e500000000000000000000000000000f0005", suspicionLevel: 90, tagsBitmap: 0b1111 },
       { wallet: "0xca12e500000000000000000000000000000f0006", suspicionLevel: 35, tagsBitmap: 0b0001 },
     ],
+    hints: [
+      // Location 0: Opera House Node
+      { locationIdx: 0, clueIndex: 0, hash: h("network traffic is normal here, no anomalies detected"), strength: 10 },
+      { locationIdx: 0, clueIndex: 1, hash: h("timing signals are legitimate — standard block production"), strength: 8 },
+      { locationIdx: 0, clueIndex: 2, hash: h("broadcast data shows no encrypted relays to suspects"), strength: 5 },
+      // Location 1: Harbour Bridge Relay
+      { locationIdx: 1, clueIndex: 0, hash: h("liquidity pool activity is legitimate MEV — no Carmen signature"), strength: 12 },
+      { locationIdx: 1, clueIndex: 1, hash: h("trade records show standard DeFi activity — nothing anomalous"), strength: 10 },
+      { locationIdx: 1, clueIndex: 2, hash: h("wallet fragments here don't match any known Carmen pattern"), strength: 15 },
+      // Location 2: Bondi Beach Market
+      { locationIdx: 2, clueIndex: 0, hash: h("departure records show no red-coat passenger — planted evidence"), strength: 8 },
+      { locationIdx: 2, clueIndex: 1, hash: h("bridge endpoints are dormant — no recent cross-chain activity"), strength: 5 },
+      { locationIdx: 2, clueIndex: 2, hash: h("transit hub is a dead end — Carmen never came through Sydney"), strength: 3 },
+    ],
+    clueSchema: [ClueType.DEAD_END, ClueType.RELATIONSHIP, ClueType.BEHAVIOR_FINGERPRINT],
   },
 ];
 
@@ -305,6 +366,24 @@ async function main() {
       await txSusp.wait();
       console.log(`   ✓ ${city.name}: suspicion index set to ${suspicionLevel}`);
 
+      // ─── Set hints (3 locations x 3 clues = 9 hints) ───
+      console.log(`   Configuring ${city.name} hints...`);
+      for (const hint of city.hints) {
+        const txHint = await cityNode.setHint(hint.locationIdx, hint.clueIndex, hint.hash, hint.strength);
+        await txHint.wait();
+      }
+      console.log(`   ✓ ${city.name}: ${city.hints.length} hints configured`);
+
+      // ─── Set clue schema ───
+      const txSchema = await cityNode.setClueSchema(city.clueSchema);
+      await txSchema.wait();
+      console.log(`   ✓ ${city.name}: clue schema set (${city.clueSchema.length} types)`);
+
+      // ─── Set GameMaster address (for cross-chain resolve calls) ───
+      const txGM = await cityNode.setGameMaster(gmAddress);
+      await txGM.wait();
+      console.log(`   ✓ ${city.name}: gameMaster set to ${gmAddress}`);
+
     } catch (err: any) {
       console.log(`   ✗ ${city.name} deployment failed: ${err.message?.slice(0, 100)}`);
     }
@@ -414,6 +493,10 @@ async function main() {
   writeJsonConfig(path.join(creDir, "generate-briefing", "config.production.json"), briefingConfig);
   writeJsonConfig(path.join(creDir, "generate-finale", "config.staging.json"), briefingConfig);
   writeJsonConfig(path.join(creDir, "generate-finale", "config.production.json"), briefingConfig);
+
+  // citynode-resolver
+  writeJsonConfig(path.join(creDir, "citynode-resolver", "config.staging.json"), baseConfig);
+  writeJsonConfig(path.join(creDir, "citynode-resolver", "config.production.json"), baseConfig);
 
   // player-check & player-registration
   writeJsonConfig(path.join(creDir, "player-check", "config.staging.json"), playerRegistryConfig);
