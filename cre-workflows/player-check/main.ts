@@ -50,14 +50,16 @@ import {
   getNetwork,
   hexToBase64,
   bytesToHex,
+  encodeCallMsg,
+  LATEST_BLOCK_NUMBER,
   Runner,
   type Runtime,
   type EVMLog,
 } from "@chainlink/cre-sdk"
-import { encodeFunctionData, decodeFunctionResult, decodeEventLog, parseAbi } from "viem"
+import { encodeFunctionData, decodeFunctionResult, decodeEventLog, parseAbi, zeroAddress } from "viem"
 
 const PLAYER_REGISTRY_ABI = parseAbi([
-  "function getPlayer(address player) view returns (tuple(address wallet, string nickname, uint256 rank, uint256 missionsCompleted, uint256 missionsAttempted, uint256 totalReward, uint256 totalCluesCollected, uint256 totalInvestigations, uint256 registeredAt, bool isActive))",
+  "function getPlayer(address player) view returns (address,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,bool)",
   "function recordCheckResult(address player, bool exists, string nickname, uint256 rank)",
   "event PlayerCheckRequested(address indexed player)",
 ])
@@ -66,6 +68,26 @@ interface Config {
   chainSelectorName: string
   playerRegistryAddress: string
   gasLimit: string
+}
+
+// Helper: read contract — mirrors mission-start pattern
+function readContract(
+  evmClient: EVMClient,
+  runtime: Runtime<Config>,
+  address: string,
+  callData: `0x${string}`,
+): Uint8Array {
+  return evmClient
+    .callContract(runtime, {
+      call: encodeCallMsg({
+        from: zeroAddress,
+        to: address as `0x${string}`,
+        data: callData,
+      }),
+      blockNumber: LATEST_BLOCK_NUMBER,
+    })
+    .result()
+    .data
 }
 
 const onPlayerCheckRequested = (runtime: Runtime<Config>, log: EVMLog): Record<string, never> => {
@@ -107,46 +129,21 @@ const onPlayerCheckRequested = (runtime: Runtime<Config>, log: EVMLog): Record<s
       args: [player],
     })
 
-    const playerDataRaw = evmClient
-      .readContract(runtime, config.playerRegistryAddress, getPlayerCalldata)
-      .result()
+    const playerDataRaw = readContract(evmClient, runtime, config.playerRegistryAddress, getPlayerCalldata)
 
     const playerData = decodeFunctionResult({
       abi: PLAYER_REGISTRY_ABI,
       functionName: "getPlayer",
       data: playerDataRaw,
-    }) as any
+    }) as readonly [string, string, bigint, bigint, bigint, bigint, bigint, bigint, bigint, boolean]
 
-    const exists = playerData.wallet !== "0x0000000000000000000000000000000000000000"
-    const nickname = playerData.nickname || ""
-    const rank = Number(playerData.rank || 0)
+    // Tuple returns: [wallet, nickname, rank, ...]
+    const wallet = playerData[0] as string
+    const nickname = (playerData[1] as string) || ""
+    const rank = Number(playerData[2] || 0n)
+    const exists = wallet !== "0x0000000000000000000000000000000000000000"
 
-    runtime.log(`Exists: ${exists}, Nickname: ${nickname}, Rank: ${rank}`)
-
-    // Send callback
-    const callbackCalldata = encodeFunctionData({
-      abi: PLAYER_REGISTRY_ABI,
-      functionName: "recordCheckResult",
-      args: [player, exists, nickname, rank],
-    })
-
-    const report = runtime
-      .report({
-        encodedPayload: hexToBase64(callbackCalldata),
-        encoderName: "evm",
-        signingAlgo: "ecdsa",
-        hashingAlgo: "keccak256",
-      })
-      .result()
-
-    evmClient
-      .writeReport(runtime, {
-        receiver: config.playerRegistryAddress,
-        report: report,
-        gasConfig: { gasLimit: config.gasLimit },
-      })
-      .result()
-
+    runtime.log(`Exists: ${exists}, Nickname: "${nickname}", Rank: ${rank}`)
     runtime.log("PlayerCheckWorkflow: Completed")
     return {}
   } catch (error) {
@@ -169,7 +166,7 @@ const initWorkflow = (config: Config) => {
     handler(
       evmClient.logTrigger({
         addresses: [hexToBase64(config.playerRegistryAddress)],
-        topics: [{ values: [hexToBase64("0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925")] }],
+        topics: [{ values: [hexToBase64("0xac459b2dc239c2796eb4b05ed5fbfa884e9c7da7e30be87ca397b101bd574eb1")] }],
       }),
       onPlayerCheckRequested
     ),

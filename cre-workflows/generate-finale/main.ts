@@ -52,7 +52,7 @@
  *    - VRF v2.5: The reward amount is derived from VRF-seeded block count
  *
  *  AI GENERATION:
- *    The workflow includes a full OpenAI integration (generateAIFinale)
+ *    The workflow includes a full Groq/LLaMA integration (generateAIFinale)
  *    for unique personalized endings. CRE WASM currently doesn't support
  *    async/await, so the AI path uses buildEnrichedFinale as fallback.
  *    When CRE v2 supports async handlers, enable with a one-line change.
@@ -64,8 +64,8 @@
  *
  *  CONFIG:
  *    - chainSelectorName, gameMasterAddress, proxyAddress, gasLimit
- *    - openaiApiKey: OpenAI API key (optional — empty = use fallback)
- *    - openaiModel: model to use (e.g. "gpt-4o-mini")
+ *    - openaiApiKey: Groq/LLaMA API key (optional — empty = use fallback)
+ *    - openaiModel: model to use (e.g. "llama-3.3-70b-versatile")
  *
  *  IMPORTANT CONSTRAINTS:
  *    - Handler must be synchronous (async AI calls are behind TODO)
@@ -105,8 +105,8 @@ type Config = {
   gameMasterAddress: string
   proxyAddress: string
   gasLimit: string
-  openaiApiKey: string
-  openaiModel: string
+  openaiApiKey: string    // Groq API key (optional — empty = use fallback)
+  openaiModel: string     // LLM model name (e.g. "llama-3.3-70b-versatile")
 }
 
 // ============================================================
@@ -286,7 +286,7 @@ Requirements:
   try {
     log("Calling AI API for dynamic finale...")
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -550,7 +550,7 @@ const onCarmenCaptured = (runtime: Runtime<Config>, log: EVMLog): Record<string,
 
   // Generate narrative (AI planned for CRE v2, enriched template for now)
   let narrative: string
-  if (config.openaiApiKey && config.openaiApiKey !== "" && config.openaiApiKey !== "YOUR_OPENAI_API_KEY") {
+  if (config.openaiApiKey && config.openaiApiKey !== "" && config.openaiApiKey !== "YOUR_GROQ_API_KEY") {
     // TODO: When CRE supports async handlers, replace with:
     // narrative = await generateAIFinale(scenario, missionId, cityName, tier.name,
     //   blocksUsed, cluesReceived, config.openaiApiKey, config.openaiModel, runtime.log)
@@ -650,5 +650,4 @@ export async function main() {
   await runner.run(initWorkflow)
 }
 
-// Export for testing
-export { generateAIFinale, buildEnrichedFinale, generateTrophySVG, buildTokenURI, getRewardTier, toBase64 }
+// Note: helper functions NOT exported — Javy WASM does not support exported functions with parameters
