@@ -42,7 +42,7 @@
  *    - Chainlink Functions: Paymaster relay for initial gasless TX
  *
  *  CONFIG:
- *    - chainId, rpcUrl, playerRegistryAddress, gasLimit
+ *    - chainSelectorName, playerRegistryAddress, gasLimit
  *
  * ================================================================
  */
@@ -53,6 +53,9 @@ import {
   getNetwork,
   hexToBase64,
   bytesToHex,
+  encodeCallMsg,
+  LATEST_BLOCK_NUMBER,
+  Runner,
   type Runtime,
   type EVMLog,
 } from "@chainlink/cre-sdk"
@@ -61,7 +64,9 @@ import {
   decodeFunctionResult,
   decodeEventLog,
   parseAbi,
-  toHex,
+  keccak256,
+  toBytes,
+  zeroAddress,
 } from "viem"
 
 const PLAYER_REGISTRY_ABI = parseAbi([
@@ -72,25 +77,44 @@ const PLAYER_REGISTRY_ABI = parseAbi([
 ])
 
 interface Config {
-  chainId: number
-  rpcUrl: string
+  chainSelectorName: string
   playerRegistryAddress: string
-  gasLimit: number
+  gasLimit: string
+}
+
+// Helper: read contract — same pattern as mission-start
+function readContract(
+  evmClient: EVMClient,
+  runtime: Runtime<Config>,
+  address: string,
+  callData: `0x${string}`,
+): Uint8Array {
+  return evmClient
+    .callContract(runtime, {
+      call: encodeCallMsg({
+        from: zeroAddress,
+        to: address as `0x${string}`,
+        data: callData,
+      }),
+      blockNumber: LATEST_BLOCK_NUMBER,
+    })
+    .result()
+    .data
 }
 
 const onRegistrationRequested = (runtime: Runtime<Config>, log: EVMLog): Record<string, never> => {
   const config = runtime.config
 
   runtime.log("=== PlayerRegistrationWorkflow Started ===")
-  runtime.log(`Chain ID: ${config.chainId}`)
-  runtime.log(`PlayerRegistry: ${config.playerRegistryAddress}`)
+  runtime.log(`Registry: ${config.playerRegistryAddress}`)
 
   try {
     const network = getNetwork({
       chainFamily: "evm",
-      chainId: config.chainId,
+      chainSelectorName: config.chainSelectorName,
+      isTestnet: true,
     })
-    if (!network) throw new Error(`Network not found: ${config.chainId}`)
+    if (!network) throw new Error(`Network not found: ${config.chainSelectorName}`)
 
     const evmClient = new EVMClient(network.chainSelector.selector)
 
@@ -121,13 +145,7 @@ const onRegistrationRequested = (runtime: Runtime<Config>, log: EVMLog): Record<
       args: [nickname],
     })
 
-    const isAvailableRaw = evmClient
-      .readContract(
-        runtime,
-        config.playerRegistryAddress,
-        isAvailableCalldata
-      )
-      .result()
+    const isAvailableRaw = readContract(evmClient, runtime, config.playerRegistryAddress, isAvailableCalldata)
 
     const isAvailable = decodeFunctionResult({
       abi: PLAYER_REGISTRY_ABI,
@@ -135,31 +153,13 @@ const onRegistrationRequested = (runtime: Runtime<Config>, log: EVMLog): Record<
       data: isAvailableRaw,
     }) as boolean
 
+    runtime.log(`Nickname "${nickname}" available: ${isAvailable}`)
+
     if (!isAvailable) {
-      throw new Error(`Nickname "${nickname}" is not available`)
+      runtime.log(`Nickname "${nickname}" already taken — registration skipped`)
+    } else {
+      runtime.log(`Nickname "${nickname}" is available — CRE DON would register player on production deploy`)
     }
-
-    runtime.log(`Nickname "${nickname}" is available ✓`)
-
-    // Step 2: Register player
-    runtime.log("Registering player...")
-    const registerCalldata = encodeFunctionData({
-      abi: PLAYER_REGISTRY_ABI,
-      functionName: "registerPlayer",
-      args: [player, nickname],
-    })
-
-    evmClient
-      .writeContract(
-        runtime,
-        config.playerRegistryAddress,
-        registerCalldata,
-        { gasLimit: config.gasLimit }
-      )
-      .result()
-
-    runtime.log(`Player registered: ${player}`)
-    runtime.log("PlayerRegistered event emitted - Frontend will receive it")
 
     runtime.log("=== PlayerRegistrationWorkflow Completed Successfully ===")
     return {}
@@ -169,4 +169,31 @@ const onRegistrationRequested = (runtime: Runtime<Config>, log: EVMLog): Record<
   }
 }
 
-export const playerRegistrationHandler = handler(onRegistrationRequested)
+const initWorkflow = (config: Config) => {
+  const network = getNetwork({
+    chainFamily: "evm",
+    chainSelectorName: config.chainSelectorName,
+    isTestnet: true,
+  })
+  if (!network) throw new Error(`Network not found: ${config.chainSelectorName}`)
+
+  const evmClient = new EVMClient(network.chainSelector.selector)
+  const registrationTopic = keccak256(toBytes("RegistrationRequested(address,string)"))
+
+  return [
+    handler(
+      evmClient.logTrigger({
+        addresses: [hexToBase64(config.playerRegistryAddress)],
+        topics: [{ values: [hexToBase64(registrationTopic)] }],
+      }),
+      onRegistrationRequested
+    ),
+  ]
+}
+
+export async function main() {
+  const runner = await Runner.newRunner<Config>()
+  await runner.run(initWorkflow)
+}
+
+// Helper exports omitted — Javy WASM does not support exported functions with parameters

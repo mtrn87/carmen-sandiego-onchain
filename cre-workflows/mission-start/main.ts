@@ -65,7 +65,7 @@
  *
  *  AI CLUE GENERATION:
  *    The workflow includes a generateAIClue function (async, for CRE v2)
- *    that creates contextual clues via OpenAI based on the scenario,
+ *    that creates contextual clues via Groq/LLaMA based on the scenario,
  *    city details, and whether the investigation was correct.
  *    Currently uses scenario-based clues as fallback.
  *
@@ -114,8 +114,8 @@ type Config = {
   gameMasterAddress: string
   proxyAddress: string
   gasLimit: string
-  openaiApiKey?: string   // Optional — for AI-generated clues (CRE v2)
-  openaiModel?: string    // Optional — model name
+  openaiApiKey?: string   // Optional — Groq API key for AI-generated clues
+  openaiModel?: string    // Optional — LLM model name (e.g. "llama-3.3-70b-versatile")
 }
 
 // ============================================================
@@ -223,7 +223,7 @@ function calculateStrength(salt: `0x${string}`, clueIndex: number, isCorrectCity
 // ============================================================
 //  AI Clue Generation (async — for CRE v2)
 //
-//  Creates contextual, dynamic clues via OpenAI API based on
+//  Creates contextual, dynamic clues via Groq/LLaMA API based on
 //  the scenario, the investigated city, and whether it's correct.
 //  Falls back to scenario-based clues when unavailable.
 // ============================================================
@@ -266,7 +266,7 @@ The clue should suggest Carmen MIGHT be in ${investigatedCity?.name} but include
   try {
     log(`Calling AI API for ${isCorrect ? "true" : "false"} clue...`)
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

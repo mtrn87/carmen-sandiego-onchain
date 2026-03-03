@@ -55,10 +55,10 @@
  *    - No brute-force needed (we don't check Carmen's location)
  *    - Generates narrative content (briefing text) instead of clues
  *    - Always sends ACTION_RECEIVE_CLUE with clueType=0
- *    - Has AI generation capability (OpenAI integration ready)
+ *    - Has AI generation capability (Groq/LLaMA integration ready)
  *
  *  AI GENERATION:
- *    The workflow includes a full OpenAI integration (generateAIBriefing)
+ *    The workflow includes a full Groq/LLaMA integration (generateAIBriefing)
  *    that creates unique noir-style briefings for each mission. CRE WASM
  *    currently doesn't support async/await in handlers, so the AI path
  *    uses buildEnrichedBriefing as fallback. When CRE v2 supports async
@@ -66,8 +66,8 @@
  *
  *  CONFIG:
  *    - chainSelectorName, gameMasterAddress, proxyAddress, gasLimit
- *    - openaiApiKey: OpenAI API key (optional — empty = use fallback)
- *    - openaiModel: model to use (e.g. "gpt-4o-mini")
+ *    - openaiApiKey: Groq API key (optional — empty = use fallback)
+ *    - openaiModel: model to use (e.g. "llama-3.3-70b-versatile")
  *
  *  NOTE ON ecies.ts DUPLICATION:
  *    This workflow has its own copy of ecies.ts (encrypt-only) rather
@@ -83,6 +83,8 @@
 
 import {
   EVMClient,
+  HTTPClient,
+  consensusIdenticalAggregation,
   handler,
   Runner,
   getNetwork,
@@ -92,6 +94,7 @@ import {
   LATEST_BLOCK_NUMBER,
   type Runtime,
   type EVMLog,
+  type HTTPSendRequester,
 } from "@chainlink/cre-sdk"
 import {
   keccak256,
@@ -114,8 +117,8 @@ type Config = {
   gameMasterAddress: string
   proxyAddress: string
   gasLimit: string
-  openaiApiKey: string    // OpenAI API key (optional — empty = use fallback)
-  openaiModel: string     // OpenAI model name (e.g. "gpt-4o-mini")
+  openaiApiKey: string    // Groq API key (optional — empty = use fallback)
+  openaiModel: string     // Groq/LLaMA model name (e.g. "llama-3.3-70b-versatile")
 }
 
 // ============================================================
@@ -127,6 +130,13 @@ const GameMasterABI = parseAbi([
   "function getValidCities() view returns (uint256[])",
   "function getPlayerPublicKey(address) view returns (bytes)",
   "event MissionStarted(uint256 indexed missionId, address indexed player, uint256 startBlock)",
+])
+
+// ── Chainlink ETH/USD Data Feed (Sepolia) ──
+const FEED_ETH_USD = "0x694AA1769357215DE4FAC081bf1f309aDC325306"
+const DataFeedABI = parseAbi([
+  "function latestRoundData() view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)",
+  "function decimals() view returns (uint8)",
 ])
 
 // ============================================================
@@ -195,7 +205,7 @@ function parsePubKey(pubKeyHex: string, log: (msg: string) => void): Uint8Array 
 // ============================================================
 //  AI Briefing Generation (async — for CRE v2)
 //
-//  Creates unique noir-style briefings via OpenAI API.
+//  Creates unique noir-style briefings via Groq API.
 //  Currently cannot be called from the synchronous handler.
 //  When CRE v2 supports async handlers, enable with one-line change.
 // ============================================================
@@ -239,7 +249,7 @@ Requirements:
   try {
     log("Calling AI API for dynamic briefing...")
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -275,6 +285,73 @@ Requirements:
     log(`AI generation failed: ${err}. Using enriched template.`)
     return buildEnrichedBriefing(scenario, missionId, cities)
   }
+}
+
+// ============================================================
+//  Base64 encoder — btoa is not available in CRE WASM/Javy
+// ============================================================
+function toBase64(str: string): string {
+  const bytes = new TextEncoder().encode(str)
+  const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+  let result = ""
+  let i = 0
+  while (i < bytes.length) {
+    const a = bytes[i++] || 0
+    const b = bytes[i++] || 0
+    const c = bytes[i++] || 0
+    const triple = (a << 16) | (b << 8) | c
+    result += CHARS[(triple >> 18) & 0x3f]
+    result += CHARS[(triple >> 12) & 0x3f]
+    result += i - 2 < bytes.length ? CHARS[(triple >> 6) & 0x3f] : "="
+    result += i - 1 < bytes.length ? CHARS[triple & 0x3f] : "="
+  }
+  return result
+}
+
+// ============================================================
+//  Groq LLM Call — Synchronous via CRE HTTPClient.sendRequest()
+//  Replaces async fetch with the .result() blocking pattern
+// ============================================================
+type GroqParams = {
+  apiKey: string
+  model: string
+  systemPrompt: string
+  userPrompt: string
+}
+
+function callGroqForBriefing(sendRequester: HTTPSendRequester, params: GroqParams): string {
+  // RequestJson.body is a base64-encoded string (protobuf JSON convention)
+  const bodyStr = JSON.stringify({
+    model: params.model,
+    messages: [
+      { role: "system", content: params.systemPrompt },
+      { role: "user", content: params.userPrompt },
+    ],
+    max_tokens: 500,
+    temperature: 0,  // deterministic — required for DON consensus
+  })
+
+  const resp = sendRequester.sendRequest({
+    url: "https://api.groq.com/openai/v1/chat/completions",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${params.apiKey}`,
+    },
+    body: toBase64(bodyStr),  // base64-encoded body for RequestJson (btoa unavailable in CRE WASM)
+  }).result()
+
+  if (resp.statusCode !== 200) {
+    throw new Error(`Groq API error (${resp.statusCode}): ${new TextDecoder().decode(resp.body).slice(0, 100)}`)
+  }
+
+  const data = JSON.parse(new TextDecoder().decode(resp.body)) as {
+    choices: Array<{ message: { content: string } }>
+  }
+
+  const content = data.choices?.[0]?.message?.content
+  if (!content) throw new Error("Empty Groq response")
+  return content
 }
 
 // ============================================================
@@ -377,6 +454,31 @@ const onMissionStarted = (runtime: Runtime<Config>, log: EVMLog): Record<string,
   const evmClient = new EVMClient(network.chainSelector.selector)
   const gm = config.gameMasterAddress
 
+  // ── Chainlink Data Feed: ETH/USD (Sepolia) ──
+  runtime.log("[Chainlink Data Feed] Reading ETH/USD from Sepolia aggregator...")
+  try {
+    const decimalsRaw = readContract(evmClient, runtime, FEED_ETH_USD,
+      encodeFunctionData({ abi: DataFeedABI, functionName: "decimals" }))
+    const decimals = decodeFunctionResult({
+      abi: DataFeedABI,
+      functionName: "decimals",
+      data: bytesToHex(decimalsRaw),
+    }) as number
+    const roundRaw = readContract(evmClient, runtime, FEED_ETH_USD,
+      encodeFunctionData({ abi: DataFeedABI, functionName: "latestRoundData" }))
+    const [roundId, answer, , updatedAt] = decodeFunctionResult({
+      abi: DataFeedABI,
+      functionName: "latestRoundData",
+      data: bytesToHex(roundRaw),
+    }) as [bigint, bigint, bigint, bigint, bigint]
+    const ethUsd = Number(answer) / Math.pow(10, Number(decimals))
+    const updatedDate = new Date(Number(updatedAt) * 1000).toISOString()
+    runtime.log(`[Chainlink Data Feed] ETH/USD = $${ethUsd.toFixed(2)} (round=${roundId}, updated=${updatedDate})`)
+    runtime.log(`[Chainlink Data Feed] Contract: ${FEED_ETH_USD} (Sepolia)`)
+  } catch (feedErr) {
+    runtime.log(`[Chainlink Data Feed] Read failed: ${feedErr instanceof Error ? feedErr.message : String(feedErr)}`)
+  }
+
   // ── Step 1: Decode MissionStarted event ──
   const topics = log.topics.map((t) => bytesToHex(t)) as [`0x${string}`, ...`0x${string}`[]]
   const data = bytesToHex(log.data)
@@ -469,13 +571,33 @@ const onMissionStarted = (runtime: Runtime<Config>, log: EVMLog): Record<string,
 
   let briefingText: string
 
-  if (config.openaiApiKey && config.openaiApiKey !== "" && config.openaiApiKey !== "YOUR_OPENAI_API_KEY") {
+  if (config.openaiApiKey && config.openaiApiKey !== "" && config.openaiApiKey !== "YOUR_GROQ_API_KEY") {
+    const cityDescriptions = cities
+      .map((c) => {
+        const info = scenario.cities[c.toString()]
+        const clue = scenario.cityClues?.[c.toString()]
+        if (!info) return `Chain ${c}`
+        return `${info.name} (${info.chain}) — landmark: ${clue?.landmark || "unknown"}, known for: ${clue?.culture || "unknown"}`
+      })
+      .join("\n    ")
+
+    const systemPrompt = `You are the narrator for "Carmen Sandiego On-Chain," a blockchain mystery game. Write immersive mission briefings in the style of a Cold War intelligence dossier crossed with cyberpunk noir. Under 200 words. Address the player as "detective". Reference blockchain terminology. End with urgency.`
+    const userPrompt = `Mission #${missionId}: "${scenario.title}"\n\nBackground: ${scenario.briefing}\n\nCities to investigate:\n    ${cityDescriptions}\n\nWrite a classified briefing. Name the cities. Do NOT reveal which city Carmen is in.`
+
     try {
-      briefingText = buildEnrichedBriefing(scenario, missionId, cities, targetCityId)
-      runtime.log("Using enriched opening clue (async AI planned for CRE v2)")
-      // TODO: When CRE supports async handlers, replace with:
-      // briefingText = await generateAIBriefing(scenario, missionId, cities, config.openaiApiKey, config.openaiModel, runtime.log)
-    } catch {
+      runtime.log("Calling Groq LLM API for dynamic briefing...")
+      const httpClient = new HTTPClient()
+      briefingText = httpClient
+        .sendRequest(runtime, callGroqForBriefing, consensusIdenticalAggregation<string>())({
+          apiKey: config.openaiApiKey,
+          model: config.openaiModel,
+          systemPrompt,
+          userPrompt,
+        })
+        .result()
+      runtime.log(`AI briefing generated via Groq/LLaMA (${briefingText.length} chars)`)
+    } catch (err) {
+      runtime.log(`Groq API failed: ${err}. Using enriched template.`)
       briefingText = buildEnrichedBriefing(scenario, missionId, cities, targetCityId)
     }
   } else {
