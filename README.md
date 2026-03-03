@@ -73,25 +73,7 @@ export async function main() {
 
 ---
 
-### 3️⃣ **Chainlink Functions - Gasless Paymaster**
-
-**❌ Problem:** How do players interact without paying gas or managing crypto?
-
-**✅ Chainlink Solution:** Functions relays transactions and sponsors gas costs.
-
-```javascript
-// Without Chainlink: Player pays gas
-await contract.connect(player.signer).investigate(city); // ❌ Gas + crypto required
-
-// With Chainlink Functions: Gasless experience
-await functionsApi.relayTransaction(playerIntent); // ✅ Zero gas, zero crypto
-```
-
-**Impact:** Web2-like UX while maintaining full Web3 decentralization.
-
----
-
-### 4️⃣ **Chainlink Data Feeds - Dynamic Reward Pricing**
+### 3️⃣ **Chainlink Data Feeds - Dynamic Reward Pricing**
 
 **❌ Problem:** How do you maintain economic value across volatile crypto markets?
 
@@ -110,7 +92,7 @@ uint256 reward = (USD_TARGET * 1e18) / ethPrice; // ✅ Stable value
 
 ---
 
-### 5️⃣ **Chainlink CCIP - Cross-Chain Interoperability**
+### 4️⃣ **Chainlink CCIP - Cross-Chain Interoperability**
 
 **❌ Problem:** How do you enable seamless cross-chain gameplay without bridges?
 
@@ -150,14 +132,14 @@ automation.register upkeep("move-carmen", interval, moveCarmen); // ✅ Decentra
 
 ```mermaid
 graph TD
-    A[Player Login] --> B[Chainlink Functions: Gasless Auth]
+    A[Player Login] --> B[Privy Auth: Embedded Wallet]
     B --> C[Chainlink VRF: Random Location]
     C --> D[Chainlink CRE: Generate Clues]
     D --> E[Player Investigation]
     E --> F[Chainlink Automation: Move Carmen]
     F --> G[Chainlink CCIP: Cross-Chain Trail]
     G --> H[Chainlink Data Feeds: Reward Value]
-    H --> I[Chainlink Functions: Gasless Capture]
+    H --> I[Capture Carmen]
 ```
 
 ---
@@ -193,7 +175,6 @@ Visit `http://localhost:5173` and start hunting Carmen across blockchains!
 |-----------|------------------|---------|
 | **Game Logic** | CRE | Decentralized game engine |
 | **Randomness** | VRF v2.5 | Provably fair location selection |
-| **Player Experience** | Functions | Gasless transactions |
 | **Economics** | Data Feeds | Dynamic reward pricing |
 | **Multi-Chain** | CCIP | Cross-chain interoperability |
 | **Timing** | Automation | Scheduled game events |
@@ -206,7 +187,6 @@ Visit `http://localhost:5173` and start hunting Carmen across blockchains!
 |-----------|------------------|----------------|
 | **Fair Randomness** | Centralized RNG (manipulable) | VRF: Mathematically provable |
 | **Game Logic** | Centralized servers (SPOF) | CRE: Decentralized computation |
-| **User Experience** | Gas + crypto required | Functions: Gasless interactions |
 | **Cross-Chain** | Risky bridges | CCIP: Secure messaging |
 | **Market Volatility** | Fixed token amounts | Data Feeds: Dynamic pricing |
 | **Scheduled Events** | Centralized cron jobs | Automation: Decentralized timing |
@@ -223,7 +203,7 @@ Visit `http://localhost:5173` and start hunting Carmen across blockchains!
 
 ## 📚 Documentation
 
-- [📖 Technical Architecture](docs/TECHNICAL_OVERVIEW.md)
+- [📖 Documentation Index](docs/INDEX.md)
 - [🎮 Game Flow](GAME_FLOW.md)
 - [🔧 Setup Guide](SETUP.md)
 - [🔒 Security Audit](docs/SECURITY_AUDIT.md)

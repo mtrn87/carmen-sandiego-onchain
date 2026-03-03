@@ -136,86 +136,7 @@ export async function main() {
 
 ---
 
-## ⛽ Problem 3: User Experience Barriers
-
-### ❌ The Challenge
-How do you make blockchain gaming accessible to mainstream users?
-
-**Web3 friction points:**
-- Need cryptocurrency for gas fees
-- Gas prices fluctuate wildly
-- Complex wallet management
-- Network switching confusion
-- Transaction confirmation delays
-- Failed transactions and retries
-
-**Without solving this:**
-- Only crypto natives can play
-- High barrier to entry
-- Poor user experience
-- Limited adoption potential
-
-### ✅ Chainlink Functions Solution
-Gasless paymaster enables Web2-like experience:
-
-```javascript
-// Frontend - Zero complexity for users
-async function investigateCity(cityId) {
-  const playerIntent = {
-    action: 'investigate',
-    cityId: cityId,
-    timestamp: Date.now()
-  };
-  
-  // Sign once, play forever
-  const signature = await signMessage(playerIntent);
-  
-  // No gas, no crypto, no network switching
-  const result = await functionsApi.call('gasless-relay', {
-    intent: playerIntent,
-    signature: signature
-  });
-  
-  return result; // Instant response!
-}
-
-// chainlink-functions/relayer.js
-class GaslessRelayer {
-  async handlePlayerRequest(request) {
-    // 1. Verify player signature
-    const player = await verifySignature(request.signature, request.intent);
-    
-    // 2. Check permissions and game state
-    if (!await canPlayerInvestigate(player.address, request.intent.cityId)) {
-      throw new Error('Invalid investigation');
-    }
-    
-    // 3. Execute transaction (paying gas ourselves)
-    const tx = await gameContract.connect(relayerWallet).investigate(
-      player.address,
-      request.intent.cityId
-    );
-    
-    // 4. Return immediate result
-    return {
-      success: true,
-      clues: await getCluesForCity(player.address, request.intent.cityId),
-      txHash: tx.hash
-    };
-  }
-}
-```
-
-**The Functions Advantage:**
-- ✅ **Zero Gas**: Players never pay transaction fees
-- ✅ **Zero Crypto**: No need to own cryptocurrency
-- ✅ **Instant**: Web2-like response times
-- ✅ **Simple**: One-click authentication
-- ✅ **Reliable**: Automatic retry and error handling
-
----
-
-## 📊 Problem 4: Economic Volatility
+## 📊 Problem 3: Economic Volatility
 
 ### ❌ The Challenge
 How do you maintain stable game economics in volatile crypto markets?
@@ -291,7 +212,7 @@ contract DynamicRewardSystem {
 
 ---
 
-## 🌐 Problem 5: Cross-Chain Complexity
+## 🌐 Problem 4: Cross-Chain Complexity
 
 ### ❌ The Challenge
 How do you create a unified game experience across multiple blockchains?
@@ -373,7 +294,7 @@ contract UnifiedGameWorld {
 
 ---
 
-## ⏰ Problem 6: Persistent Game World
+## ⏰ Problem 5: Persistent Game World
 
 ### ❌ The Challenge
 How do you maintain a living, breathing game world 24/7 without centralized servers?
@@ -457,7 +378,6 @@ contract PersistentGameWorld {
 |---------|-------------------|-------------------|---------|
 | **Fair Randomness** | Centralized RNG (manipulable) | VRF v2.5 (cryptographically provable) | ✅ Trustless fairness |
 | **Complex Logic** | Centralized servers (SPOF) | CRE (decentralized computation) | ✅ Infinite complexity |
-| **User Experience** | Gas + crypto required | Functions (gasless paymaster) | ✅ Web2 UX |
 | **Economic Stability** | Fixed amounts (volatile) | Data Feeds (dynamic pricing) | ✅ Stable value |
 | **Cross-Chain** | Risky bridges (custodial) | CCIP (secure messaging) | ✅ Unified world |
 | **Persistence** | Centralized cron (fragile) | Automation (decentralized) | ✅ 24/7 reliability |
@@ -483,7 +403,6 @@ Decentralized Game Network
 ├── Smart Contracts (on-chain state)
 ├── VRF (fair randomness)
 ├── CRE (complex logic)
-├── Functions (gasless UX)
 ├── CCIP (cross-chain)
 ├── Data Feeds (stable economics)
 └── Automation (persistent world)
@@ -533,7 +452,6 @@ This isn't just a game - it's a **demonstration of what's possible** when you co
 
 - **VRF** for trustless randomness
 - **CRE** for decentralized computation  
-- **Functions** for gasless UX
 - **Data Feeds** for stable economics
 - **CCIP** for cross-chain unity
 - **Automation** for persistent worlds

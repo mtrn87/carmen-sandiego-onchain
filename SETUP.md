@@ -56,9 +56,6 @@ carmen-sandiego-onchain/
 │   ├── src/
 │   ├── .env.example        # Template for frontend env vars
 │   └── package.json
-├── chainlink-functions/    # Gasless paymaster relay server
-│   ├── server.js
-│   └── package.json
 ├── cre-workflows/          # Chainlink CRE workflows (TypeScript → WASM)
 │   ├── mission-start/
 │   ├── generate-briefing/
@@ -390,15 +387,7 @@ npm run test:run
 # Expected: 59+ passing tests
 ```
 
-### 4. Relay server starts
-
-```bash
-cd chainlink-functions
-node server.js
-# Expected: Server listening on port 3001
-```
-
-### 5. CRE workflow builds
+### 4. CRE workflow builds
 
 ```bash
 cd cre-workflows/mission-start
