@@ -11,11 +11,10 @@ Step-by-step guide to set up and run Carmen Sandiego On-Chain locally.
 3. [Environment Variables](#environment-variables)
 4. [Smart Contracts Setup](#smart-contracts-setup)
 5. [Frontend Setup](#frontend-setup)
-6. [Chainlink Functions Paymaster](#chainlink-functions-paymaster)
-7. [CRE Workflows](#cre-workflows)
-8. [Testnet Deployment](#testnet-deployment)
-9. [Verification](#verification)
-10. [Troubleshooting](#troubleshooting)
+6. [CRE Workflows](#cre-workflows)
+7. [Testnet Deployment](#testnet-deployment)
+8. [Verification](#verification)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -223,34 +222,6 @@ npm run lint       # ESLint
 npm run build      # Production build
 npm run preview    # Preview production build
 ```
-
----
-
-## Chainlink Functions Paymaster
-
-The paymaster relay server handles gasless transactions for players.
-
-### Install and run
-
-```bash
-cd chainlink-functions
-npm install
-node server.js
-# → http://localhost:3001
-```
-
-### Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/faucet` | Auto-fund player wallet with testnet ETH |
-| `POST` | `/relay/register-player` | Gasless player registration |
-| `POST` | `/relay/start-mission` | Gasless mission start |
-| `POST` | `/relay/submit-investigation` | Gasless city investigation |
-| `POST` | `/relay/city-action` | Gasless CityNode interactions |
-| `GET` | `/health` | Server health check |
-
-> The relay wallet (configured via `PRIVATE_KEY` in root `.env`) pays all gas costs.
 
 ---
 

@@ -193,7 +193,7 @@ export default function LoginPage() {
           await initializePlayerRegistry(playerRegistryAddress)
 
           // Auto-fund player wallet (gasless UX — relayer sends testnet ETH)
-          const paymasterUrl = import.meta.env.VITE_RELAYER_URL || import.meta.env.VITE_PAYMASTER_URL || 'http://localhost:3001'
+          const paymasterUrl = import.meta.env.VITE_RELAYER_URL || 'http://localhost:3001'
           if (paymasterUrl) {
             try {
               const faucetRes = await fetch(`${paymasterUrl}/faucet`, {
