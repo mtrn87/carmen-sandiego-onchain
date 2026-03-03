@@ -2,7 +2,7 @@
 
 ## 🎯 Overview
 
-**Carmen Sandiego On-Chain** is the first blockchain game to demonstrate the full power of Chainlink's decentralized oracle network. This documentation explains how we use all 6 major Chainlink services to solve fundamental challenges in decentralized gaming.
+**Carmen Sandiego On-Chain** is the first blockchain game to demonstrate the power of Chainlink's decentralized oracle network. This documentation explains how we use 5 major Chainlink services to solve fundamental challenges in decentralized gaming.
 
 ---
 
@@ -22,7 +22,7 @@
 
 ### 🔬 Technical Deep Dive  
 **[🔗 Chainlink Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md)**  
-Comprehensive technical analysis of all 6 Chainlink services with code examples and architecture diagrams.
+Comprehensive technical analysis of 5 Chainlink services with code examples and architecture diagrams.
 
 ### 🛡️ Security & Architecture
 **[🔒 Security Audit](SECURITY_AUDIT.md)**  
@@ -50,7 +50,6 @@ Visual architecture diagrams and flow charts.
 |---------|---------|-------------|----------------|
 | **VRF v2.5** | Provably Fair Randomness | Trustless randomness | [Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md#-chainlink-vrf-v25-provably-fair-randomness) |
 | **CRE** | Decentralized Game Engine | Unlimited complexity | [Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md#-chainlink-cre-decentralized-game-engine) |
-| **Functions** | Gasless Paymaster | Web2 UX | [Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md#-chainlink-functions-gasless-player-experience) |
 | **Data Feeds** | Dynamic Economics | Stable value | [Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md#-chainlink-data-feeds-economic-stability) |
 | **CCIP** | Cross-Chain Unity | Multi-chain native | [Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md#-chainlink-ccip-true-cross-chain-gaming) |
 | **Automation** | Persistent World | 24/7 reliability | [Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md#-chainlink-automation-scheduled-game-events) |
@@ -89,7 +88,7 @@ With Chainlink: Decentralized 24/7 automation
 
 ### For the Industry
 - **Blueprint**: Demonstrates full potential of Chainlink services
-- **Innovation**: First game integrating all 6 major Chainlink services
+- **Innovation**: First game integrating 5 major Chainlink services
 - **Future-Proof**: Architecture ready for AI, advanced NFTs, and more
 
 ### For Developers  
@@ -131,7 +130,7 @@ With Chainlink: Decentralized 24/7 automation
 ## 🛣️ Development Roadmap
 
 ### ✅ Completed (v1.0)
-- [x] All 6 Chainlink services integrated
+- [x] All 5 Chainlink services integrated
 - [x] Cross-chain gameplay
 - [x] Gasless player experience  
 - [x] Dynamic reward economics

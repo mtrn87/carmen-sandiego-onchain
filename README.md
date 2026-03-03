@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://chain.link/hackathon"><img src="https://img.shields.io/badge/Chainlink-Convergence%20Hackathon-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="Chainlink Convergence"/></a>
-  <a href="#chainlink-services"><img src="https://img.shields.io/badge/Powered%20by-6%20Chainlink%20Services-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="Chainlink Services"/></a>
+  <a href="#chainlink-services"><img src="https://img.shields.io/badge/Powered%20by-5%20Chainlink%20Services-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="Chainlink Services"/></a>
   <a href="#deployed-contracts"><img src="https://img.shields.io/badge/Multi--Chain-4%20Testnets-FF6B6B?style=for-the-badge" alt="Multi-Chain"/></a>
 </p>
 
@@ -128,7 +128,7 @@ ccip.send(polygon, player, message, tokens); // ✅ Non-custodial, secure
 
 ---
 
-### 6️⃣ **Chainlink Automation - Scheduled Game Events**
+### 5️⃣ **Chainlink Automation - Scheduled Game Events**
 
 **❌ Problem:** How do you trigger time-based game events without centralized cron jobs?
 
@@ -216,7 +216,7 @@ Visit `http://localhost:5173` and start hunting Carmen across blockchains!
 ## 🏆 Awards & Recognition
 
 - 🥇 **Chainlink Convergence Hackathon 2024** - Best Use of Chainlink Services
-- 🌟 **First game** to integrate all 6 major Chainlink services
+- 🌟 **First game** to integrate 5 major Chainlink services
 - 🚀 **Innovation showcase** for decentralized gaming
 
 ---
