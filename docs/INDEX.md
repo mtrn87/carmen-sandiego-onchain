@@ -36,8 +36,7 @@ Visual architecture diagrams and flow charts.
 ## 📋 Reference Documentation
 
 ### 🎮 Game Mechanics
-- **[🎯 Gameplay Balance](GAMEPLAY_BALANCE.md)** - Economic and difficulty balancing
-- **[🔄 System Flows](SYSTEM_FLOWS.md)** - Detailed interaction flows
+- **[� Game Flow](../GAME_FLOW.md)** - Complete gameplay mechanics
 
 ### 🌐 Deployment & Operations
 - **[🚀 Deployment Guide](DEPLOYMENT_GUIDE.md)** - Multi-chain deployment instructions
