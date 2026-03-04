@@ -13,7 +13,7 @@ graph TB
         Wallet["Embedded Wallet<br/>Google OAuth<br/>ECIES Encryption"]
     end
 
-    subgraph Relayer["Relayer Server (3001)"]
+    subgraph RelayService["Relay Service"]
         Validate["Validate Signature<br/>ECDSA Recovery"]
         Register["Call registerPlayer()<br/>Pay Gas"]
     end
@@ -105,7 +105,7 @@ sequenceDiagram
     participant User as User
     participant Frontend as Frontend
     participant Privy as Privy
-    participant Relayer as Relayer (3001)
+    participant Relayer as Relay Service
     participant Contract as PlayerRegistry
     participant Storage as localStorage
 

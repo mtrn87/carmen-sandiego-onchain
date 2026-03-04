@@ -2,7 +2,7 @@
 
 Chainlink CRE (Compute Runtime Environment) workflows para Carmen Sandiego On-Chain. TypeScript compilado para WASM.
 
-**📚 [Back to Documentation Index](../docs/INDEX.md)** | **[Technical Workflows](../docs/02-technical-workflows.md)**
+**📚 [Back to Documentation Index](../docs/INDEX.md)**
 
 ## Prerequisites
 

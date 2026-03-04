@@ -34,8 +34,6 @@ const rlWarn = (...a) => _rl("RELAY ⚠  WARN  ", "#e74c3c", ...a)
 // ============================================================
 
 const RELAY_URL = import.meta.env.VITE_RELAYER_URL
-  || import.meta.env.VITE_RELAY_URL
-  || import.meta.env.VITE_CHAINLINK_FUNCTIONS_URL
   || "http://localhost:3001"
 
 /** Whether relayer is available (set to false on first failure, retried periodically) */
@@ -50,209 +48,201 @@ let _nonce = Date.now()
 // ============================================================
 
 async function checkRelayerAvailable() {
+  // Return cached result if recently checked
+  if (_relayerAvailable !== null) return _relayerAvailable
+  
+  // If check is in progress, wait for it
+  if (_relayerCheckPromise) {
+    await _relayerCheckPromise
+    return _relayerAvailable
+  }
+
+  // Perform health check
+  _relayerCheckPromise = (async () => {
+    try {
+      rlOut(`Health check → ${RELAY_URL}/health`)
+      const resp = await fetch(`${RELAY_URL}/health`, { signal: AbortSignal.timeout(3000) })
+      if (resp.ok) {
+        const data = await resp.json()
+        rlIn("Relayer is UP ✓", data)
+        _relayerAvailable = true
+        // Retry failed relayer every 5 minutes
+        setTimeout(() => { _relayerAvailable = null }, 300_000)
+      } else {
+        throw new Error(`HTTP ${resp.status}`)
+      }
+    } catch (err) {
+      rlWarn("Relayer is DOWN ✗", err.message)
+      _relayerAvailable = false
+      // Retry failed relayer every 30 seconds
+      setTimeout(() => { _relayerAvailable = null }, 30_000)
+    } finally {
+      _relayerCheckPromise = null
+    }
+  })()
+
+  await _relayerCheckPromise
+  return _relayerAvailable
+}
+
+// ============================================================
+//  Generic relay function
+// ============================================================
+
+async function relayTransaction(endpoint, payload) {
+  if (!(await checkRelayerAvailable())) {
+    rlWarn("Relayer unavailable, skipping relay")
+    return null
+  }
+
   try {
-    rlOut(`Health check → ${RELAY_URL}/health`)
-    const resp = await fetch(`${RELAY_URL}/health`, { signal: AbortSignal.timeout(3000) })
-    if (resp.ok) {
-      _relayerAvailable = true
-      rlIn("Relayer is UP ✓")
-      return true
-    }
-  } catch {
-    // relayer not reachable
-  }
-  _relayerAvailable = false
-  rlWarn("Relayer is DOWN — will use direct contract calls")
-  return false
-}
+    const url = `${RELAY_URL}${endpoint}`
+    rlOut(`POST ${url}`, payload)
 
-/**
- * Check if the relayer is available (cached, re-checks every 60s if down).
- */
-export async function isRelayerAvailable() {
-  if (_relayerAvailable === true) return true
-  if (_relayerAvailable === false) {
-    // Re-check periodically (every 60s)
-    if (!_relayerCheckPromise) {
-      _relayerCheckPromise = new Promise((resolve) => {
-        setTimeout(async () => {
-          _relayerCheckPromise = null
-          resolve(await checkRelayerAvailable())
-        }, 60000)
-      })
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+
+    if (!resp.ok) {
+      const error = await resp.text()
+      throw new Error(`Relay error: ${resp.status} - ${error}`)
     }
-    return false
+
+    const result = await resp.json()
+    rlIn("Relay SUCCESS ✓", result)
+    return result
+  } catch (err) {
+    rlWarn("Relay FAILED ✗", err.message)
+    // Mark relayer as temporarily unavailable
+    _relayerAvailable = false
+    setTimeout(() => { _relayerAvailable = null }, 30_000)
+    return null
   }
-  // First check
-  return checkRelayerAvailable()
 }
 
 // ============================================================
-//  Signing
+//  Specific relay functions for game actions
 // ============================================================
 
-/**
- * Sign a relay intent message.
- * Message: keccak256(abi.encodePacked(playerAddress, action, nonce, gameMasterAddress))
- */
-async function signRelayIntent(action) {
+export async function relayFlagTx(chainId, bytes32RefId) {
   const signer = await getSigner()
+  if (!signer) return null
+
   const playerAddress = await signer.getAddress()
-  const nonce = _nonce++
+  const nonce = ++_nonce
+  const message = `flag:${chainId}:${bytes32RefId}:${nonce}`
+  const signature = await signer.signMessage(message)
 
-  rlSign(`Action: "${action}" | Player: ${playerAddress.slice(0, 10)}... | Nonce: ${nonce}`)
-
-  const messageHash = ethers.keccak256(
-    ethers.solidityPacked(
-      ["address", "string", "uint256", "address"],
-      [playerAddress, action, nonce, GAME_MASTER_ADDRESS]
-    )
-  )
-
-  rlSign(`Hash: ${messageHash.slice(0, 18)}... → Requesting wallet signature...`)
-  const signature = await signer.signMessage(ethers.getBytes(messageHash))
-  rlSign(`Signature: ${signature.slice(0, 18)}... ✓`)
-
-  return { playerAddress, signature, nonce: nonce.toString() }
-}
-
-// ============================================================
-//  Relay helpers
-// ============================================================
-
-/**
- * Send a relay request to the server.
- * @returns {{ success, txHash, blockNumber }} or throws on failure
- */
-async function relayRequest(endpoint, body) {
-  const url = `${RELAY_URL}${endpoint}`
-  rlOut(`POST ${endpoint}`, { player: body.playerAddress?.slice(0, 10), action: body.action })
-  const t0 = performance.now()
-
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+  return await relayTransaction("/relay/flag", {
+    chainId,
+    playerAddress,
+    bytes32RefId,
+    nonce,
+    signature
   })
-
-  const result = await resp.json()
-  const dt = (performance.now() - t0).toFixed(0)
-
-  if (!result.success) {
-    rlWarn(`${endpoint} FAILED (${dt}ms): ${result.error}`)
-    throw new Error(result.error || "Relay request failed")
-  }
-
-  rlIn(`${endpoint} OK (${dt}ms) | tx: ${result.txHash?.slice(0, 18)}... | block: ${result.blockNumber}`)
-  return result
-}
-
-// ============================================================
-//  Relayed GameMaster Actions
-// ============================================================
-
-/**
- * Relay registerPlayer(publicKeyHex) through server.
- * Returns relay result or null if relay unavailable.
- */
-export async function relayRegisterPlayer(publicKeyHex) {
-  if (!(await isRelayerAvailable())) { rlWarn("Relayer unavailable — registerPlayer will use direct TX"); return null }
-  try {
-    rlOut("▶ registerPlayer (gasless relay)")
-    const signed = await signRelayIntent("registerPlayer")
-    return await relayRequest("/relay/register-player", {
-      ...signed,
-      publicKeyHex,
-    })
-  } catch (err) {
-    rlWarn(`registerPlayer relay failed, falling back: ${err.message}`)
-    return null
-  }
-}
-
-/**
- * Relay startMission() through server.
- * Returns relay result or null if relay unavailable.
- */
-export async function relayStartMission() {
-  if (!(await isRelayerAvailable())) { rlWarn("Relayer unavailable — startMission will use direct TX"); return null }
-  try {
-    rlOut("▶ startMission (gasless relay) — triggers Chainlink VRF v2.5")
-    const signed = await signRelayIntent("startMission")
-    return await relayRequest("/relay/start-mission", signed)
-  } catch (err) {
-    rlWarn(`startMission relay failed, falling back: ${err.message}`)
-    return null
-  }
-}
-
-/**
- * Relay submitInvestigation(chainId) through server.
- * Returns relay result or null if relay unavailable.
- */
-export async function relaySubmitInvestigation(chainId) {
-  if (!(await isRelayerAvailable())) { rlWarn("Relayer unavailable — submitInvestigation will use direct TX"); return null }
-  try {
-    rlOut(`▶ submitInvestigation(chainId=${chainId}) (gasless relay)`)
-    const signed = await signRelayIntent(`submitInvestigation:${chainId}`)
-    return await relayRequest("/relay/submit-investigation", {
-      ...signed,
-      chainId: chainId.toString(),
-    })
-  } catch (err) {
-    rlWarn(`submitInvestigation relay failed, falling back: ${err.message}`)
-    return null
-  }
-}
-
-/**
- * Relay a CityNode action through server.
- * @param {number} chainId
- * @param {string} action - e.g. "inspectLocation", "requestClue", "flagTx"
- * @param {object} params - action-specific parameters
- * Returns relay result or null if relay unavailable.
- */
-export async function relayCityAction(chainId, action, params = {}) {
-  if (!(await isRelayerAvailable())) { rlWarn(`Relayer unavailable — city:${action} will use direct TX`); return null }
-  try {
-    rlOut(`▶ CityNode.${action}(chain=${chainId})`, params)
-    const signed = await signRelayIntent(`city:${action}:${chainId}`)
-    return await relayRequest("/relay/city-action", {
-      ...signed,
-      chainId: chainId.toString(),
-      action,
-      params,
-    })
-  } catch (err) {
-    rlWarn(`city ${action} relay failed, falling back: ${err.message}`)
-    return null
-  }
-}
-
-// ============================================================
-//  Convenience wrappers for CityNode actions
-// ============================================================
-
-export async function relayInspectLocation(chainId, locationIdx) {
-  return relayCityAction(chainId, "inspectLocation", { locationIdx })
-}
-
-export async function relayScanAnomalies(chainId, locationIdx) {
-  return relayCityAction(chainId, "scanAnomalies", { locationIdx })
 }
 
 export async function relayRequestClue(chainId, locationIdx, clueIndex) {
-  return relayCityAction(chainId, "requestClue", { locationIdx, clueIndex })
+  const signer = await getSigner()
+  if (!signer) return null
+
+  const playerAddress = await signer.getAddress()
+  const nonce = ++_nonce
+  const message = `clue:${chainId}:${locationIdx}:${clueIndex}:${nonce}`
+  const signature = await signer.signMessage(message)
+
+  return await relayTransaction("/relay/clue", {
+    chainId,
+    playerAddress,
+    locationIdx,
+    clueIndex,
+    nonce,
+    signature
+  })
 }
 
 export async function relayRequestDossier(chainId) {
-  return relayCityAction(chainId, "requestDossier")
+  const signer = await getSigner()
+  if (!signer) return null
+
+  const playerAddress = await signer.getAddress()
+  const nonce = ++_nonce
+  const message = `dossier:${chainId}:${nonce}`
+  const signature = await signer.signMessage(message)
+
+  return await relayTransaction("/relay/dossier", {
+    chainId,
+    playerAddress,
+    nonce,
+    signature
+  })
 }
 
-export async function relayRequestCapture(chainId, suspectWallet, evidenceBundleHash) {
-  return relayCityAction(chainId, "requestCapture", { suspectWallet, evidenceBundleHash })
+export async function relayRequestCapture(chainId, evidence) {
+  const signer = await getSigner()
+  if (!signer) return null
+
+  const playerAddress = await signer.getAddress()
+  const nonce = ++_nonce
+  const message = `capture:${chainId}:${JSON.stringify(evidence)}:${nonce}`
+  const signature = await signer.signMessage(message)
+
+  return await relayTransaction("/relay/capture", {
+    chainId,
+    playerAddress,
+    evidence,
+    nonce,
+    signature
+  })
 }
 
-export async function relayFlagTx(chainId, refId) {
-  return relayCityAction(chainId, "flagTx", { refId })
+export async function relayInspectLocation(chainId, locationIdx) {
+  const signer = await getSigner()
+  if (!signer) return null
+
+  const playerAddress = await signer.getAddress()
+  const nonce = ++_nonce
+  const message = `inspect:${chainId}:${locationIdx}:${nonce}`
+  const signature = await signer.signMessage(message)
+
+  return await relayTransaction("/relay/inspect", {
+    chainId,
+    playerAddress,
+    locationIdx,
+    nonce,
+    signature
+  })
+}
+
+export async function relayScanAnomalies(chainId, locationIdx) {
+  const signer = await getSigner()
+  if (!signer) return null
+
+  const playerAddress = await signer.getAddress()
+  const nonce = ++_nonce
+  const message = `scan:${chainId}:${locationIdx}:${nonce}`
+  const signature = await signer.signMessage(message)
+
+  return await relayTransaction("/relay/scan", {
+    chainId,
+    playerAddress,
+    locationIdx,
+    nonce,
+    signature
+  })
+}
+
+// ============================================================
+//  Registration relay (for player signup)
+// ============================================================
+
+export async function relayRegistration(playerAddress, nickname, signature) {
+  return await relayTransaction("/relay", {
+    playerAddress,
+    nickname,
+    signature,
+    nonce: "0"
+  })
 }
