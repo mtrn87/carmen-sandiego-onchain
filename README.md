@@ -4,332 +4,237 @@
 
 <h1 align="center">Where in the Web3 World is Carmen Sandiego?</h1>
 
-<h3 align="center">A Fully Decentralized Mystery Game Powered by Chainlink</h3>
+<h3 align="center">A Fully Decentralized Mystery Game — CRE + AI on Chainlink</h3>
 
 <p align="center">
   <a href="https://chain.link/hackathon"><img src="https://img.shields.io/badge/Chainlink-Convergence%20Hackathon-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="Chainlink Convergence"/></a>
-  <a href="#chainlink-services"><img src="https://img.shields.io/badge/Powered%20by-5%20Chainlink%20Services-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="Chainlink Services"/></a>
-  <a href="#deployed-contracts"><img src="https://img.shields.io/badge/Multi--Chain-4%20Testnets-FF6B6B?style=for-the-badge" alt="Multi-Chain"/></a>
+  <a href="#cre--ai--the-decentralized-game-engine"><img src="https://img.shields.io/badge/CRE%20%2B%20AI-6%20WASM%20Workflows-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="CRE + AI"/></a>
+  <a href="#deployed-contracts--on-chain-evidence"><img src="https://img.shields.io/badge/Multi--Chain-4%20Testnets-FF6B6B?style=for-the-badge" alt="Multi-Chain"/></a>
 </p>
 
 <p align="center">
-  <strong>The first blockchain game demonstrating the full power of Chainlink's decentralized oracle network</strong>
+  <a href="#on-chain-transaction-proofs"><img src="https://img.shields.io/badge/Transactions-5%20Verified%20on%20Sepolia-2ECC71?style=flat-square" alt="Verified TXs"/></a>
+  <a href="#cre-cli-simulation-batch-results"><img src="https://img.shields.io/badge/CRE%20Simulations-6%2F6%20PASSED-2ECC71?style=flat-square" alt="CRE Simulations"/></a>
+  <a href="#test-suite"><img src="https://img.shields.io/badge/Tests-124%20Passing-2ECC71?style=flat-square" alt="Tests"/></a>
+</p>
+
+<p align="center">
+  <strong>The first blockchain game where the entire game brain — including AI content generation — runs decentralized inside Chainlink CRE</strong>
+</p>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=yIjX9qju8zo">
+    <img src="https://img.youtube.com/vi/yIjX9qju8zo/maxresdefault.jpg" alt="Project Explanation" width="600"/>
+  </a>
+</p>
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=yIjX9qju8zo"><strong>▶ Watch the Project Explanation</strong></a>
 </p>
 
 ---
 
-## 🎯 The Challenge
+## The Problem
 
-**How do you create a truly decentralized game that is:**
-- ✅ **Provably fair** (no centralized randomness)
-- ✅ **Cross-chain** (multiple blockchains) 
-- ✅ **Gas-free for players** (seamless UX)
-- ✅ **Dynamic & intelligent** (AI-driven content)
-- ✅ **Secure & private** (encrypted clues)
+Every blockchain game today has the same dirty secret: the fun parts — generating content, evaluating player actions, updating game state — all run on a **centralized server**. The smart contract is just a scoreboard. One server goes down, one company pulls the plug, and the game is gone forever.
 
-**Without Chainlink, this would be impossible.** Here's why:
+There's a deeper problem: **who decides if your answer is right?** A backend you can't audit. An API you have to trust. And when a game uses AI to generate content — who controls the prompt? Who verifies the output?
 
----
+**That's not Web3 — that's Web2 with a wallet.**
 
-## 🔗 Chainlink Services: Problems & Solutions
-
-### 1️⃣ **Chainlink VRF v2.5 - Provably Fair Randomness**
-
-**❌ Problem:** How do you randomly place Carmen across blockchains without a trusted centralized source?
-
-**✅ Chainlink Solution:** VRF provides cryptographically provable randomness directly on-chain.
-
-```solidity
-// Without Chainlink: Centralized RNG (manipulable)
-uint256 random = "centralized_server_api.getRandom()"; // ❌ Trust required
-
-// With Chainlink VRF: Provably fair randomness
-uint256 random = s_vrfCoordinator.requestRandomWords(); // ✅ Mathematically provable
-```
-
-**Impact:** Every mission location is unpredictable and verifiable by anyone.
+We asked: **what if the AI itself ran inside a decentralized oracle network?**
 
 ---
 
-### 2️⃣ **Chainlink CRE - Decentralized Game Engine**
+## CRE + AI — The Decentralized Game Engine
 
-**❌ Problem:** How do you run complex game logic (AI clues, cross-chain moves) without centralized servers?
+**We built 6 CRE workflows.** Each is an independent TypeScript file that compiles to WASM and executes inside the Chainlink DON. All nodes run identical bytecode, produce identical output (temperature=0), reach consensus, and deliver threshold-signed reports on-chain.
 
-**✅ Chainlink Solution:** CRE runs TypeScript/WASM workflows off-chain with on-chain results.
+### How AI Runs Inside CRE
 
 ```typescript
-// Without Chainlink: Centralized game server
-const server = new GameServer(); // ❌ Single point of failure
+// generate-briefing/main.ts — runs on EVERY DON node
+export async function main(runtime: CRERuntime) {
+  // 1. Read live ETH/USD price from Chainlink Data Feed (on-chain read inside WASM)
+  const ethPrice = await evmClient.callContract(runtime, {
+    call: encodeCallMsg({ to: DATA_FEED_ADDRESS, data: latestRoundDataSelector })
+  });
 
-// With Chainlink CRE: Decentralized computation
-export async function main() {
-  // Runs on DON nodes, results posted on-chain
-  const encryptedClue = await generateEncryptedClue(playerPubKey);
-  await emitClueGenerated(player, encryptedClue);
+  // 2. Call Groq LLaMA 3.3-70b via HTTPClient (AI inside decentralized compute)
+  const briefing = await httpClient.sendRequest(runtime, {
+    url: "https://api.groq.com/openai/v1/chat/completions",
+    body: JSON.stringify({ model: "llama-3.3-70b-versatile", temperature: 0, messages: [...] })
+  }).result();
+
+  // 3. Encrypt with player's secp256k1 public key (end-to-end privacy)
+  const encrypted = eciesEncrypt(playerPublicKey, briefing);
+
+  // 4. Deliver threshold-signed report on-chain via KeystoneForwarder
+  return writeReport(runtime, [{ abi, data: encrypted }]);
 }
 ```
 
-**Impact:** Game logic is decentralized, tamper-proof, and always available.
+**In one workflow execution:** live blockchain data + AI generation + end-to-end encryption + on-chain delivery. All inside WASM. All decentralized.
+
+### The 6 CRE Workflows
+
+| # | Workflow | Trigger | AI/LLM | What It Does |
+|---|----------|---------|--------|--------------|
+| 1 | **generate-briefing** | `MissionStarted` event | Groq LLaMA 3.3-70b | Reads Data Feed, calls LLM, ECIES-encrypts briefing, delivers on-chain |
+| 2 | **mission-start** | `InvestigationSubmitted` event | — | Brute-forces commit-reveal hash, evaluates guess, generates encrypted clue |
+| 3 | **generate-finale** | `CarmenCaptured` event | Groq LLaMA 3.3-70b | Generates SVG trophy + ERC-721 metadata, sets token URI on-chain |
+| 4 | **carmen-moves** | CronCapability (every 3 min) | — | Reads active missions, relocates Carmen using targetHash entropy |
+| 5 | **player-registration** | `RegistrationRequested` event | — | Validates nickname, registers player gaslessly |
+| 6 | **player-check** | `PlayerCheckRequested` event | — | Verifies player exists and returns rank |
+
+### CRE Capabilities Used
+
+| Capability | Where | Purpose |
+|------------|-------|---------|
+| **EVMClient.callContract** | generate-briefing | Read ETH/USD Data Feed from inside WASM |
+| **HTTPClient.sendRequest** | generate-briefing, generate-finale | Call Groq LLaMA 3.3-70b for AI content |
+| **writeReport** | All 6 workflows | Deliver threshold-signed results on-chain |
+| **CronCapability** | carmen-moves | Autonomous scheduled execution (every 3 min) |
+| **LogTrigger** | 5 workflows | React to on-chain events |
+
+### Determinism for DON Consensus
+
+AI outputs must be **identical across all DON nodes** for consensus. We achieve this with:
+- `temperature: 0` on all LLM calls — deterministic output
+- `@noble/curves v1.x` for ECIES — pinned because v2.x breaks CRE WASM compiler
+- Scenario-based clue pools with deterministic strength scoring
+- All randomness derived from VRF salt (on-chain, verifiable)
 
 ---
 
-### 3️⃣ **Chainlink Data Feeds - Dynamic Reward Pricing**
+## Supporting Chainlink Services
 
-**❌ Problem:** How do you maintain economic value across volatile crypto markets?
+CRE is the core, but it's powered by the full Chainlink stack:
 
-**✅ Chainlink Solution:** Real-time price feeds for dynamic reward calculations.
-
-```solidity
-// Without Chainlink: Static rewards
-uint256 reward = 0.01 ether; // ❌ Value fluctuates wildly
-
-// With Chainlink Data Feeds: Dynamic pricing
-uint256 ethPrice = priceFeed.latestAnswer();
-uint256 reward = (USD_TARGET * 1e18) / ethPrice; // ✅ Stable value
-```
-
-**Impact:** Rewards maintain consistent value regardless of market volatility.
+| Service | Role | Integration Point |
+|---------|------|-------------------|
+| **VRF v2.5** | Provably fair randomness | `fulfillRandomWords()` → salt → `targetHash = keccak256(chainId, salt)` |
+| **Data Feeds** | Live ETH/USD pricing | CRE reads aggregator inside WASM via `EVMClient.callContract` |
+| **CCIP** | Cross-chain messaging | Carmen movement notifications to CityNode contracts |
+| **Automation** | Scheduled events | `carmen-moves` via CronCapability (every 3 min) |
+| **Keystone Forwarder** | Report delivery | All CRE workflow outputs delivered with threshold signatures |
 
 ---
 
-### 4️⃣ **Chainlink CCIP - Cross-Chain Interoperability**
-
-**❌ Problem:** How do you enable seamless cross-chain gameplay without bridges?
-
-**✅ Chainlink Solution:** CCIP provides secure cross-chain messaging and token transfers.
-
-```solidity
-// Without Chainlink: Complex bridges
-bridge.transfer(arbitrum, polygon, token); // ❌ Custodial, risky
-
-// With Chainlink CCIP: Native cross-chain
-ccip.send(polygon, player, message, tokens); // ✅ Non-custodial, secure
-```
-
-**Impact:** Carmen can move across chains seamlessly with players following her trail.
-
----
-
-### 5️⃣ **Chainlink Automation - Scheduled Game Events**
-
-**❌ Problem:** How do you trigger time-based game events without centralized cron jobs?
-
-**✅ Chainlink Solution:** Automation triggers smart contract functions on schedule.
-
-```solidity
-// Without Chainlink: Centralized cron
-cron.schedule('*/3 * * * *', moveCarmen); // ❌ Server dependency
-
-// With Chainlink Automation: Decentralized scheduling
-automation.register upkeep("move-carmen", interval, moveCarmen); // ✅ Decentralized
-```
-
-**Impact:** Carmen moves every 3 minutes reliably, creating urgency and dynamic gameplay.
-
----
-
-## 🎮 How It Works: The Chainlink-Powered Flow
+## Game Flow
 
 ```mermaid
-graph TD
-    A[Player Login] --> B[Privy Auth: Embedded Wallet]
-    B --> C[Chainlink VRF: Random Location]
-    C --> D[Chainlink CRE: Generate Clues]
-    D --> E[Player Investigation]
-    E --> F[Chainlink Automation: Move Carmen]
-    F --> G[Chainlink CCIP: Cross-Chain Trail]
-    G --> H[Chainlink Data Feeds: Reward Value]
-    H --> I[Capture Carmen]
+graph LR
+    A[Player Login] --> B[VRF: Random Location]
+    B --> C[CRE + AI: Generate Briefing]
+    C --> D[Player Investigates City]
+    D --> E[CRE: Evaluate + Deliver Clue]
+    E --> F{Correct City?}
+    F -->|No| D
+    F -->|Yes| G[CRE: Capture + Mint NFT]
+    G --> H[CRE + AI: Generate SVG Trophy]
 ```
 
 ---
 
-## 🚀 Quick Start
+## Deployed Contracts & On-Chain Evidence
 
-```bash
-# 1. Clone and setup
-git clone https://github.com/mtrn87/carmen-sandiego-onchain
-cd carmen-sandiego-onchain
+### Ethereum Sepolia — Hub (Chain ID: 11155111)
 
-# 2. Install dependencies
-npm run install:all
-
-# 3. Configure environment
-cp .env.example .env
-# Edit .env with your API keys
-
-# 4. Deploy contracts
-npm run deploy
-
-# 5. Start services
-npm run dev
-```
-
-Visit `http://localhost:5173` and start hunting Carmen across blockchains!
-
----
-
-## 📊 Project Architecture
-
-| Component | Chainlink Service | Purpose |
-|-----------|------------------|---------|
-| **Game Logic** | CRE | Decentralized game engine |
-| **Randomness** | VRF v2.5 | Provably fair location selection |
-| **Economics** | Data Feeds | Dynamic reward pricing |
-| **Multi-Chain** | CCIP | Cross-chain interoperability |
-| **Timing** | Automation | Scheduled game events |
-
----
-
-## 🎯 Why Chainlink is Essential
-
-| Challenge | Without Chainlink | With Chainlink |
-|-----------|------------------|----------------|
-| **Fair Randomness** | Centralized RNG (manipulable) | VRF: Mathematically provable |
-| **Game Logic** | Centralized servers (SPOF) | CRE: Decentralized computation |
-| **Cross-Chain** | Risky bridges | CCIP: Secure messaging |
-| **Market Volatility** | Fixed token amounts | Data Feeds: Dynamic pricing |
-| **Scheduled Events** | Centralized cron jobs | Automation: Decentralized timing |
-
----
-
-## Deployed Contracts
-
-### Ethereum Sepolia (Hub — Chain ID: 11155111)
-
-| Contract | Address | Etherscan |
-|----------|---------|-----------|
-| GameMaster | `0x826B5aCBE085C30C9F34A287D1fE543e2EAC56ce` | [View](https://sepolia.etherscan.io/address/0x826B5aCBE085C30C9F34A287D1fE543e2EAC56ce) |
-| GameMasterProxy | `0xcbFD04229AB18f65F70242e676c292aE35188a4A` | [View](https://sepolia.etherscan.io/address/0xcbFD04229AB18f65F70242e676c292aE35188a4A) |
-| PlayerRegistry | `0x9c0C0C6126e6E53a4fbd186674156420a356B69A` | [View](https://sepolia.etherscan.io/address/0x9c0C0C6126e6E53a4fbd186674156420a356B69A) |
-| MissionNFT | `0x61F7fb92862e10d5290C16fC07Ea90fF260aee20` | [View](https://sepolia.etherscan.io/address/0x61F7fb92862e10d5290C16fC07Ea90fF260aee20) |
+| Contract | Address | Etherscan | TX Count |
+|----------|---------|-----------|----------|
+| **GameMaster** | `0x826B5aCBE085C30C9F34A287D1fE543e2EAC56ce` | [View](https://sepolia.etherscan.io/address/0x826B5aCBE085C30C9F34A287D1fE543e2EAC56ce) | 409+ |
+| **GameMasterProxy** | `0xcbFD04229AB18f65F70242e676c292aE35188a4A` | [View](https://sepolia.etherscan.io/address/0xcbFD04229AB18f65F70242e676c292aE35188a4A) | — |
+| **PlayerRegistry** | `0x9c0C0C6126e6E53a4fbd186674156420a356B69A` | [View](https://sepolia.etherscan.io/address/0x9c0C0C6126e6E53a4fbd186674156420a356B69A) | — |
+| **MissionNFT** (ERC-721) | `0x61F7fb92862e10d5290C16fC07Ea90fF260aee20` | [View](https://sepolia.etherscan.io/address/0x61F7fb92862e10d5290C16fC07Ea90fF260aee20) | — |
 
 ### Cross-Chain CityNodes
 
-| City | Chain | Chain ID | Address |
-|------|-------|----------|---------|
+| City | Network | Chain ID | Address |
+|------|---------|----------|---------|
 | Tokyo | Arbitrum Sepolia | 421614 | `0x6A906A00ca053Ec9Ff7844f2070C31E505c159A0` |
 | Sydney | XDC Apothem | 51 | `0x47E25bFfCC00B2206a1B0A99284A6c447876C6A1` |
 
-### Chainlink Infrastructure (Sepolia)
+### Chainlink Infrastructure
 
-| Component | Address |
-|-----------|---------|
-| VRF Coordinator v2.5 | `0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B` |
-| KeystoneForwarder | `0x15fC6ae953E024d975e77382eEeC56A9101f9F88` |
-| ETH/USD Data Feed | `0x694AA1769357215DE4FAC081bf1f309aDC325306` |
-| Deployer Wallet | `0xb19eE81581AE385F56D702d412D92d70fb65b9F7` |
+| Component | Address | Etherscan |
+|-----------|---------|-----------|
+| VRF Coordinator v2.5 | `0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B` | [View](https://sepolia.etherscan.io/address/0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B) |
+| KeystoneForwarder | `0x15fC6ae953E024d975e77382eEeC56A9101f9F88` | [View](https://sepolia.etherscan.io/address/0x15fC6ae953E024d975e77382eEeC56A9101f9F88) |
+| ETH/USD Data Feed | `0x694AA1769357215DE4FAC081bf1f309aDC325306` | [View](https://sepolia.etherscan.io/address/0x694AA1769357215DE4FAC081bf1f309aDC325306) |
+
+| Parameter | Value |
+|-----------|-------|
+| VRF Subscription ID | `80568780173052067359480512728291582443404092976312047101726106109476569951281` |
+| VRF Key Hash | `0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae` |
+| Deployer | `0xb19eE81581AE385F56D702d412D92d70fb65b9F7` |
 
 ---
 
-## On-Chain Evidence & Transaction Proofs
+## On-Chain Transaction Proofs
 
-> All transactions are verifiable on [Sepolia Etherscan](https://sepolia.etherscan.io). CRE simulation logs are stored in [`cre-workflows/logs/`](cre-workflows/logs/).
+> All transactions verified on [Sepolia Etherscan](https://sepolia.etherscan.io) — Status: **Success** for all 5.
 
-### CRE Workflow Simulations — Sepolia Transaction Hashes
+Each CRE workflow was compiled to WASM and simulated against these **real Sepolia transactions** using the CRE CLI:
 
-Every CRE workflow was compiled to WASM and simulated against **real Sepolia on-chain state** using the CRE CLI. Each simulation reads a real transaction, decodes its event logs, and executes the full workflow logic (AI calls, encryption, on-chain reads/writes):
-
-| # | Workflow | Sepolia TX Hash | Event | Log Index | Etherscan |
-|---|----------|----------------|-------|-----------|-----------|
-| 1 | **generate-briefing** | `0x3fba49f92846035e3c65e703af12b97`<br>`55c168287b9ada2f4e9cb749bb0019f0c` | `MissionStarted` | 1 | [View TX](https://sepolia.etherscan.io/tx/0x3fba49f92846035e3c65e703af12b9755c168287b9ada2f4e9cb749bb0019f0c) |
-| 2 | **mission-start** | `0xafe53d52de5ced22ae861f84e37b5fb1`<br>`3323b20cc6973f45f6be3628c23f3f13` | `InvestigationSubmitted` | 0 | [View TX](https://sepolia.etherscan.io/tx/0xafe53d52de5ced22ae861f84e37b5fb13323b20cc6973f45f6be3628c23f3f13) |
-| 3 | **generate-finale** | `0xb88e671b9b63cd67fd06c1ebb61cbb63`<br>`e30e919c61f882f26cd74eb941512494` | `CarmenCaptured` | 1 | [View TX](https://sepolia.etherscan.io/tx/0xb88e671b9b63cd67fd06c1ebb61cbb63e30e919c61f882f26cd74eb941512494) |
-| 4 | **player-registration** | `0x19f9aa5b53dd277ccf5e064bf18e1551`<br>`25890dd71137117f9edacf3ca9899ee4` | `RegistrationRequested` | 0 | [View TX](https://sepolia.etherscan.io/tx/0x19f9aa5b53dd277ccf5e064bf18e155125890dd71137117f9edacf3ca9899ee4) |
-| 5 | **player-check** | `0x6aecf68f4ffdbe2b3f0281ad3e8a30d5`<br>`2eec9f414f614c297f80be066a4a4038` | `PlayerCheckRequested` | 0 | [View TX](https://sepolia.etherscan.io/tx/0x6aecf68f4ffdbe2b3f0281ad3e8a30d52eec9f414f614c297f80be066a4a4038) |
-| 6 | **carmen-moves** | Cron-triggered (no TX input) | `CronCapability` | — | N/A — reads `getActiveMissionIds()` on-chain |
-
-### What Each Simulation Proves (From CRE CLI Logs)
+| # | Workflow | TX Hash | Event | Contract | Etherscan |
+|---|----------|---------|-------|----------|-----------|
+| 1 | **generate-briefing** | `0x3fba49...019f0c` | `MissionStarted` | GameMaster | [View TX](https://sepolia.etherscan.io/tx/0x3fba49f92846035e3c65e703af12b9755c168287b9ada2f4e9cb749bb0019f0c) |
+| 2 | **mission-start** | `0xafe53d...3f3f13` | `InvestigationSubmitted` | GameMaster | [View TX](https://sepolia.etherscan.io/tx/0xafe53d52de5ced22ae861f84e37b5fb13323b20cc6973f45f6be3628c23f3f13) |
+| 3 | **generate-finale** | `0xb88e67...512494` | `CarmenCaptured` + NFT Mint | GameMaster + MissionNFT | [View TX](https://sepolia.etherscan.io/tx/0xb88e671b9b63cd67fd06c1ebb61cbb63e30e919c61f882f26cd74eb941512494) |
+| 4 | **player-registration** | `0x19f9aa...99ee4` | `RegistrationRequested` | PlayerRegistry | [View TX](https://sepolia.etherscan.io/tx/0x19f9aa5b53dd277ccf5e064bf18e155125890dd71137117f9edacf3ca9899ee4) |
+| 5 | **player-check** | `0x6aecf6...a4038` | `PlayerCheckRequested` | PlayerRegistry | [View TX](https://sepolia.etherscan.io/tx/0x6aecf68f4ffdbe2b3f0281ad3e8a30d52eec9f414f614c297f80be066a4a4038) |
+| 6 | **carmen-moves** | Cron (no TX input) | `CronCapability` | GameMaster | N/A — reads `getActiveMissionIds()` |
 
 <details>
-<summary><strong>generate-briefing</strong> — AI + Data Feed + ECIES inside WASM</summary>
+<summary><strong>TX #1 — startMission()</strong> — VRF request + CRE AI briefing</summary>
 
-```
-[Chainlink Data Feed] ETH/USD = $2137.09 (round=18446744073709582665)
-[Chainlink Data Feed] Contract: 0x694AA1769357215DE4FAC081bf1f309aDC325306 (Sepolia)
-MissionStarted: mission=12, player=0xb19eE81581AE385F56D702d412D92d70fb65b9F7
-TargetHash: 0xcc00fc51...bd0cb4, salt: 0xdf21a432...f2531
-Scenario: "The DAO Treasury Drain"
-Calling Groq LLM API for dynamic briefing...
-AI briefing generated via Groq/LLaMA (973 chars)
-Opening clue encrypted (2132 hex chars)
-Encrypted opening clue delivered on-chain!
-```
-**Chainlink services used:** CRE (WASM execution), Data Feeds (ETH/USD live price), VRF (salt from commit-reveal), Keystone Forwarder (signed report delivery)
+- **From:** `0xb19eE81581AE385F56D702d412D92d70fb65b9F7`
+- **To:** GameMaster (`0x826B5aCBE085C30C9F34A287D1fE543e2EAC56ce`)
+- **Gas Used:** 258,756
+- **Events:** `RandomWordsRequested` (VRF Coordinator) + `MissionStarted` (mission=12)
+- **CRE reads:** mission ID, player address, target hash, salt, player public key
+- **CRE calls:** Groq LLaMA 3.3-70b (temperature=0) for noir-style mission briefing
+- **CRE encrypts:** ECIES secp256k1 with player's on-chain public key
+- **CRE delivers:** encrypted briefing (2,132 hex chars) via signed report
 </details>
 
 <details>
-<summary><strong>mission-start</strong> — Commit-reveal brute-force + clue engine</summary>
+<summary><strong>TX #2 — submitInvestigation()</strong> — CRE commit-reveal + clue engine</summary>
 
-```
-Investigation: mission=12, player=0xb19eE81581AE385F56D702d412D92d70fb65b9F7, chainId=84532
-Salt: 0xdf21a432e6cfb8be02f00d64163cb9f40e3895ca010fd0db3ebd1d1ed35f2531
-Carmen is in city: 84532
-Player investigated 84532, correct=true
-Clue strength: 61 (threshold=65, correct=true)
-Clue encrypted (668 hex chars)
-Clues: 4 on-chain + 1 new = 5 total (need 3)
-CAPTURE! Player found Carmen in city 84532 with 5 clues.
-Carmen captured! Mission complete!
-```
-**Chainlink services used:** CRE (commit-reveal verification, clue selection), VRF (salt for keccak256 hash matching), Keystone Forwarder (clue + capture delivery)
+- **From:** `0xb19eE81581AE385F56D702d412D92d70fb65b9F7`
+- **To:** GameMaster (`0x826B5aCBE085C30C9F34A287D1fE543e2EAC56ce`)
+- **Gas Used:** 45,543
+- **Events:** `InvestigationSubmitted` (chainId=84532)
+- **CRE computes:** `keccak256(84532, salt) == targetHash` → **MATCH** (Carmen in Paris/Base Sepolia)
+- **CRE outputs:** encrypted clue (668 hex chars) + capture trigger (5 clues collected)
 </details>
 
 <details>
-<summary><strong>generate-finale</strong> — SVG trophy + ERC-721 on-chain NFT</summary>
+<summary><strong>TX #3 — Carmen captured + ERC-721 NFT minted</strong></summary>
 
-```
-CarmenCaptured: mission=12, player=0xb19eE81581AE385F56D702d412D92d70fb65b9F7, blocks=14, reward=100
-Captured in: Paris (Base Sepolia)
-Scenario: "The DAO Treasury Drain", Tier: GOLD
-SVG trophy generated (3600 chars)
-Token URI built (9405 chars)
-Trophy NFT metadata set for Mission #12! (GOLD rank)
-```
-**Chainlink services used:** CRE (SVG generation, metadata encoding), Keystone Forwarder (`ACTION_SET_TOKEN_URI` delivery to MissionNFT ERC-721)
+- **From:** `0xb19eE81581AE385F56D702d412D92d70fb65b9F7`
+- **To:** GameMaster → MissionNFT
+- **Events (4):** `CarmenCaptured` + game state update + ERC-721 `Transfer(0x0 → player, tokenId=11)` + token metadata set
+- **CRE generates:** SVG trophy (3,600 chars) + ERC-721 metadata (9,405 chars) — fully on-chain, no IPFS
+- **CRE calls:** Groq LLaMA for victory narrative (with enriched template fallback)
 </details>
 
 <details>
-<summary><strong>player-registration</strong> — Gasless onboarding via CRE</summary>
+<summary><strong>TX #4 — requestRegistration("HackatonDemo")</strong></summary>
 
-```
-Registry: 0x9c0C0C6126e6E53a4fbd186674156420a356B69A
-Player: 0xb19eE81581AE385F56D702d412D92d70fb65b9F7
-Nickname: HackatonDemo
-Nickname "HackatonDemo" available: true
-```
-**Chainlink services used:** CRE (nickname validation, gasless relay), Keystone Forwarder (registration delivery)
+- **To:** PlayerRegistry (`0x9c0C0C6126e6E53a4fbd186674156420a356B69A`)
+- **Events:** `RegistrationRequested`
+- **CRE validates:** nickname availability, registers player gaslessly
 </details>
 
 <details>
-<summary><strong>player-check</strong> — On-chain player verification</summary>
+<summary><strong>TX #5 — checkPlayerExists()</strong></summary>
 
-```
-Player: 0xb19eE81581AE385F56D702d412D92d70fb65b9F7
-Exists: true, Nickname: " ", Rank: 320
-```
-**Chainlink services used:** CRE (on-chain read via EVMClient), Keystone Forwarder (check result delivery)
+- **To:** PlayerRegistry (`0x9c0C0C6126e6E53a4fbd186674156420a356B69A`)
+- **Gas Used:** 22,971
+- **Events:** `PlayerCheckRequested`
+- **CRE reads:** player exists=true, rank=320
 </details>
-
-<details>
-<summary><strong>carmen-moves</strong> — Autonomous cron via CronCapability</summary>
-
-```
-=== Carmen Moves — Cron Trigger ===
-Active missions: [] (0 total)
-No active missions, nothing to do
-```
-**Chainlink services used:** CRE CronCapability (Automation — scheduled every 3 min), EVMClient (`getActiveMissionIds()` on-chain read)
-</details>
-
-### Chainlink VRF v2.5 — On-Chain Configuration
-
-| Parameter | Value | Etherscan |
-|-----------|-------|-----------|
-| VRF Coordinator | `0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B` | [View](https://sepolia.etherscan.io/address/0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B) |
-| VRF Subscription ID | `80568780173052067359480512728291582443404092976312047101726106109476569951281` | [View on vrf.chain.link](https://vrf.chain.link) |
-| VRF Key Hash | `0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae` | Sepolia 150 gwei lane |
-| Consumer Contract | `0x826B5aCBE085C30C9F34A287D1fE543e2EAC56ce` (GameMaster) | [View](https://sepolia.etherscan.io/address/0x826B5aCBE085C30C9F34A287D1fE543e2EAC56ce) |
 
 ### Commit-Reveal Cryptographic Proof (Mission #12)
 
@@ -340,71 +245,147 @@ Verification:     keccak256(abi.encodePacked(84532, salt)) == targetHash  ✓
 Carmen's city:    84532 (Base Sepolia = Paris)
 ```
 
-### End-to-End Demo Results (Mission #11 — Live Sepolia Testnet)
+---
 
-| Phase | Duration | Chainlink Service | Details |
-|-------|----------|-------------------|---------|
-| VRF Fulfillment | ~77s | **VRF v2.5** | `requestRandomWords()` → DON → `fulfillRandomWords()` with salt |
-| Briefing Generation | ~4s | **CRE** + Groq LLM | Noir-style mission narrative, ECIES-encrypted |
-| Investigation 1 (Tokyo) | — | **CRE** | Wrong city — encrypted clue delivered |
-| Investigation 2 (Sydney) | — | **CRE** | Wrong city — encrypted clue delivered |
-| Investigation 3 (Tokyo) | — | **CRE** + **Automation** | Carmen found! (`carmen-moves` relocated Paris→Tokyo) |
-| Capture + NFT Mint | ~45s | **CRE** + ERC-721 | GOLD rank, 13 blocks, NFT #10 with on-chain SVG |
-| **Total Runtime** | **4m 2s** | **5 services** | Real testnet, real Chainlink, zero mocks |
+## End-to-End Demo (Mission #11 — Live Sepolia)
 
-### CRE CLI Simulation Batch Results
+Full game loop on live testnet — real VRF, real CRE oracle, real AI, zero mocks:
 
-All 6 workflows compiled and simulated successfully across **10+ confirmed batch runs**:
+| Phase | Time | Service | Result |
+|-------|------|---------|--------|
+| VRF Fulfillment | ~77s | VRF v2.5 | `requestRandomWords()` → DON → `fulfillRandomWords()` |
+| Briefing | ~4s | **CRE + Groq LLM** | AI-generated noir briefing, ECIES-encrypted |
+| Investigation 1 | — | **CRE** | Tokyo — wrong city, encrypted clue delivered |
+| Investigation 2 | — | **CRE** | Sydney — wrong city, encrypted clue delivered |
+| Investigation 3 | — | **CRE** + Automation | Tokyo — correct! (carmen-moves relocated Paris→Tokyo) |
+| Capture + NFT | ~45s | **CRE + AI** | GOLD rank, 13 blocks, NFT #10 with on-chain SVG |
+| **Total** | **4m 2s** | **CRE + AI + VRF** | End-to-end on real Sepolia |
 
-| Batch Timestamp | Result | Log File |
-|-----------------|--------|----------|
-| `2026-03-04T20:28:23Z` | **6/6 PASSED** | [`20260304_202823_SUMMARY.log`](cre-workflows/logs/20260304_202823_SUMMARY.log) |
-| `2026-03-04T20:09:48Z` | **6/6 PASSED** | [`20260304_200948_SUMMARY.log`](cre-workflows/logs/20260304_200948_SUMMARY.log) |
-| `2026-03-04T19:52:07Z` | **6/6 PASSED** | [`20260304_195207_SUMMARY.log`](cre-workflows/logs/20260304_195207_SUMMARY.log) |
-| `2026-03-03T20:58:07Z` | **6/6 PASSED** | [`20260303_205807_SUMMARY.log`](cre-workflows/logs/20260303_205807_SUMMARY.log) |
-| `2026-03-03T20:49:04Z` | **6/6 PASSED** | [`20260303_204904_SUMMARY.log`](cre-workflows/logs/20260303_204904_SUMMARY.log) |
-| `2026-03-03T20:46:46Z` | **6/6 PASSED** | [`20260303_204646_SUMMARY.log`](cre-workflows/logs/20260303_204646_SUMMARY.log) |
-| `2026-03-03T19:50:00Z` | **6/6 PASSED** | [`20260303_195000_SUMMARY.log`](cre-workflows/logs/20260303_195000_SUMMARY.log) |
-| `2026-03-03T19:45:51Z` | **6/6 PASSED** | [`20260303_194551_SUMMARY.log`](cre-workflows/logs/20260303_194551_SUMMARY.log) |
-| `2026-03-03T19:33:34Z` | **6/6 PASSED** | [`20260303_193334_SUMMARY.log`](cre-workflows/logs/20260303_193334_SUMMARY.log) |
-| `2026-03-03T18:50:50Z` | **6/6 PASSED** | [`20260303_185050_SUMMARY.log`](cre-workflows/logs/20260303_185050_SUMMARY.log) |
+---
 
-### Test Suite
+## CRE CLI Simulation Batch Results
+
+All 6 workflows compiled to WASM and simulated successfully — **10 confirmed runs**:
+
+| Date | Time | Result | Log |
+|------|------|--------|-----|
+| Mar 4 | 20:28 | **6/6 PASSED** | [`SUMMARY`](cre-workflows/logs/20260304_202823_SUMMARY.log) |
+| Mar 4 | 20:09 | **6/6 PASSED** | [`SUMMARY`](cre-workflows/logs/20260304_200948_SUMMARY.log) |
+| Mar 4 | 19:52 | **6/6 PASSED** | [`SUMMARY`](cre-workflows/logs/20260304_195207_SUMMARY.log) |
+| Mar 3 | 20:58 | **6/6 PASSED** | [`SUMMARY`](cre-workflows/logs/20260303_205807_SUMMARY.log) |
+| Mar 3 | 20:49 | **6/6 PASSED** | [`SUMMARY`](cre-workflows/logs/20260303_204904_SUMMARY.log) |
+| Mar 3 | 20:46 | **6/6 PASSED** | [`SUMMARY`](cre-workflows/logs/20260303_204646_SUMMARY.log) |
+| Mar 3 | 19:50 | **6/6 PASSED** | [`SUMMARY`](cre-workflows/logs/20260303_195000_SUMMARY.log) |
+| Mar 3 | 19:45 | **6/6 PASSED** | [`SUMMARY`](cre-workflows/logs/20260303_194551_SUMMARY.log) |
+| Mar 3 | 19:33 | **6/6 PASSED** | [`SUMMARY`](cre-workflows/logs/20260303_193334_SUMMARY.log) |
+| Mar 3 | 18:50 | **6/6 PASSED** | [`SUMMARY`](cre-workflows/logs/20260303_185050_SUMMARY.log) |
+
+---
+
+## Test Suite
 
 ```
-Contracts:  65 tests passing  (Hardhat + VRF/DataFeed/CCIP mocks)
-Frontend:   59 tests passing  (Vitest)
-CRE:        6/6 workflows     compile + simulate (10 batch runs)
+Smart Contracts    65 tests passing    Hardhat + VRF/DataFeed/CCIP mocks
+Frontend           59 tests passing    Vitest
+CRE Workflows      6/6 compile + simulate    10 batch runs, all green
 ```
 
 ---
 
-## 📚 Documentation
+## Quick Start
 
-- [📖 Documentation Index](docs/INDEX.md)
-- [🎮 Game Flow](GAME_FLOW.md)
-- [🔧 Setup Guide](SETUP.md)
-- [🔒 Security Audit](docs/SECURITY_AUDIT.md)
-- [🌐 Deployment Guide](docs/DEPLOYMENT_GUIDE.md)
+```bash
+# Clone
+git clone https://github.com/mtrn87/carmen-sandiego-onchain
+cd carmen-sandiego-onchain
+
+# Smart Contracts
+cd contracts && npm install && npx hardhat compile && npx hardhat test
+
+# CRE Workflows (requires CRE CLI + Bun)
+cd cre-workflows && bash simulate-all.sh
+
+# Frontend
+cd frontend && npm install && npm run dev
+```
 
 ---
 
-## 🤝 Contributing
+## Tech Stack
 
-We welcome contributions! Please see our [contributing guidelines](CONTRIBUTING.md) for details.
+| Layer | Technology |
+|-------|------------|
+| CRE Workflows | TypeScript → WASM · 6 workflows · Chainlink CRE CLI |
+| AI | Groq LLaMA 3.3-70b inside CRE WASM (temperature=0 for DON consensus) |
+| Encryption | ECIES secp256k1 (end-to-end clue privacy inside CRE) |
+| Smart Contracts | Solidity 0.8.24 · Hardhat · OpenZeppelin 5.x |
+| Blockchain | Sepolia · Arbitrum Sepolia · Base Sepolia · XDC Apothem |
+| Randomness | Chainlink VRF v2.5 (native ETH) |
+| Pricing | Chainlink Data Feeds (ETH/USD) |
+| Cross-Chain | Chainlink CCIP |
+| Scheduling | Chainlink CronCapability (Automation) |
+| Frontend | React 19 · Vite 7 · Zustand · ethers.js v6 |
+| Auth | Privy (embedded wallet) |
+| NFTs | ERC-721 with on-chain SVG data URIs |
 
 ---
 
-## 📄 License
+## Project Structure
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```
+carmen-sandiego-onchain/
+├── cre-workflows/                 # CRE — TypeScript → WASM (CORE)
+│   ├── generate-briefing/         # AI briefing + Data Feed + ECIES
+│   ├── mission-start/             # Clue engine + commit-reveal
+│   ├── generate-finale/           # AI victory + SVG trophy + ERC-721
+│   ├── carmen-moves/              # Cron: relocate Carmen every 3 min
+│   ├── player-registration/       # Gasless onboarding
+│   ├── player-check/              # Player verification
+│   ├── simulate-all.sh            # Run all 6 simulations
+│   └── logs/                      # Timestamped simulation evidence
+│
+├── contracts/                     # Solidity — Hardhat
+│   ├── src/GameMaster.sol         # VRF 2.5 + commit-reveal + CRE callbacks
+│   ├── src/GameMasterProxy.sol    # KeystoneForwarder receiver
+│   ├── src/PlayerRegistry.sol     # Player profiles + gasless registration
+│   ├── src/CityNode.sol           # Per-chain investigation contracts
+│   ├── src/MissionNFT.sol         # ERC-721 on-chain SVG trophies
+│   └── test/                      # 65 tests
+│
+├── frontend/                      # React 19 + Vite 7
+│   ├── src/services/              # Contract + CRE + relay services
+│   ├── src/store/                 # Zustand game state
+│   └── src/utils/ecies.js         # ECIES decryption
+│
+└── docs/                          # Technical documentation
+```
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Documentation Index](docs/INDEX.md) | Complete navigation guide |
+| [Chainlink Technical Deep Dive](docs/CHAINLINK_TECHNICAL_DEEP_DIVE.md) | How CRE + AI and each Chainlink service is used |
+| [Problems & Solutions](docs/PROBLEMS_AND_SOLUTIONS.md) | CRE WASM gotchas and how we solved them |
+| [System Diagrams](docs/SYSTEM_DIAGRAMS.md) | Visual architecture and flow diagrams |
+| [Game Flow](GAME_FLOW.md) | 9-phase game flow |
+| [Setup Guide](SETUP.md) | Full deployment instructions |
+| [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) | Multi-chain deployment steps |
+| [Security Audit](docs/SECURITY_AUDIT.md) | Smart contract security analysis |
+
+---
+
+## License
+
+MIT
 
 ---
 
 <p align="center">
-  <strong>Built with ❤️ using the full power of Chainlink's decentralized oracle network</strong>
+  <strong>Built for the Convergence | Chainlink Hackathon</strong>
 </p>
-
 <p align="center">
-  <em>"Without Chainlink, this game would be impossible. With Chainlink, it's unstoppable."</em>
+  <em>The game that can't be shut down.</em>
 </p>
