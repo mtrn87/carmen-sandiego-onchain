@@ -1,0 +1,29 @@
+=== Carmen Sandiego — CRE Simulation: carmen-moves ===
+=== Tue, Mar  3, 2026  8:58:07 PM ===
+
+Initializing...
+Checking RPC connectivity...
+Compiling workflow...
+✓ Workflow compiled
+2026-03-03T20:58:11Z [SIMULATION] Simulator Initialized
+
+2026-03-03T20:58:11Z [SIMULATION] Running trigger trigger=cron-trigger@1.0.0
+2026-03-03T20:58:11Z [USER LOG] === Carmen Moves — Cron Trigger ===
+2026-03-03T20:58:11Z [USER LOG] Active missions: [14] (1 total)
+2026-03-03T20:58:12Z [USER LOG] Cities: [421614, 84532, 51]
+2026-03-03T20:58:13Z [USER LOG] [14] Carmen moved: 51 -> 84532 (broadcast sent)
+2026-03-03T20:58:13Z [USER LOG] === Done: 1 active, 1 moved ===
+
+✓ Workflow Simulation Result:
+{}
+
+2026-03-03T20:58:13Z [SIMULATION] Execution finished signal received
+2026-03-03T20:58:13Z [SIMULATION] Skipping WorkflowEngineV2
+
+╭──────────────────────────────────────────────────────╮
+│ Simulation complete! Ready to deploy your workflow?  │
+│                                                      │
+│ Run cre account access to request deployment access. │
+╰──────────────────────────────────────────────────────╯
+
+✅ [carmen-moves] SIMULATION PASSED

@@ -1,0 +1,51 @@
+=== Carmen Sandiego — CRE Simulation: generate-finale ===
+=== Tue Mar  3 18:51:12     2026 ===
+
+Initializing...
+Checking RPC connectivity...
+Compiling workflow...
+✗ Build failed:
+✗ failed to compile workflow: failed to compile workflow: exit status 1                                                                                                                    
+build output:                                                                                                                                                                              
+🚀 Compiling workflow                                                                                                                                                                      
+📁 Input:   C:\AmbienteDesenvolvimento\Hackaton\carmen-sandiego-onchain\cre-workflows\generate-finale\main.ts                                                                              
+🧪 JS out:  C:\AmbienteDesenvolvimento\Hackaton\carmen-sandiego-onchain\cre-workflows\generate-finale\.cre_build_tmp.js                                                                    
+🎯 WASM out:C:\AmbienteDesenvolvimento\Hackaton\carmen-sandiego-onchain\cre-workflows\generate-finale\.cre_build_tmp.wasm                                                                  
+                                                                                                                                                                                           
+📦 Step 1: Compiling JS...                                                                                                                                                                 
+📁 Using input file: C:\AmbienteDesenvolvimento\Hackaton\carmen-sandiego-onchain\cre-workflows\generate-finale\main.ts                                                                     
+Bundled 1 module in 67ms                                                                                                                                                                   
+                                                                                                                                                                                           
+  .cre_build_tmp.js  0.75 MB  (entry point)                                                                                                                                                
+                                                                                                                                                                                           
+✅ Built: C:\AmbienteDesenvolvimento\Hackaton\carmen-sandiego-onchain\cre-workflows\generate-finale\.cre_build_tmp.js                                                                      
+                                                                                                                                                                                           
+🔨 Step 2: Compiling to WASM...                                                                                                                                                            
+🔨 Compiling to WASM                                                                                                                                                                       
+📁 Input:  C:\AmbienteDesenvolvimento\Hackaton\carmen-sandiego-onchain\cre-workflows\generate-finale\.cre_build_tmp.js                                                                     
+🎯 Output: C:\AmbienteDesenvolvimento\Hackaton\carmen-sandiego-onchain\cre-workflows\generate-finale\.cre_build_tmp.wasm                                                                   
+[cre-sdk-javy-plugin] Detected platform: win32, arch: x64                                                                                                                                  
+[cre-sdk-javy-plugin] Using cached binary: C:\Users\MTulio\.cache\javy\v5.0.4\win32-x64\javy.exe                                                                                           
+Error: Exported functions with parameters are not supported                                                                                                                                
+[cre-sdk-javy-plugin] Detected platform: win32, arch: x64                                                                                                                                  
+[cre-sdk-javy-plugin] Using cached binary: C:\Users\MTulio\.cache\javy\v5.0.4\win32-x64\javy.exe                                                                                           
+Error: Exported functions with parameters are not supported                                                                                                                                
+57 |         const scriptDir = import.meta.dir                                                                                                                                             
+58 |         const compilerPath = path.resolve(                                                                                                                                            
+59 |             scriptDir,                                                                                                                                                                
+60 |             '../../../cre-sdk-javy-plugin/bin/compile-workflow.ts',                                                                                                                   
+61 |         )                                                                                                                                                                             
+62 |         await $`bun --bun ${compilerPath} ${resolvedInput} ${resolvedOutput}`                                                                                                         
+                    ^                                                                                                                                                                      
+ShellError: Failed with exit code 1                                                                                                                                                        
+ exitCode: 1,                                                                                                                                                                              
+   stdout: "[cre-sdk-javy-plugin] Detected platform: win32, arch: x64\n[cre-sdk-javy-plugin] Using cached binary: C:\\Users\\MTulio\\.cache\\javy\\v5.0.4\\win32-x64\\javy.exe\n",         
+   stderr: "Error: Exported functions with parameters are not supported\n",                                                                                                                
+                                                                                                                                                                                           
+      at new ShellPromise (75:16)                                                                                                                                                          
+      at BunShell (190:35)                                                                                                                                                                 
+      at <anonymous> (C:\AmbienteDesenvolvimento\Hackaton\carmen-sandiego-onchain\cre-workflows\generate-finale\node_modules\@chainlink\cre-sdk\scripts\src\compile-to-wasm.ts:62:9)       
+      at async <anonymous> (C:\AmbienteDesenvolvimento\Hackaton\carmen-sandiego-onchain\cre-workflows\generate-finale\node_modules\@chainlink\cre-sdk\scripts\src\compile-workflow.ts:54:8)
+      at async <anonymous> (C:\AmbienteDesenvolvimento\Hackaton\carmen-sandiego-onchain\cre-workflows\generate-finale\node_modules\@chainlink\cre-sdk\bin\cre-compile.ts:24:9)             
+
+✅ [generate-finale] SIMULATION PASSED

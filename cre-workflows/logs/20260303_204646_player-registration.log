@@ -1,0 +1,34 @@
+=== Carmen Sandiego — CRE Simulation: player-registration ===
+=== Tue, Mar  3, 2026  8:47:12 PM ===
+
+Initializing...
+Checking RPC connectivity...
+Compiling workflow...
+✓ Workflow compiled
+Fetching transaction receipt for 0x19f9aa5b53dd277ccf5e064bf18e155125890dd71137117f9edacf3ca9899ee4...
+2026-03-03T20:47:16Z [SIMULATION] Simulator Initialized
+
+2026-03-03T20:47:16Z [SIMULATION] Running trigger trigger=evm:ChainSelector:16015286601757825753@1.0.0
+2026-03-03T20:47:16Z [USER LOG] === PlayerRegistrationWorkflow Started ===
+2026-03-03T20:47:16Z [USER LOG] Registry: 0x9c0C0C6126e6E53a4fbd186674156420a356B69A
+2026-03-03T20:47:16Z [USER LOG] Decoding RegistrationRequested event...
+2026-03-03T20:47:16Z [USER LOG] Player: 0xb19eE81581AE385F56D702d412D92d70fb65b9F7
+2026-03-03T20:47:16Z [USER LOG] Nickname: HackatonDemo
+2026-03-03T20:47:16Z [USER LOG] Validating nickname availability...
+2026-03-03T20:47:16Z [USER LOG] Nickname "HackatonDemo" available: true
+2026-03-03T20:47:16Z [USER LOG] Nickname "HackatonDemo" is available — CRE DON would register player on production deploy
+2026-03-03T20:47:16Z [USER LOG] === PlayerRegistrationWorkflow Completed Successfully ===
+
+✓ Workflow Simulation Result:
+{}
+
+2026-03-03T20:47:16Z [SIMULATION] Execution finished signal received
+2026-03-03T20:47:16Z [SIMULATION] Skipping WorkflowEngineV2
+
+╭──────────────────────────────────────────────────────╮
+│ Simulation complete! Ready to deploy your workflow?  │
+│                                                      │
+│ Run cre account access to request deployment access. │
+╰──────────────────────────────────────────────────────╯
+
+✅ [player-registration] SIMULATION PASSED

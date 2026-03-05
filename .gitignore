@@ -47,6 +47,8 @@ coverage.json
 # Logs
 *.log
 npm-debug.log*
+# CRE simulation logs (hackathon evidence)
+!cre-workflows/logs/*.log
 
 # Claude Code
 CLAUDE.md
