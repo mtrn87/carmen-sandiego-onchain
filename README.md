@@ -369,6 +369,7 @@ carmen-sandiego-onchain/
 | Document | Description |
 |----------|-------------|
 | [Documentation Index](docs/INDEX.md) | Complete navigation guide |
+| [**CRE Workflows README**](cre-workflows/README.md) | All 7 CRE workflows — architecture, code, simulation, gotchas |
 | [Chainlink Technical Deep Dive](docs/CHAINLINK_TECHNICAL_DEEP_DIVE.md) | How CRE + AI and each Chainlink service is used |
 | [Problems & Solutions](docs/PROBLEMS_AND_SOLUTIONS.md) | CRE WASM gotchas and how we solved them |
 | [System Diagrams](docs/SYSTEM_DIAGRAMS.md) | Visual architecture and flow diagrams |
