@@ -8,13 +8,13 @@
 
 <p align="center">
   <a href="https://chain.link/hackathon"><img src="https://img.shields.io/badge/Chainlink-Convergence%20Hackathon-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="Chainlink Convergence"/></a>
-  <a href="#cre--ai--the-decentralized-game-engine"><img src="https://img.shields.io/badge/CRE%20%2B%20AI-6%20WASM%20Workflows-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="CRE + AI"/></a>
+  <a href="#cre--ai--the-decentralized-game-engine"><img src="https://img.shields.io/badge/CRE%20%2B%20AI-7%20WASM%20Workflows-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="CRE + AI"/></a>
   <a href="#deployed-contracts--on-chain-evidence"><img src="https://img.shields.io/badge/Multi--Chain-4%20Testnets-FF6B6B?style=for-the-badge" alt="Multi-Chain"/></a>
 </p>
 
 <p align="center">
   <a href="#on-chain-transaction-proofs"><img src="https://img.shields.io/badge/Transactions-5%20Verified%20on%20Sepolia-2ECC71?style=flat-square" alt="Verified TXs"/></a>
-  <a href="#cre-cli-simulation-batch-results"><img src="https://img.shields.io/badge/CRE%20Simulations-6%2F6%20PASSED-2ECC71?style=flat-square" alt="CRE Simulations"/></a>
+  <a href="#cre-cli-simulation-batch-results"><img src="https://img.shields.io/badge/CRE%20Simulations-7%20Workflows%20PASSED-2ECC71?style=flat-square" alt="CRE Simulations"/></a>
   <a href="#test-suite"><img src="https://img.shields.io/badge/Tests-124%20Passing-2ECC71?style=flat-square" alt="Tests"/></a>
 </p>
 
@@ -47,7 +47,7 @@ We asked: **what if the AI itself ran inside a decentralized oracle network?**
 
 ## CRE + AI — The Decentralized Game Engine
 
-**We built 6 CRE workflows.** Each is an independent TypeScript file that compiles to WASM and executes inside the Chainlink DON. All nodes run identical bytecode, produce identical output (temperature=0), reach consensus, and deliver threshold-signed reports on-chain.
+**We built 7 CRE workflows (~3,578 lines of TypeScript).** Each is an independent module that compiles to WASM and executes inside the Chainlink DON. All nodes run identical bytecode, produce identical output (temperature=0), reach consensus, and deliver threshold-signed reports on-chain.
 
 ### How AI Runs Inside CRE
 
@@ -75,7 +75,7 @@ export async function main(runtime: CRERuntime) {
 
 **In one workflow execution:** live blockchain data + AI generation + end-to-end encryption + on-chain delivery. All inside WASM. All decentralized.
 
-### The 6 CRE Workflows
+### The 7 CRE Workflows
 
 | # | Workflow | Trigger | AI/LLM | What It Does |
 |---|----------|---------|--------|--------------|
@@ -85,16 +85,17 @@ export async function main(runtime: CRERuntime) {
 | 4 | **carmen-moves** | CronCapability (every 3 min) | — | Reads active missions, relocates Carmen using targetHash entropy |
 | 5 | **player-registration** | `RegistrationRequested` event | — | Validates nickname, registers player gaslessly |
 | 6 | **player-check** | `PlayerCheckRequested` event | — | Verifies player exists and returns rank |
+| 7 | **citynode-resolver** | `ClueRequested` / `DossierRequested` / `CaptureRequested` | — | Resolves cross-chain CityNode requests back to GameMaster on Sepolia |
 
 ### CRE Capabilities Used
 
 | Capability | Where | Purpose |
 |------------|-------|---------|
-| **EVMClient.callContract** | generate-briefing | Read ETH/USD Data Feed from inside WASM |
+| **EVMClient.callContract** | All 7 workflows | Read on-chain state (missions, players, cities, Data Feed) |
 | **HTTPClient.sendRequest** | generate-briefing, generate-finale | Call Groq LLaMA 3.3-70b for AI content |
-| **writeReport** | All 6 workflows | Deliver threshold-signed results on-chain |
+| **writeReport** | All 7 workflows | Deliver threshold-signed results on-chain |
 | **CronCapability** | carmen-moves | Autonomous scheduled execution (every 3 min) |
-| **LogTrigger** | 5 workflows | React to on-chain events |
+| **LogTrigger** | 6 workflows | React to on-chain events |
 
 ### Determinism for DON Consensus
 
@@ -265,7 +266,7 @@ Full game loop on live testnet — real VRF, real CRE oracle, real AI, zero mock
 
 ## CRE CLI Simulation Batch Results
 
-All 6 workflows compiled to WASM and simulated successfully — **10 confirmed runs**:
+All 7 workflows compiled to WASM and simulated successfully — **10 confirmed batch runs** (6 per batch via simulate-all.sh + citynode-resolver separately):
 
 | Date | Time | Result | Log |
 |------|------|--------|-----|
@@ -287,7 +288,7 @@ All 6 workflows compiled to WASM and simulated successfully — **10 confirmed r
 ```
 Smart Contracts    65 tests passing    Hardhat + VRF/DataFeed/CCIP mocks
 Frontend           59 tests passing    Vitest
-CRE Workflows      6/6 compile + simulate    10 batch runs, all green
+CRE Workflows      7/7 compile + simulate    10 batch runs, all green
 ```
 
 ---
@@ -315,7 +316,7 @@ cd frontend && npm install && npm run dev
 
 | Layer | Technology |
 |-------|------------|
-| CRE Workflows | TypeScript → WASM · 6 workflows · Chainlink CRE CLI |
+| CRE Workflows | TypeScript → WASM · 7 workflows · ~3,578 lines · Chainlink CRE CLI |
 | AI | Groq LLaMA 3.3-70b inside CRE WASM (temperature=0 for DON consensus) |
 | Encryption | ECIES secp256k1 (end-to-end clue privacy inside CRE) |
 | Smart Contracts | Solidity 0.8.24 · Hardhat · OpenZeppelin 5.x |
@@ -341,7 +342,8 @@ carmen-sandiego-onchain/
 │   ├── carmen-moves/              # Cron: relocate Carmen every 3 min
 │   ├── player-registration/       # Gasless onboarding
 │   ├── player-check/              # Player verification
-│   ├── simulate-all.sh            # Run all 6 simulations
+│   ├── citynode-resolver/         # Cross-chain CityNode request resolver
+│   ├── simulate-all.sh            # Run all simulations
 │   └── logs/                      # Timestamped simulation evidence
 │
 ├── contracts/                     # Solidity — Hardhat
