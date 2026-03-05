@@ -1,189 +1,104 @@
-# 📚 Carmen Sandiego On-Chain Documentation
+# Carmen Sandiego On-Chain — Documentation Index
 
-## 🎯 Overview
+## Overview
 
-**Carmen Sandiego On-Chain** is the first blockchain game to demonstrate the power of Chainlink's decentralized oracle network. This documentation explains how we use 5 major Chainlink services to solve fundamental challenges in decentralized gaming.
-
----
-
-## 🚀 Quick Start
-
-1. **[📖 README](../README.md)** - Project overview and quick setup
-2. **[🎮 Game Flow](../GAME_FLOW.md)** - Complete gameplay mechanics
-3. **[🔧 Setup Guide](../SETUP.md)** - Installation and deployment
+**Carmen Sandiego On-Chain** is the first blockchain game where the entire game brain — including AI content generation — runs decentralized inside Chainlink CRE. This documentation covers all aspects of the project: CRE workflows, smart contracts, Chainlink integrations, and deployment.
 
 ---
 
-## 🔗 Chainlink Technical Documentation
+## Quick Start
 
-### 🎯 Core Problem-Solution Analysis
-**[📋 Problems & Solutions](PROBLEMS_AND_SOLUTIONS.md)**  
-*Essential reading* - Understand how each Chainlink service solves specific decentralized gaming challenges.
-
-### 🔬 Technical Deep Dive  
-**[🔗 Chainlink Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md)**  
-Comprehensive technical analysis of 5 Chainlink services with code examples and architecture diagrams.
-
-### 🛡️ Security & Architecture
-**[🔒 Security Audit](SECURITY_AUDIT.md)**  
-Security analysis of the decentralized architecture and threat mitigation.
-
-**[🏗️ System Diagrams](SYSTEM_DIAGRAMS.md)**  
-Visual architecture diagrams and flow charts.
+1. **[README](../README.md)** — Project overview, on-chain evidence, tech stack
+2. **[Game Flow](../GAME_FLOW.md)** — Complete gameplay mechanics (9 phases)
+3. **[Setup Guide](../SETUP.md)** — Installation and local development
 
 ---
 
-## 📋 Reference Documentation
+## CRE Workflows (Core)
 
-### 🎮 Game Mechanics
-- **[� Game Flow](../GAME_FLOW.md)** - Complete gameplay mechanics
+**[CRE Workflows README](../cre-workflows/README.md)**
 
-### 🌐 Deployment & Operations
-- **[🚀 Deployment Guide](DEPLOYMENT_GUIDE.md)** - Multi-chain deployment instructions
-- **[🧪 E2E Testing](../E2E_TEST_GUIDE.md)** - End-to-end testing procedures
-
----
-
-## 🔗 Chainlink Services Integration
-
-| Service | Purpose | Key Benefit | Documentation |
-|---------|---------|-------------|----------------|
-| **VRF v2.5** | Provably Fair Randomness | Trustless randomness | [Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md#-chainlink-vrf-v25-provably-fair-randomness) |
-| **CRE** | Decentralized Game Engine | Unlimited complexity | [Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md#-chainlink-cre-decentralized-game-engine) |
-| **Data Feeds** | Dynamic Economics | Stable value | [Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md#-chainlink-data-feeds-economic-stability) |
-| **CCIP** | Cross-Chain Unity | Multi-chain native | [Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md#-chainlink-ccip-true-cross-chain-gaming) |
-| **Automation** | Persistent World | 24/7 reliability | [Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md#-chainlink-automation-scheduled-game-events) |
+The heart of the project — 7 TypeScript workflows compiled to WASM and executed inside the Chainlink DON. Covers:
+- Architecture diagram and data flow
+- All 7 workflows with detailed descriptions
+- CRE capabilities used (EVMClient, HTTPClient, writeReport, CronCapability, LogTrigger)
+- Determinism for DON consensus
+- Simulation commands with real Sepolia TX hashes
+- CRE gotchas and lessons learned (~10 undocumented issues)
+- ~3,578 lines of CRE workflow code
 
 ---
 
-## 🎯 Key Innovations
+## Chainlink Technical Documentation
 
-### 🎲 **Trustless Randomness**
-Without Chainlink: Centralized RNG (manipulable)  
-With Chainlink: Cryptographically provable VRF randomness
+### Problem-Solution Analysis
+**[Problems & Solutions](PROBLEMS_AND_SOLUTIONS.md)**
 
-### 🧠 **Decentralized AI**  
-Without Chainlink: Centralized game servers (SPOF)  
-With Chainlink: CRE-powered AI-ready workflows
+How each Chainlink service solves specific decentralized gaming challenges — VRF for fair randomness, CRE for decentralized game logic, Data Feeds for dynamic economics, CCIP for cross-chain, Automation for persistent worlds.
 
-### ⛽ **Gasless Gaming**
-Without Chainlink: Gas + crypto required  
-With Chainlink: Zero gas, Web2-like UX
+### Technical Deep Dive
+**[Chainlink Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md)**
 
-### 🌐 **Cross-Chain Native**
-Without Chainlink: Risky bridges, fragmented experience  
-With Chainlink: Unified game world across all chains
+Comprehensive technical analysis of all Chainlink services with code examples, architecture diagrams, and integration patterns.
 
-### 📊 **Dynamic Economics**
-Without Chainlink: Fixed rewards (volatile value)  
-With Chainlink: Real-time price-adjusted rewards
+### Security Analysis
+**[Security Audit](SECURITY_AUDIT.md)**
 
-### ⏰ **Persistent Worlds**
-Without Chainlink: Centralized cron jobs  
-With Chainlink: Decentralized 24/7 automation
+Smart contract security analysis covering GameMaster, GameMasterProxy, MissionNFT, CityNode, PlayerRegistry, and ReceiverTemplate.
+
+### System Architecture
+**[System Diagrams](SYSTEM_DIAGRAMS.md)**
+
+Visual architecture diagrams and flow charts (Mermaid) showing the full system: frontend, CRE DON, smart contracts, cross-chain messaging.
 
 ---
 
-## 🏆 Why This Matters
+## Deployment & Operations
 
-### For the Industry
-- **Blueprint**: Demonstrates full potential of Chainlink services
-- **Innovation**: First game integrating 5 major Chainlink services
-- **Future-Proof**: Architecture ready for AI, advanced NFTs, and more
-
-### For Developers  
-- **Reference**: Complete implementation patterns for Chainlink integration
-- **Learning**: Step-by-step problem-solving approach
-- **Reusable**: Modular components for other projects
-
-### For Players
-- **Experience**: Web2 UX with Web3 benefits
-- **Fairness**: Provably random, tamper-proof gameplay
-- **Accessibility**: Zero gas, no crypto required
+- **[Setup Guide](../SETUP.md)** — Full local setup and configuration
+- **[Deployment Guide](DEPLOYMENT_GUIDE.md)** — Multi-chain deployment to testnets
+- **[E2E Test Guide](../E2E_TEST_GUIDE.md)** — End-to-end testing procedures
 
 ---
 
-## 📊 Project Metrics
+## Chainlink Services Used
 
-### 🎮 Gameplay
-- **Chains Supported**: 4 testnets (Arbitrum, Base, Polygon, XDC)
-- **Mission Duration**: 320 blocks (~17 minutes)
-- **Carmen Movement**: Every 3 minutes via Automation
-- **Clue Encryption**: ECIES per-player encryption
-
-### 🔗 Chainlink Integration
-- **VRF Requests**: < 30 seconds fulfillment
-- **CRE Workflows**: < 45 seconds execution
-- **CCIP Messages**: < 2 minutes cross-chain
-- **Functions Relays**: < 15 seconds gasless
-- **Data Feeds**: Real-time price updates
-- **Automation**: 99.9% uptime
-
-### 📈 Economic Model
-- **Player Cost**: $0 (gasless)
-- **Reward Stability**: USD-pegged via Data Feeds
-- **Cross-Chain Value**: Automatic conversion via CCIP
-- **Sustainability**: Sponsor-based gas model
+| Service | Purpose | Documentation |
+|---------|---------|---------------|
+| **CRE** | Decentralized game engine (7 WASM workflows) | [CRE Workflows](../cre-workflows/README.md) |
+| **VRF v2.5** | Provably fair randomness for Carmen's location | [Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md) |
+| **Data Feeds** | Live ETH/USD pricing inside CRE WASM | [Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md) |
+| **CCIP** | Cross-chain Carmen movement notifications | [Technical Deep Dive](CHAINLINK_TECHNICAL_DEEP_DIVE.md) |
+| **Automation** | CronCapability for autonomous Carmen relocation | [CRE Workflows](../cre-workflows/README.md) |
 
 ---
 
-## 🛣️ Development Roadmap
+## Key Innovations
 
-### ✅ Completed (v1.0)
-- [x] All 5 Chainlink services integrated
-- [x] Cross-chain gameplay
-- [x] Gasless player experience  
-- [x] Dynamic reward economics
-- [x] Encrypted clue system
-- [x] Automated world persistence
-
-### 🚧 In Progress (v1.1)
-- [ ] GPT-4 integration for dynamic clues
-- [ ] Advanced NFT trophy system
-- [ ] Tournament mode
-- [ ] Mobile optimization
-
-### 🔮 Future (v2.0)
-- [ ] CCIP NFT transfers
-- [ ] Dynamic NFT metadata
-- [ ] Multiplayer missions
-- [ ] Guild system
+- **AI inside CRE WASM** — Groq LLaMA 3.3-70b with temperature=0 for DON consensus
+- **ECIES encryption inside CRE** — End-to-end clue privacy using secp256k1
+- **Commit-reveal with VRF** — Contract never knows Carmen's location in plaintext
+- **Deterministic ECIES** — Ephemeral key derived from VRF salt (no randomness in WASM)
+- **Gasless onboarding** — Players never spend a single wei
+- **On-chain NFT trophies** — SVG + ERC-721 metadata as data URIs (no IPFS)
+- **Autonomous game world** — Carmen moves every 3 min via CronCapability, even if developer is offline
 
 ---
 
-## 🤝 Contributing
+## Project Metrics
 
-We welcome contributions! Key areas:
-
-1. **Chainlink Integration**: New service integrations
-2. **Game Mechanics**: New gameplay features
-3. **Cross-Chain**: Additional blockchain support
-4. **AI/ML**: Advanced content generation
-5. **Security**: Audit and improvements
-
-See [contributing guidelines](../CONTRIBUTING.md) for details.
-
----
-
-## 📞 Support & Community
-
-- **Discord**: [Join our community](https://discord.gg/carmen-sandiego)
-- **Twitter**: [@CarmenOnChain](https://twitter.com/CarmenOnChain)
-- **Issues**: [GitHub Issues](https://github.com/mtrn87/carmen-sandiego-onchain/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/mtrn87/carmen-sandiego-onchain/discussions)
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+| Metric | Value |
+|--------|-------|
+| CRE Workflows | 7 (all compile + simulate) |
+| CRE Code | ~3,578 lines of TypeScript |
+| Smart Contract Tests | 65 passing |
+| Frontend Tests | 59 passing |
+| Simulation Batch Runs | 10 consecutive, all green |
+| Networks | 4 testnets (Sepolia, Arbitrum Sepolia, Base Sepolia, XDC Apothem) |
+| E2E Demo Time | 4m 2s on live Sepolia |
 
 ---
 
 <p align="center">
-  <strong>"Without Chainlink, decentralized gaming is limited. With Chainlink, it's unlimited."</strong>
-</p>
-
-<p align="center">
-  <em>Built with ❤️ using the full power of Chainlink's decentralized oracle network</em>
+  <strong>Built for the Convergence | Chainlink Hackathon</strong>
 </p>
