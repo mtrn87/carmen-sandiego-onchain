@@ -8,8 +8,7 @@
  * Falls back to direct contract calls if relayer is unavailable.
  */
 
-import { ethers } from "ethers"
-import { getSigner, GAME_MASTER_ADDRESS } from "./contractService"
+import { getSigner } from "./contractService"
 
 // ============================================================
 //  Visual Logging for Video Demo
@@ -26,7 +25,6 @@ const _rl = (tag, color, ...args) => {
 }
 const rlOut  = (...a) => _rl("RELAY →  SERVER", "#e67e22", ...a)
 const rlIn   = (...a) => _rl("RELAY ←  SERVER", "#27ae60", ...a)
-const rlSign = (...a) => _rl("RELAY 🔑 SIGN  ", "#9b59b6", ...a)
 const rlWarn = (...a) => _rl("RELAY ⚠  WARN  ", "#e74c3c", ...a)
 
 // ============================================================
