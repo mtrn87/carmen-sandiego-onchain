@@ -364,6 +364,56 @@ carmen-sandiego-onchain/
 
 ---
 
+## Chainlink Usage — Source Code Links
+
+Every file in the project that integrates a Chainlink service:
+
+### Smart Contracts (Solidity)
+
+| File | Chainlink Service | What It Does |
+|------|-------------------|-------------|
+| [`GameMaster.sol`](contracts/src/GameMaster.sol) | **VRF v2.5**, **CCIP**, **Data Feeds** | `VRFConsumerBaseV2Plus` inheritance, `requestRandomWords()`, `fulfillRandomWords()`, CCIP Router `ccipSend()`, AggregatorV3 price reads |
+| [`GameMasterProxy.sol`](contracts/src/GameMasterProxy.sol) | **CRE (KeystoneForwarder)** | Receives threshold-signed CRE reports via `ReceiverTemplate`, routes 11 action types to GameMaster |
+| [`CityNode.sol`](contracts/src/CityNode.sol) | **CCIP** | `CCIPReceiver` inheritance, `_ccipReceive()` for cross-chain Carmen location updates |
+| [`CCIPReceiver.sol`](contracts/src/CCIPReceiver.sol) | **CCIP** | Base contract for receiving CCIP messages, Router validation |
+| [`interfaces/ICCIPRouter.sol`](contracts/src/interfaces/ICCIPRouter.sol) | **CCIP** | `IRouterClient` and `Client.Any2EVMMessage` / `EVM2AnyMessage` type definitions |
+| [`interfaces/IGameMaster.sol`](contracts/src/interfaces/IGameMaster.sol) | **VRF**, **CCIP** | Interface declaring VRF + CCIP function signatures |
+| [`mocks/VRFCoordinatorV2PlusMock.sol`](contracts/src/mocks/VRFCoordinatorV2PlusMock.sol) | **VRF v2.5** | Custom VRF Coordinator mock (OZ 5.x compatible) |
+| [`mocks/MockAggregatorV3.sol`](contracts/src/mocks/MockAggregatorV3.sol) | **Data Feeds** | Mock `AggregatorV3Interface` for local testing |
+| [`mocks/MockCCIPRouter.sol`](contracts/src/mocks/MockCCIPRouter.sol) | **CCIP** | Mock CCIP Router for local testing |
+
+### CRE Workflows (TypeScript → WASM)
+
+| File | Chainlink Capabilities | What It Does |
+|------|----------------------|-------------|
+| [`generate-briefing/main.ts`](cre-workflows/generate-briefing/main.ts) | **EVMClient**, **HTTPClient**, **writeReport**, **LogTrigger** | Reads Data Feed price, calls Groq LLaMA, ECIES-encrypts, delivers on-chain |
+| [`mission-start/main.ts`](cre-workflows/mission-start/main.ts) | **EVMClient**, **writeReport**, **LogTrigger** | Brute-forces commit-reveal hash, generates encrypted clues, delivers wallet fragments |
+| [`generate-finale/main.ts`](cre-workflows/generate-finale/main.ts) | **EVMClient**, **HTTPClient**, **writeReport**, **LogTrigger** | AI trophy + SVG generation, ERC-721 metadata, on-chain delivery |
+| [`carmen-moves/main.ts`](cre-workflows/carmen-moves/main.ts) | **EVMClient**, **writeReport**, **CronCapability** | Reads active missions, relocates Carmen, triggers CCIP broadcast |
+| [`player-registration/main.ts`](cre-workflows/player-registration/main.ts) | **EVMClient**, **writeReport**, **LogTrigger** | Validates and registers players gaslessly |
+| [`player-check/main.ts`](cre-workflows/player-check/main.ts) | **EVMClient**, **writeReport**, **LogTrigger** | Verifies player status and rank |
+| [`citynode-resolver/main.ts`](cre-workflows/citynode-resolver/main.ts) | **EVMClient**, **writeReport**, **LogTrigger** | Resolves cross-chain CityNode requests back to GameMaster |
+
+### Tests
+
+| File | Chainlink Service Tested |
+|------|-------------------------|
+| [`GameMaster.test.ts`](contracts/test/GameMaster.test.ts) | VRF v2.5, CCIP, Data Feeds |
+| [`GameMaster.e2e.test.ts`](contracts/test/GameMaster.e2e.test.ts) | VRF v2.5, CCIP, KeystoneForwarder |
+| [`GameMasterProxy.test.ts`](contracts/test/GameMasterProxy.test.ts) | CRE report delivery via KeystoneForwarder |
+| [`CityNode.test.ts`](contracts/test/CityNode.test.ts) | CCIP receive + cross-chain state |
+
+### Demo Scripts
+
+| File | Chainlink Service |
+|------|-------------------|
+| [`scripts/cre-responder.ts`](contracts/scripts/cre-responder.ts) | CRE oracle simulation (VRF, CCIP, KeystoneForwarder) |
+| [`scripts/demo-testnet.ts`](contracts/scripts/demo-testnet.ts) | End-to-end game flow (VRF, CRE) |
+| [`scripts/deploy-all.ts`](contracts/scripts/deploy-all.ts) | VRF subscription, CCIP Router setup, KeystoneForwarder config |
+| [`scripts/deploy-citynode.ts`](contracts/scripts/deploy-citynode.ts) | CCIP Router configuration per chain |
+
+---
+
 ## Documentation
 
 | Document | Description |
