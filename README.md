@@ -23,12 +23,12 @@
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=yIjX9qju8zo">
-    <img src="https://img.youtube.com/vi/yIjX9qju8zo/maxresdefault.jpg" alt="Project Explanation" width="600"/>
+  <a href="https://youtu.be/r7PBb7fs9vU">
+    <img src="https://img.youtube.com/vi/r7PBb7fs9vU/maxresdefault.jpg" alt="Project Explanation" width="600"/>
   </a>
 </p>
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=yIjX9qju8zo"><strong>▶ Watch the Project Explanation</strong></a>
+  <a href="https://youtu.be/r7PBb7fs9vU"><strong>▶ Watch the Project Explanation</strong></a>
 </p>
 
 ---
@@ -186,7 +186,7 @@ Each CRE workflow was compiled to WASM and simulated against these **real Sepoli
 | 5 | **player-check** | `0x6aecf6...a4038` | `PlayerCheckRequested` | PlayerRegistry | [View TX](https://sepolia.etherscan.io/tx/0x6aecf68f4ffdbe2b3f0281ad3e8a30d52eec9f414f614c297f80be066a4a4038) |
 | 6 | **carmen-moves** | Cron (no TX input) | `CronCapability` | GameMaster | N/A — reads `getActiveMissionIds()` |
 
-<details>
+<details open>
 <summary><strong>TX #1 — startMission()</strong> — VRF request + CRE AI briefing</summary>
 
 - **From:** `0xb19eE81581AE385F56D702d412D92d70fb65b9F7`
