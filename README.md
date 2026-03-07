@@ -23,12 +23,12 @@
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=yIjX9qju8zo" target="_blank" rel="noopener noreferrer">
-    <img src="https://img.youtube.com/vi/yIjX9qju8zo/maxresdefault.jpg" alt="Project Explanation" width="600"/>
+  <a href="https://youtu.be/r7PBb7fs9vU">
+    <img src="https://img.youtube.com/vi/r7PBb7fs9vU/maxresdefault.jpg" alt="Project Explanation" width="600"/>
   </a>
 </p>
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=yIjX9qju8zo" target="_blank" rel="noopener noreferrer"><strong>▶ Watch the Project Explanation</strong></a>
+  <a href="https://youtu.be/r7PBb7fs9vU"><strong>▶ Watch the Project Explanation</strong></a>
 </p>
 
 ---
