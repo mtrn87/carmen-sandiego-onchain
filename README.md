@@ -7,7 +7,7 @@
 <h3 align="center">A Fully Decentralized Mystery Game — CRE + AI on Chainlink</h3>
 
 <p align="center">
-  <a href="https://chain.link/hackathon"><img src="https://img.shields.io/badge/Chainlink-Convergence%20Hackathon-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="Chainlink Convergence"/></a>
+  <a href="https://chain.link/hackathon" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Chainlink-Convergence%20Hackathon-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="Chainlink Convergence"/></a>
   <a href="#cre--ai--the-decentralized-game-engine"><img src="https://img.shields.io/badge/CRE%20%2B%20AI-7%20WASM%20Workflows-375BD2?style=for-the-badge&logo=chainlink&logoColor=white" alt="CRE + AI"/></a>
   <a href="#deployed-contracts--on-chain-evidence"><img src="https://img.shields.io/badge/Multi--Chain-4%20Testnets-FF6B6B?style=for-the-badge" alt="Multi-Chain"/></a>
 </p>
@@ -23,12 +23,12 @@
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=yIjX9qju8zo">
+  <a href="https://www.youtube.com/watch?v=yIjX9qju8zo" target="_blank" rel="noopener noreferrer">
     <img src="https://img.youtube.com/vi/yIjX9qju8zo/maxresdefault.jpg" alt="Project Explanation" width="600"/>
   </a>
 </p>
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=yIjX9qju8zo"><strong>▶ Watch the Project Explanation</strong></a>
+  <a href="https://www.youtube.com/watch?v=yIjX9qju8zo" target="_blank" rel="noopener noreferrer"><strong>▶ Watch the Project Explanation</strong></a>
 </p>
 
 ---
@@ -143,10 +143,10 @@ graph LR
 
 | Contract | Address | Etherscan | TX Count |
 |----------|---------|-----------|----------|
-| **GameMaster** | `0x826B5aCBE085C30C9F34A287D1fE543e2EAC56ce` | [View](https://sepolia.etherscan.io/address/0x826B5aCBE085C30C9F34A287D1fE543e2EAC56ce) | 409+ |
-| **GameMasterProxy** | `0xcbFD04229AB18f65F70242e676c292aE35188a4A` | [View](https://sepolia.etherscan.io/address/0xcbFD04229AB18f65F70242e676c292aE35188a4A) | — |
-| **PlayerRegistry** | `0x9c0C0C6126e6E53a4fbd186674156420a356B69A` | [View](https://sepolia.etherscan.io/address/0x9c0C0C6126e6E53a4fbd186674156420a356B69A) | — |
-| **MissionNFT** (ERC-721) | `0x61F7fb92862e10d5290C16fC07Ea90fF260aee20` | [View](https://sepolia.etherscan.io/address/0x61F7fb92862e10d5290C16fC07Ea90fF260aee20) | — |
+| **GameMaster** | `0x826B5aCBE085C30C9F34A287D1fE543e2EAC56ce` | <a href="https://sepolia.etherscan.io/address/0x826B5aCBE085C30C9F34A287D1fE543e2EAC56ce" target="_blank" rel="noopener noreferrer">View</a> | 409+ |
+| **GameMasterProxy** | `0xcbFD04229AB18f65F70242e676c292aE35188a4A` | <a href="https://sepolia.etherscan.io/address/0xcbFD04229AB18f65F70242e676c292aE35188a4A" target="_blank" rel="noopener noreferrer">View</a> | — |
+| **PlayerRegistry** | `0x9c0C0C6126e6E53a4fbd186674156420a356B69A` | <a href="https://sepolia.etherscan.io/address/0x9c0C0C6126e6E53a4fbd186674156420a356B69A" target="_blank" rel="noopener noreferrer">View</a> | — |
+| **MissionNFT** (ERC-721) | `0x61F7fb92862e10d5290C16fC07Ea90fF260aee20` | <a href="https://sepolia.etherscan.io/address/0x61F7fb92862e10d5290C16fC07Ea90fF260aee20" target="_blank" rel="noopener noreferrer">View</a> | — |
 
 ### Cross-Chain CityNodes
 
@@ -159,9 +159,9 @@ graph LR
 
 | Component | Address | Etherscan |
 |-----------|---------|-----------|
-| VRF Coordinator v2.5 | `0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B` | [View](https://sepolia.etherscan.io/address/0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B) |
-| KeystoneForwarder | `0x15fC6ae953E024d975e77382eEeC56A9101f9F88` | [View](https://sepolia.etherscan.io/address/0x15fC6ae953E024d975e77382eEeC56A9101f9F88) |
-| ETH/USD Data Feed | `0x694AA1769357215DE4FAC081bf1f309aDC325306` | [View](https://sepolia.etherscan.io/address/0x694AA1769357215DE4FAC081bf1f309aDC325306) |
+| VRF Coordinator v2.5 | `0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B` | <a href="https://sepolia.etherscan.io/address/0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B" target="_blank" rel="noopener noreferrer">View</a> |
+| KeystoneForwarder | `0x15fC6ae953E024d975e77382eEeC56A9101f9F88` | <a href="https://sepolia.etherscan.io/address/0x15fC6ae953E024d975e77382eEeC56A9101f9F88" target="_blank" rel="noopener noreferrer">View</a> |
+| ETH/USD Data Feed | `0x694AA1769357215DE4FAC081bf1f309aDC325306` | <a href="https://sepolia.etherscan.io/address/0x694AA1769357215DE4FAC081bf1f309aDC325306" target="_blank" rel="noopener noreferrer">View</a> |
 
 | Parameter | Value |
 |-----------|-------|
@@ -173,20 +173,20 @@ graph LR
 
 ## On-Chain Transaction Proofs
 
-> All transactions verified on [Sepolia Etherscan](https://sepolia.etherscan.io) — Status: **Success** for all 5.
+> All transactions verified on <a href="https://sepolia.etherscan.io" target="_blank" rel="noopener noreferrer">Sepolia Etherscan</a> — Status: **Success** for all 5.
 
 Each CRE workflow was compiled to WASM and simulated against these **real Sepolia transactions** using the CRE CLI:
 
 | # | Workflow | TX Hash | Event | Contract | Etherscan |
 |---|----------|---------|-------|----------|-----------|
-| 1 | **generate-briefing** | `0x3fba49...019f0c` | `MissionStarted` | GameMaster | [View TX](https://sepolia.etherscan.io/tx/0x3fba49f92846035e3c65e703af12b9755c168287b9ada2f4e9cb749bb0019f0c) |
-| 2 | **mission-start** | `0xafe53d...3f3f13` | `InvestigationSubmitted` | GameMaster | [View TX](https://sepolia.etherscan.io/tx/0xafe53d52de5ced22ae861f84e37b5fb13323b20cc6973f45f6be3628c23f3f13) |
-| 3 | **generate-finale** | `0xb88e67...512494` | `CarmenCaptured` + NFT Mint | GameMaster + MissionNFT | [View TX](https://sepolia.etherscan.io/tx/0xb88e671b9b63cd67fd06c1ebb61cbb63e30e919c61f882f26cd74eb941512494) |
-| 4 | **player-registration** | `0x19f9aa...99ee4` | `RegistrationRequested` | PlayerRegistry | [View TX](https://sepolia.etherscan.io/tx/0x19f9aa5b53dd277ccf5e064bf18e155125890dd71137117f9edacf3ca9899ee4) |
-| 5 | **player-check** | `0x6aecf6...a4038` | `PlayerCheckRequested` | PlayerRegistry | [View TX](https://sepolia.etherscan.io/tx/0x6aecf68f4ffdbe2b3f0281ad3e8a30d52eec9f414f614c297f80be066a4a4038) |
+| 1 | **generate-briefing** | `0x3fba49...019f0c` | `MissionStarted` | GameMaster | <a href="https://sepolia.etherscan.io/tx/0x3fba49f92846035e3c65e703af12b9755c168287b9ada2f4e9cb749bb0019f0c" target="_blank" rel="noopener noreferrer">View TX</a> |
+| 2 | **mission-start** | `0xafe53d...3f3f13` | `InvestigationSubmitted` | GameMaster | <a href="https://sepolia.etherscan.io/tx/0xafe53d52de5ced22ae861f84e37b5fb13323b20cc6973f45f6be3628c23f3f13" target="_blank" rel="noopener noreferrer">View TX</a> |
+| 3 | **generate-finale** | `0xb88e67...512494` | `CarmenCaptured` + NFT Mint | GameMaster + MissionNFT | <a href="https://sepolia.etherscan.io/tx/0xb88e671b9b63cd67fd06c1ebb61cbb63e30e919c61f882f26cd74eb941512494" target="_blank" rel="noopener noreferrer">View TX</a> |
+| 4 | **player-registration** | `0x19f9aa...99ee4` | `RegistrationRequested` | PlayerRegistry | <a href="https://sepolia.etherscan.io/tx/0x19f9aa5b53dd277ccf5e064bf18e155125890dd71137117f9edacf3ca9899ee4" target="_blank" rel="noopener noreferrer">View TX</a> |
+| 5 | **player-check** | `0x6aecf6...a4038` | `PlayerCheckRequested` | PlayerRegistry | <a href="https://sepolia.etherscan.io/tx/0x6aecf68f4ffdbe2b3f0281ad3e8a30d52eec9f414f614c297f80be066a4a4038" target="_blank" rel="noopener noreferrer">View TX</a> |
 | 6 | **carmen-moves** | Cron (no TX input) | `CronCapability` | GameMaster | N/A — reads `getActiveMissionIds()` |
 
-<details>
+<details open>
 <summary><strong>TX #1 — startMission()</strong> — VRF request + CRE AI briefing</summary>
 
 - **From:** `0xb19eE81581AE385F56D702d412D92d70fb65b9F7`
